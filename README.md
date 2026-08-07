@@ -425,12 +425,45 @@ location). Not started.
 
 ```
 radial1d/
-  radial1d.py   grid, r(x), coefficients (coeffs), Stage-A freq-domain residual
-  evolve.py     PML time-domain evolver (run) + prony/logfit + CLI (main)
-  scan_pml.py   PML tuning sweep (gmax, eps_match, xmin, N) vs Leaver at a=0.5
-  README.md     this file
-  *.log         run outputs (pml_a050.log, scan_pml.log, ...)
+  radial1d.py       grid, r(x), coefficients (coeffs), Stage-A freq-domain residual
+  evolve.py         PML time-domain evolver (run) + logfit/prony/freqfilter/inst_gamma + CLI
+  README.md         this file
+  pml_tuning/        Stage B/C: PML validation & tuning, extraction-method development
+    scan_pml.py            PML width/eps_match/gmax sweep vs Leaver (a=0.9,alpha=0.5)
+    fig3_pml_validation.py  Dolan Fig.3 replication, OUR benchmark params
+    fig3_dolan_match.py     Dolan Fig.3 replication, HIS exact params (a=0.99 massless)
+    floor_check.py          extraction-window floor/beating diagnostic
+    prony_test.py           prony() anchor-selection fix test
+    freqfilter_validate.py  freqfilter() validation against known Leaver answer
+    *.log, *.png, pml_a050_field.npz   outputs (gitignored except tracked .png)
+  stage_d/           Stage D: superradiant growth-peak deliverable (a=0.99,alpha=0.42)
+    stage_d_growth.py       attempt 1 (FAILED -- PML too narrow, kept for the record)
+    stage_d_floortest.py    cheap decisive PML-width test before the full run
+    stage_d_full.py         DEFINITIVE run (T=1e5, dx=M/6, 2.82lambda PML) + freqfilter
+    stage_d_full.sbatch     cluster submission (lr4, ~1hr)
+    *.log, *.npz, *.out/.err
+  stage_e/           Stage E: Gamma(alpha) sweep vs Leaver + 3D DMD overlay
+    stage_e_sweep.py         fixed-(T,window) sweep (only alpha=0.5 valid -- see log)
+    stage_e_adaptive.py      per-alpha adaptive T/PML/window (the one that works)
+    stage_e_adaptive.sbatch  SLURM ARRAY submission (lr4, one alpha per task)
+    stage_e_sweep.sbatch     single-job submission for the (superseded) fixed sweep
+    stage_e_gather.py        collects the array's .npz outputs -> table + plot
+    *.png, *.npz, *.out/.err
+  nonlinear/         Tier 1.5: RWA quartic self-interaction (Sec. 10)
+    selfint_test.py          Hermiticity + detuning-scaling sanity tests (Sec 10.4)
+    detuning_sweep.py        calibrate k_detune, predict A_sat (Sec 10.6)
+    *.png                    detuning_sweep[_grow].png, selfint_test.png
+  viz/               space-time visualization (not part of the Gamma pipeline)
+    spacetime.py             renders a psi(x,t) snapshot sequence -> movie
+    plots/                   rendered frames/movies (gitignored)
 ```
+
+All scripts under the subfolders add the parent `radial1d/` to `sys.path` so
+`import evolve as ev` / `from radial1d import ...` work regardless of cwd --
+but by convention **run them from inside their own subfolder** (matching
+where their `.sbatch` scripts `cd` to) so relative output files
+(`*.log`, `*.npz`, `*.png`) land next to the script that made them, not
+scattered back into the top-level `radial1d/`.
 
 Env + run:
 ```
@@ -438,9 +471,14 @@ GWENV=/global/scratch/projects/pc_heptheory/clwelch/software/envs/gwenv/bin/pyth
 cd Examples/AxionSuperradiance/radial1d
 $GWENV radial1d.py                              # Stage-A residual check
 $GWENV evolve.py --alpha 0.50 --a 0.90 --T 3000 --N 4000 --gmax 1.0
-# long/slow runs: launch with nohup ... & and log to THIS folder (persistent);
-# NOT the session /tmp scratchpad (ephemeral). Consider tmux for the claude
-# session itself so monitors survive SSH drops.
+# long/slow runs: prefer sbatch (Sec. 7 examples: stage_d/stage_d_full.sbatch,
+# stage_e/stage_e_adaptive.sbatch) over a local nohup -- the login-node/session
+# approach worked but cluster maintenance windows / node faults happened during
+# development (see the Stage D/E chronological log) and sbatch survives both
+# session drops and (with a resubmit) node failures. If launching locally
+# anyway: nohup ... & and log to the relevant subfolder (persistent), NOT the
+# session /tmp scratchpad (ephemeral); double-check your shell's cwd first --
+# a stale cwd after a session gap silently no-ops the launch (happened once).
 ```
 Reference values from `../linear_rates/leaver.py` (M=1, mu=alpha, l=m=1, n=2):
 `leaver.solve(alpha, a)` returns complex omega. Key targets:
@@ -458,9 +496,15 @@ Reference values from `../linear_rates/leaver.py` (M=1, mu=alpha, l=m=1, n=2):
 | B | evolve, extract **E** (damped a=0.5) vs Leaver | DONE: **E to 0.03%** |
 | C | extract **Gamma** (damped a=0.5) vs Leaver | NEARLY DONE: sponge 0.64x -> PML 0.88x -> eps_match/xmin tuning **0.95x** (logfit, beating-biased) -> fixed `prony` gives **0.98-1.00x** across 3 fit windows. Small (~2%) `E`-from-prony offset unexplained; not blocking |
 | D | superradiant **growth peak** (a=0.99, alpha~0.42, Gamma=+1.5e-7) | **DONE: freqfilter +1.603e-7 = 1.056x Leaver, RIGHT SIGN (growth), E to 5 digits; stable over kbins=3/5/8** (cluster job 24715584, T=1e5) |
-| E | Gamma(alpha) sweep vs Leaver (+ vs 3D DMD) + write-up | IN PROGRESS: adaptive per-alpha sweep on cluster; 3/5 pts in (0.50/0.55 freqfilter 0.99x, 0.60 edge-case 0.25x); 2/5 (0.40/0.45) failed on cluster (node fault, zero output), resubmitted job 24784194 |
+| E | Gamma(alpha) sweep vs Leaver (+ vs 3D DMD) + write-up | **DONE: all 5/5 pts (a=0.9, alpha=0.40-0.60). freqfilter = 0.98-0.99x Leaver at alpha=0.40/0.45/0.50/0.55 (4 decades of \|Gamma\|); 0.60 is a characterized filter-clipping edge case (0.25x). 3D DMD point (0.92x) lands right on our alpha=0.5 point.** `stage_e_adaptive.png` |
 
 ### Chronological log
+
+*(Script names below are bare, e.g. `scan_pml.py` -- see Sec. 6 for which
+subfolder each one now lives in; the directory was reorganized into
+`pml_tuning/`, `stage_d/`, `stage_e/`, `nonlinear/`, `viz/` after this log was
+written, and it wasn't worth re-touching every historical mention below.)*
+
 - **Stage A/B (pass).** Equation transcribed from Dolan Eq. 25, single-mode.
   Freq-domain residual converges to ~1e-4 in the bulk (r>16); large near-horizon
   relative residual is FD/scale (|psi|, Delta -> 0), not a transcription error.
@@ -620,29 +664,185 @@ Reference values from `../linear_rates/leaver.py` (M=1, mu=alpha, l=m=1, n=2):
   lr4 -- queued normally this time (no maint block). If lr4 ever shows the
   same symptom, check `sinfo -p <partition>` for a `maint`/`down*` state
   before assuming it's a code bug.
+- **Stage E COMPLETE (`stage_e_adaptive.png`, all 5/5 points, job `24784511`
+  tasks 0/1 + earlier `24716620` tasks 2/3/4).** Full table (freqfilter is
+  the trusted column; logfit/prony included for contrast):
+
+  | alpha | Leaver Gamma | freqfilter | logfit | prony |
+  |---|---|---|---|---|
+  | 0.40 | -4.436e-06 | **0.99x** | 0.94x | 1.09x |
+  | 0.45 | -5.794e-05 | **0.98x** | 0.99x | 0.98x |
+  | 0.50 | -5.205e-04 | **0.99x** | 0.87x | 1.06x |
+  | 0.55 | -2.684e-03 | **0.99x** | 0.18x | 0.12x |
+  | 0.60 | -8.061e-03 | 0.25x | 0.12x | 0.12x |
+
+  **freqfilter tracks Leaver to 1-2% across 4 decades of `|Gamma|`**
+  (4.4e-6 -> 2.7e-3), visibly hugging the truth curve in the plot while
+  logfit/prony peel off past alpha=0.5 (field decays into noise before their
+  fixed-shape window -- the exact failure mode the per-alpha adaptive T/PML
+  was built to dodge, and it worked for 4/5 points). alpha=0.60 remains the
+  one characterized miss (filter-clipping edge, previous entry) -- not
+  re-tuned since it's outside our benchmark's target range. The 3D DMD point
+  (a=0.9,alpha=0.5, 0.92x) lands right on our alpha=0.5 point in the plot --
+  the visual argument for the whole project: **the 1+1D tool matches 3D where
+  3D can reach (alpha=0.5) and keeps tracking Leaver into the regime
+  (alpha=0.40, `Gamma~1e-6`, approaching the 3D dispersion floor's territory)
+  where 3D cannot.**
 
 ## 8. Immediate next actions (for whoever picks this up)
-1. (Optional polish) Understand `prony`'s ~2% `E` offset, and consider
-   whether `p`/`L`/SVD threshold need further tuning -- not blocking, since
-   Gamma is already the tight match and Gamma is the deliverable.
-2. **Stage D: growth peak (a=0.99, alpha=0.42, Gamma=+1.5e-7) -- IN PROGRESS,
-   attempt 1 failed, now properly parameterized.** Use Dolan's Fig.13 params
-   as the target spec: `dx=M/6`, `t_max` up toward `1e5 M`, PML width >=2.5λ
-   (=251 M here, so `xmin ~ -750`). Extract with anchor-`prony` (or implement
-   Dolan's frequency-filter, Sec. 5a-bis, if prony stumbles). Gate on the
-   floor test (chronological log above) before committing the full `1e5 M`
-   run. Confirm the **sign flips to +** (growth) and matches Leaver -- this is
-   the actual deliverable. Feasibility caveat: `1e5 M` at `dx=M/6` over a
-   ~1000 M domain is ~1.5e6 pure-numpy RK4 steps (~tens of min, may need a
-   detached `nohup`/`tmux` run or a C/numba port -- README Sec. 4).
-3. Stage E: sweep alpha at a=0.9 (and a=0.99) -> Gamma(alpha) vs Leaver, and
-   overlay the 3D DMD point (a=0.9, alpha=0.5 damped, Gamma=0.92x Leaver --
-   see memory `kerr_schild_reslice`) to show the 1+1D tool reaches
-   where 3D cannot. Write up.
+
+**Stages A-E are now all DONE** (Sec. 7 ladder, Sec. 7 chronological log). The
+Tier-1 linear-rate deliverable is complete: Stage D got the superradiant
+growth peak (freqfilter +1.603e-7 = 1.056x Leaver, right sign) and Stage E
+confirmed freqfilter tracks Leaver to 1-2% across 4 decades of `|Gamma|`
+(alpha=0.40-0.55 at a=0.9), with the 3D DMD point landing on our alpha=0.5
+point. Remaining loose ends, none blocking:
+
+1. (Optional polish) Understand `prony`'s ~2% `E` offset -- not blocking,
+   `freqfilter` is now the trusted extractor and its `E` is accurate.
+2. (Optional) alpha=0.60's freqfilter miss (0.25x, filter-clipping edge,
+   Sec. 7 chronological log) could be fixed with a wider `kbins` or a
+   shorter/earlier fit window if that alpha range is ever needed.
+3. (Optional) Extend the Stage E sweep to a=0.99 (near-extremal), and/or push
+   Stage D to a full alpha-sweep of the superradiant growth branch (Dolan's
+   full Fig. 13, n=0 AND n=1, alpha=0.30-0.44) for a complete write-up figure.
+4. Write up Stages A-E as the Tier-1 linear-rate calibration deliverable
+   (three-tier strategy, `CLAUDE.md`) -- the physics content is now all here,
+   this is a presentation task.
+5. See Sec. 10 below for the Tier-1.5 nonlinear-self-interaction extension
+   (in progress, separate from the linear-rate work above).
 
 ## 9. Gotchas
 - Conventions: M=1, mu=alpha; time dependence e^{-i omega t} so
   omega = i * (log-eigenvalue)/dt; growth is Im(omega) > 0.
 - The single-mode c^2 truncation is good to <1% for a QBS but is an
   approximation; Sec. 2 says how to add l=3,5 if a benchmark ever needs it.
+- The RWA quartic (Sec. 10) captures the frequency shift but NOT the dominant
+  multi-mode saturation; it is Hermitian so it cannot change Gamma except via
+  detuning. Bill it accordingly.
 - Run outputs must go to this folder (persistent), not the session /tmp.
+
+## 10. Nonlinear self-interaction (quartic) — Tier 1.5
+
+### 10.1 The physics, and what this single-mode model can and cannot see
+
+An axion has self-interactions: `V = (1/2) mu^2 Phi^2 + (lambda/4!) Phi^4`
+(the leading term of the cosine `mu^2 f^2[1-cos(Phi/f)]`, whose quartic
+coefficient is NEGATIVE: `lambda = -mu^2/f^2 < 0` = **attractive**). The EOM
+gains `-(lambda/6) Phi^3` on the RHS.
+
+A genuine `Phi^3` does NOT respect the single-mode ansatz: cubing generates a
+`3 omega` / `m=3` harmonic and couples `l -> l, l+-2` at `m=1`. We keep the
+**rotating-wave (resonant) piece**: for `Phi = Re(psi e^{-i omega t})` that is
+`(3/4)|psi|^2 psi` (the Gross-Pitaevskii / nonlinear-Schrodinger cubic; the
+standard axion-superradiance treatment, Baryakhtar-Galanis-Lasenby-Simon
+arXiv:2011.11646; Yoshino-Kodama bosenova arXiv:1203.5070).
+
+**Three saturation channels, and which THIS model captures:**
+
+| mechanism | physics | single-mode 1+1D? |
+|---|---|---|
+| detuning | `omega(A) -> m*OmH` shuts off superradiance | **yes** (weak; only lever here) |
+| level transitions | 211+211 -> bound + (infinity/horizon); Baryakhtar's dominant quartic channel | **no** — needs other (l,n) modes |
+| bosenova collapse | attractive lambda, strong coupling, radial self-focusing | **partially** (mostly radial, so partly in reach) |
+
+Key honest caveat: the resonant cubic is **Hermitian**, so it CANNOT change
+Gamma directly (it is norm-conserving). It only shifts `omega`, and saturates
+growth ONLY via detuning. The physically dominant saturation (level mixing) is
+intrinsically multi-mode and is the motivation for the l-tower step below. **Do
+not over-read a Gamma(t) rollover from this model as the true saturation
+amplitude** — it is a detuning rollover.
+
+### 10.2 How it enters the equations (one line)
+
+The mass sits in `Vc` as `Delta*mu^2*r^2`. Since `Phi^3 = psi^3/r^3` carries
+exactly the `1/r^2` that cancels the mass `r^2`, the cubic is an
+amplitude-dependent shift of the potential:
+
+```
+Vc -> Vc + Delta * lambda_quartic * |psi|^2        (interior only)
+```
+
+so `-Vc*psi` gains `-Delta*lambda_quartic*|psi|^2*psi`. The signed knob
+`lambda_quartic` absorbs the `1/8` (=`(1/6)(3/4)`) and the angular overlap
+`<|Y11|^2 Y11 | Y11>`. `lambda_quartic < 0` = attractive (axion), `> 0` =
+repulsive. Applied on the interior mask only (the PML/near-horizon reduced form
+assumes the linear equation, and the QBS amplitude is ~0 there anyway).
+Implemented in `evolve.run(..., lambda_quartic=..., init_amplitude=...)`;
+CLI `--lambda` / `--amp`.
+
+### 10.3 Growth rate from the amplitude (nonlinear extractor)
+
+Once nonlinear, a single complex `omega` no longer exists, so
+logfit/prony/freqfilter (all `~ e^{-i omega t}`) break. `inst_gamma(t,
+cloud_norm)` reads the local log-slope `Gamma(t) = d ln||psi|| / dt` of the
+interior L2 norm `cloud_norm` (a phase-free envelope, avoiding the single-point
+beating). In the linear regime it is flat at the true Gamma; it tracks the
+rollover toward 0 at (detuning-driven) saturation.
+
+### 10.4 Sanity test (exact-answer, `selfint_test.py`)
+
+Two falsifiable predictions independent of any fit quality:
+1. **Hermiticity:** at fixed amplitude `Gamma(lambda) == Gamma(0)` (any shift =
+   a non-Hermitian discretization bug).
+2. **Detuning scaling:** `delta_E = E(lambda)-E(0)` is linear in `lambda` (sign
+   flips) and quadratic in amplitude (`delta_E ~ lambda*amp^2`).
+
+Run (from `nonlinear/`): `selfint_test.py [--plot selfint_test.png]` (damped
+a=0.9,alpha=0.5, short T; ~8 short evolutions). **STATUS: ALL PASS
+(2026-08-07, `selfint_test.log`).**
+Hermiticity: max|dGamma|=7e-6 (< 3% of |Gamma|), i.e. Gamma unchanged by the
+Hermitian cubic. Sign-flip: dE=+/-8.41e-6 for lambda=+/-0.02 (exactly opposite).
+Scaling: `dE(2amp)/dE(amp)=4.00` (quadratic), `dE(lambda)/dE(lambda/2)=2.00`
+(linear) -- both exact to the printed digits. The term does what the derivation
+in 10.2 says: a Hermitian, amplitude^2, linear-in-lambda frequency shift.
+
+### 10.5 Roadmap (Tier 1.5 -> Tier 2 bridge)
+
+```
+[A] 1+1D single-mode + RWA |psi|^2 psi        <-- THIS STEP (evolve lambda_quartic)
+     - validate Hermiticity + detuning scaling (selfint_test.py)          [DONE, all pass]
+     - calibrate detuning k & predict saturation amplitude (detuning_sweep.py) [DONE, Sec 10.6]
+     - attractive branch: push amplitude, look for radial self-focusing (bosenova onset)
+[B] coupled (l, m=1) tower: Phi = sum_l psi_l(t,r) Y_l1 / r
+     - resonant quartic couples l=1 -> 3,5 at SAME omega (not 3-omega-suppressed)
+     - THIS is where the dominant (multi-mode) saturation lives -- the real deliverable
+     - converge in l_max; answer "how many angular modes does saturation need?"
+[C] add tidal m-coupling (companion BH): Phi = sum_lm psi_lm(t,r) Y_lm / r
+     - breaks axisymmetry, m no longer conserved; tidal vs axion nonlinearity compete
+     - Tier-2 bridge; if the (l,m) spectrum blows up -> genuine 2+1/3+1 needed
+```
+Next concrete actions: (1) `selfint_test.py` -- DONE (Sec 10.4, all pass);
+(2) `detuning_sweep.py` -- DONE (Sec 10.6); (3) begin the (l, m=1) tower [B].
+
+### 10.6 Detuning calibration & saturation-amplitude prediction (`detuning_sweep.py`)
+
+Measures the detuning coefficient `k_detune` in `delta_E = k_detune*lambda*A^2`
+by sweeping `init_amplitude` at `lambda=+/-L` and differencing against `lambda=0`
+(the differencing cancels the absolute-E log-fit systematic, so `k` is trustworthy
+even on a cheap/narrow-PML run -- the self-check is whether `k` comes out
+amplitude-flat). A=`init_amplitude` (seed-Gaussian units; the QBS that forms is
+proportional to it, so A is a relative amplitude, not a physical field strength).
+
+**Results (2026-08-07, `detuning_sweep.log` / `detuning_sweep_grow.log`):**
+
+| config | E0 vs m*OmH | k_detune | R^2(A^2 law) | asym @ amp=4 |
+|---|---|---|---|---|
+| a=0.9, alpha=0.5 (damped) | E0>m*OmH, gap=-0.165 | +4.196e-4 | 1.00000 | 3.4e-3 |
+| a=0.99, alpha=0.42 (growing) | E0<m*OmH, gap=+0.025 | +1.482e-4 | 1.00000 | 6.6e-2 |
+
+- **`k_detune` is amplitude-flat to 5 digits over a decade of A^2 (0.25->16)** at
+  both configs -- the `delta_E = k*lambda*A^2` RWA law is exact in-range. `lambda>0`
+  (repulsive) raises E; `lambda<0` (attractive) lowers it (Hermitian sign-flip).
+- **Detuning-only saturation prediction (growing config):** only `lambda>0` detunes
+  E UP toward `m*OmH`, closing the gap at `A_sat^2 = gap/(k*lambda) = 8.4e3` at
+  `|lambda|=0.02`, i.e. `A_sat ~ 92*sqrt(0.02/|lambda|)` (scales `1/sqrt(|lambda|)`).
+  `lambda<0` (the axion sign) detunes AWAY -> detuning never saturates it.
+- **KEY CAVEAT / physics conclusion:** the beyond-RWA correction (the `asym`
+  column = even-in-lambda part) grows `~A^2` and is already **6.6% at amp=4**;
+  `A_sat` sits at amp~92 (~23x further out), where RWA is wildly invalid. So the
+  pure-detuning `A_sat` is a **formal upper bound the cloud never reaches** --
+  multi-mode / beyond-RWA physics saturates it first. This is the quantitative
+  argument that the real saturation is the (l,m=1) tower [B], not single-mode
+  detuning. (For the attractive axion it's even starker: detuning can't saturate
+  it at all; only collapse / level-mixing can.)

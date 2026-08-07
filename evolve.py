@@ -24,7 +24,18 @@ from radial1d import build_grid, coeffs, d_dx, d2_dx2, horizons
 
 def run(alpha=0.50, a=0.90, xmin=-70., xmax=220., N=4000, T=3000., cfl=0.4,
         x0=20., sigx=6., eps_match=0.02, gmax=1.0, probe_r=None, nrec=6000,
-        nsnap=0):
+        nsnap=0, lambda_quartic=0.0, init_amplitude=1.0):
+    """lambda_quartic: signed quartic self-coupling ('lambda' is a Python keyword,
+    hence the suffix). The RWA-resonant piece of (lambda/6)Phi^3 enters as an
+    amplitude-dependent shift of the potential,
+        Vc -> Vc + Delta*lambda_quartic*|psi|^2   (interior only),
+    i.e. the -Vc*psi RHS gains a Hermitian nonlinear-Schrodinger term
+    -Delta*lambda_quartic*|psi|^2*psi. Sign: <0 = attractive (axion/cosine sign),
+    >0 = repulsive. It absorbs the 1/8 and angular overlap <|Y11|^2 Y11|Y11>.
+    Because the term is Hermitian it CANNOT change Gamma directly (norm-conserving);
+    it shifts omega, and only saturates growth via detuning omega(A)->m*OmH.
+    init_amplitude: initial Gaussian amplitude (sets the nonlinear strength
+    lambda_quartic*|psi|^2)."""
     w_ref = complex(leaver.solve(alpha, a))
     rp,_ = horizons(a); OmH = a/(2*rp); m = 1
     x, r = build_grid(a, xmin, xmax, N); dx = x[1]-x[0]
@@ -46,10 +57,18 @@ def run(alpha=0.50, a=0.90, xmin=-70., xmax=220., N=4000, T=3000., cfl=0.4,
     ifl = int(np.argmin(np.abs(x - x_match))); rfl = r[ifl]
     dt = cfl*dx; nsteps = int(T/dt)
 
+    # interior mask (complement of PML and outer sponge) -- where the nonlinear
+    # self-interaction is applied. The PML/near-horizon reduced form assumes the
+    # linear equation, and the QBS amplitude there is ~0 anyway.
+    interior = ~pml
+    phys = interior & ~out    # physical region for the L2 cloud-norm diagnostic
     def rhs(psi, pi, chi):
         px = d_dx(psi,dx); pxx = d2_dx2(psi,dx); cx = d_dx(chi,dx)
         # interior (full, r-dependent) momentum RHS
         dpi_int = invD*(A2*pxx + A1*px + At*pi - Vc*psi)
+        # RWA quartic self-interaction: -Delta*lambda_quartic*|psi|^2*psi (Hermitian NLS term)
+        if lambda_quartic != 0.0:
+            dpi_int = dpi_int - invD*(interior*Delta*lambda_quartic)*np.abs(psi)**2*psi
         # PML momentum RHS (near-horizon reduced form + auxiliary chi + attenuation)
         dpi_pml = pxx + 2*imO*(px - pi) - cx - imO*chi - g*(pi + imO*psi)
         dpi = np.where(pml, dpi_pml, dpi_int) - gout*pi
@@ -57,10 +76,10 @@ def run(alpha=0.50, a=0.90, xmin=-70., xmax=220., N=4000, T=3000., cfl=0.4,
         dchi = np.where(pml, g*(px - chi + imO*psi) - imO*chi, 0.0)
         return dpsi, dpi, dchi
 
-    psi = np.exp(-((x-x0)**2)/(2*sigx**2)).astype(complex)
+    psi = (init_amplitude*np.exp(-((x-x0)**2)/(2*sigx**2))).astype(complex)
     pi  = np.zeros_like(psi); chi = np.zeros_like(psi)
     trec = np.linspace(0, T, nrec); rec_i=(trec/dt).astype(int); rp_=0
-    tsig=[]; psig=[]; phi_fl=[]; phidot_fl=[]; phix_fl=[]
+    tsig=[]; psig=[]; phi_fl=[]; phidot_fl=[]; phix_fl=[]; cloud_norm=[]
     tsnap=np.linspace(0, T, nsnap) if nsnap>0 else np.array([])
     snap_i=(tsnap/dt).astype(int); sp_=0
     field_t=[]; field_psi=[]
@@ -69,6 +88,9 @@ def run(alpha=0.50, a=0.90, xmin=-70., xmax=220., N=4000, T=3000., cfl=0.4,
             tsig.append(n*dt); psig.append(psi[ip])
             phi_fl.append(psi[ifl]); phidot_fl.append(pi[ifl])
             phix_fl.append(d_dx(psi,dx)[ifl])
+            # interior L2 norm (cloud amplitude): a phase-free growth measure that
+            # avoids the single-point beating logfit/prony wrestle with.
+            cloud_norm.append(np.sqrt(np.sum(np.abs(psi[phys])**2)*dx))
             rp_+=1
         if sp_<nsnap and n>=snap_i[sp_]:
             field_t.append(n*dt); field_psi.append(psi.astype(np.complex64).copy()); sp_+=1
@@ -87,6 +109,8 @@ def run(alpha=0.50, a=0.90, xmin=-70., xmax=220., N=4000, T=3000., cfl=0.4,
         if not np.all(np.isfinite(psi)): print(f"  NaN at t={n*dt:.1f}"); break
     out = dict(w_ref=w_ref, OmH=OmH, t=np.array(tsig), psi=np.array(psig),
                probe_r=r[ip], dx=dx, dt=dt, x_match=x_match,
+               lambda_quartic=lambda_quartic, init_amplitude=init_amplitude,
+               cloud_norm=np.array(cloud_norm),
                flux_r=rfl, phi_flux=np.array(phi_fl),
                phidot_flux=np.array(phidot_fl), phix_flux=np.array(phix_fl))
     if nsnap>0:
@@ -151,6 +175,30 @@ def logfit(t,psi,tmin_frac=0.4):
     G=np.polyfit(tt,np.log(np.abs(psi[m])),1)[0]
     E=-np.polyfit(tt,np.unwrap(np.angle(psi[m])),1)[0]; return E,G
 
+def inst_gamma(t, amplitude, smooth=21):
+    """Instantaneous growth rate Gamma(t) = d ln A(t) / dt from an amplitude
+    envelope amplitude(t) (e.g. the interior L2 norm 'cloud_norm'). The extractor
+    for the NONLINEAR regime, where a single complex omega no longer exists:
+    logfit/prony/freqfilter all assume psi ~ e^{-i omega t} and break once the
+    self-interaction detunes/saturates the mode. Gamma(t) instead reads the
+    local log-slope of the amplitude, so it tracks the rollover Gamma->0 at
+    saturation directly.
+
+    Method: smooth ln A with a centered moving average (odd `smooth` window),
+    then a 4th-order-ish centered finite difference. Returns (t_mid, Gamma(t)).
+    In the LINEAR regime Gamma(t) is flat at the true Gamma; a caveat for the
+    single-mode model: any rollover here is DETUNING-driven (omega(A)->m*OmH),
+    not the true multi-mode saturation (see README)."""
+    amplitude = np.asarray(amplitude, float)
+    log_amp = np.log(np.maximum(amplitude, 1e-300))
+    if smooth > 1:
+        kernel = np.ones(smooth)/smooth
+        log_amp = np.convolve(log_amp, kernel, mode="same")
+    gamma = np.gradient(log_amp, t)
+    # trim the convolution/gradient edges where the smoothing window runs off
+    edge = smooth
+    return t[edge:-edge], gamma[edge:-edge]
+
 def freqfilter(t, psi, E_peak, kbins=5.0, keep_frac=0.5):
     """Dolan's frequency-filter (his Sec. IV.A.2, eq. 49): isolate ONE mode by
     a super-Gaussian bandpass around its spectral peak, then log-regress the
@@ -186,10 +234,15 @@ def main():
     ap.add_argument("--xmin",type=float,default=-70.); ap.add_argument("--xmax",type=float,default=220.)
     ap.add_argument("--gmax",type=float,default=1.0); ap.add_argument("--save",type=str,default=None)
     ap.add_argument("--eps_match",type=float,default=0.02)
+    ap.add_argument("--lambda",type=float,default=0.0,dest="lambda_quartic",
+                    help="signed quartic self-coupling (<0 attractive/axion, >0 repulsive)")
+    ap.add_argument("--amp",type=float,default=1.0,dest="init_amplitude",
+                    help="initial Gaussian amplitude")
     ap.add_argument("--nsnap",type=int,default=0,
                     help="save this many full-field psi(x) snapshots (for a space-time heatmap)")
     q=ap.parse_args()
-    o=run(q.alpha,q.a,q.xmin,q.xmax,q.N,q.T,gmax=q.gmax,eps_match=q.eps_match,nsnap=q.nsnap)
+    o=run(q.alpha,q.a,q.xmin,q.xmax,q.N,q.T,gmax=q.gmax,eps_match=q.eps_match,
+          nsnap=q.nsnap,lambda_quartic=q.lambda_quartic,init_amplitude=q.init_amplitude)
     w=o["w_ref"]; E1,G1=logfit(o["t"],o["psi"])
     try: E2,G2=prony(o["t"],o["psi"],anchor=w)
     except Exception as e: E2,G2=(float("nan"),float("nan")); print("prony failed:",e)
@@ -199,6 +252,13 @@ def main():
     print(f"  logfit : E={E1:.6f}  Gamma={G1:+.4e}   (Gamma {G1/w.imag:+.3f}x)")
     print(f"  prony  : E={E2:.6f}  Gamma={G2:+.4e}   (Gamma {G2/w.imag:+.3f}x)")
     print(f"  flux   :            Gamma={G3:+.4e}   (Gamma {G3/w.imag:+.3f}x)  [at x_match, Dolan eq.34]")
+    if q.lambda_quartic != 0.0:
+        t_gamma, gamma_t = inst_gamma(o["t"], o["cloud_norm"])
+        # late-window mean of the amplitude-based instantaneous rate
+        late_window = t_gamma > 0.6*t_gamma[-1]
+        print(f"  ampGam : lambda={q.lambda_quartic:+.3g} amp={q.init_amplitude:g}  "
+              f"Gamma(t) late-mean={np.mean(gamma_t[late_window]):+.4e}  "
+              f"(endpoint {gamma_t[-1]:+.4e})  [d ln||psi||/dt]")
     if q.save is not None:
         save_kw = dict(t=o["t"], psi=o["psi"], w_ref=w)
         if q.nsnap>0:

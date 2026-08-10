@@ -44,7 +44,7 @@ import angular
 
 def run(alpha=0.50, a=0.90, l_max=3, xmin=-70., xmax=220., N=4000, T=3000., cfl=0.4,
         x0=20., sigx=6., eps_match=0.02, gmax=1.0, probe_r=None, nrec=6000,
-        lambda_quartic=0.0, init_amplitude=1.0, seed_channels=None):
+        lambda_quartic=0.0, init_amplitude=1.0, seed_channels=None, seed="gaussian"):
     """Evolve the coupled (l, m=1) tower up to l_max.
 
     l_max          : highest angular index; channels are [1,3,...,l_max] (odd sector).
@@ -107,14 +107,24 @@ def run(alpha=0.50, a=0.90, l_max=3, xmin=-70., xmax=220., N=4000, T=3000., cfl=
             dchi[i] = np.where(pml, g * (px - chi[i] + imO * psi[i]) - imO * chi[i], 0.0)
         return dpsi, dpi, dchi
 
-    # seed: l=1 Gaussian (plus any requested higher channels); others zero
-    seed = dict(seed_channels) if seed_channels else {}
-    seed.setdefault(ls[0], init_amplitude)
+    # seed: l=1 (Gaussian or clean eigenmode) plus any requested higher channels;
+    # higher channels are meant to GROW from the cubic, so default them to zero.
+    seed_amps = dict(seed_channels) if seed_channels else {}
+    seed_amps.setdefault(ls[0], init_amplitude)
     psi = np.zeros((nl, N), complex)
-    for i, l in enumerate(ls):
-        if l in seed:
-            psi[i] = seed[l] * np.exp(-((x - x0) ** 2) / (2 * sigx**2))
     pi = np.zeros_like(psi); chi = np.zeros_like(psi)
+    if seed == "eigenmode":
+        from radial1d import eigenmode_seed
+        # clean l=1 eigenmode (psi and pi=-i w psi) on channel 0; the l=1
+        # eigenfrequency w_ref matches the ls[0]=1 channel operator exactly.
+        psi[0], pi[0] = eigenmode_seed(x, r, alpha, a, w_ref, l=ls[0], m=m,
+                                       amplitude=seed_amps[ls[0]])
+        higher = [(i, l) for i, l in enumerate(ls) if i != 0 and l in seed_amps]
+    else:
+        higher = list(enumerate(ls))
+    for i, l in higher:
+        if l in seed_amps:
+            psi[i] = seed_amps[l] * np.exp(-((x - x0) ** 2) / (2 * sigx**2))
 
     trec = np.linspace(0, T, nrec); rec_i = (trec / dt).astype(int); rp_ = 0
     tsig = []; psig = []; cloud = []       # psig[k] = psi[:,ip] at record k ; cloud[k] = per-channel L2

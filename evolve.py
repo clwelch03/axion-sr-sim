@@ -24,7 +24,7 @@ from radial1d import build_grid, coeffs, d_dx, d2_dx2, horizons
 
 def run(alpha=0.50, a=0.90, xmin=-70., xmax=220., N=4000, T=3000., cfl=0.4,
         x0=20., sigx=6., eps_match=0.02, gmax=1.0, probe_r=None, nrec=6000,
-        nsnap=0, lambda_quartic=0.0, init_amplitude=1.0):
+        nsnap=0, lambda_quartic=0.0, init_amplitude=1.0, seed="gaussian"):
     """lambda_quartic: signed quartic self-coupling ('lambda' is a Python keyword,
     hence the suffix). The RWA-resonant piece of (lambda/6)Phi^3 enters as an
     amplitude-dependent shift of the potential,
@@ -76,8 +76,13 @@ def run(alpha=0.50, a=0.90, xmin=-70., xmax=220., N=4000, T=3000., cfl=0.4,
         dchi = np.where(pml, g*(px - chi + imO*psi) - imO*chi, 0.0)
         return dpsi, dpi, dchi
 
-    psi = (init_amplitude*np.exp(-((x-x0)**2)/(2*sigx**2))).astype(complex)
-    pi  = np.zeros_like(psi); chi = np.zeros_like(psi)
+    if seed == "eigenmode":
+        from radial1d import eigenmode_seed
+        psi, pi = eigenmode_seed(x, r, alpha, a, w_ref, m=m, amplitude=init_amplitude)
+        chi = np.zeros_like(psi)
+    else:
+        psi = (init_amplitude*np.exp(-((x-x0)**2)/(2*sigx**2))).astype(complex)
+        pi  = np.zeros_like(psi); chi = np.zeros_like(psi)
     trec = np.linspace(0, T, nrec); rec_i=(trec/dt).astype(int); rp_=0
     tsig=[]; psig=[]; phi_fl=[]; phidot_fl=[]; phix_fl=[]; cloud_norm=[]
     tsnap=np.linspace(0, T, nsnap) if nsnap>0 else np.array([])

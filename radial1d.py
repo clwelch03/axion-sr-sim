@@ -51,6 +51,26 @@ def d2_dx2(f,dx):  # 4th-order centered 2nd derivative
     g=np.zeros_like(f); g[2:-2]=(-f[4:]+16*f[3:-1]-30*f[2:-2]+16*f[1:-3]-f[:-4])/(12*dx*dx)
     g[1]=(f[2]-2*f[1]+f[0])/dx**2; g[-2]=(f[-1]-2*f[-2]+f[-3])/dx**2; return g
 
+def eigenmode_seed(x, r, alpha, a, w, l=1, m=1, Nseries=400, amplitude=1.0):
+    """Clean single-mode initial data: psi = amplitude * normalized(r*R(r)), with
+    R(r) the Leaver bound-state radial profile at the eigenfrequency w, AND the
+    matching momentum pi = -i*w*psi so the state is a pure e^{-i w t} eigenmode.
+
+    This is the transient-free alternative to the Gaussian seed (which starts with
+    pi=0 and the wrong radial shape, so it rings as it sheds onto the true mode).
+    On a linear (lambda=0) run a correct eigenmode seed reproduces the Leaver
+    growth rate from t=0 with no shedding. Returns (psi, pi) as complex arrays on
+    the grid r(x); normalized so max|psi| = amplitude (same peak convention as the
+    Gaussian seed, so lambda_quartic*|psi|^2 strengths are comparable)."""
+    coef = lef.series_coeffs(mp.mpc(w), alpha, a, l, m, Nseries)
+    R = np.array([complex(lef.R_of_r(mp.mpf(ri), mp.mpc(w), alpha, a, coef))
+                  for ri in r])
+    psi = r * R
+    psi = amplitude * psi / np.max(np.abs(psi))
+    pi = -1j * w * psi
+    return psi.astype(complex), pi.astype(complex)
+
+
 def stageA(alpha=0.30, a=0.90):
     mp.mp.dps=30
     w=complex(leaver.solve(alpha,a)); print(f"Leaver: E={w.real:.8f} Gamma={w.imag:.4e}")

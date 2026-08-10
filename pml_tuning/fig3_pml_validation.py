@@ -9,6 +9,8 @@ Uses the current best PML config (eps_match=0.002, xmin=-120) from scan_pml.py.
 import numpy as np, matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import sys
+sys.path.insert(0, "/global/scratch/projects/pc_heptheory/clwelch/software/GRChombo-Axion-SR/Examples/AxionSuperradiance/radial1d")
 import evolve as ev
 
 alpha, a = 0.50, 0.90

@@ -1,16 +1,22 @@
 #!/usr/bin/env python
-"""Animate the 1+1D radial psi(x,t): the 1D analogue of ../viz/cloud_movie.py's
-equatorial-slice movie -- Re[psi(x)] and |psi(x)| as a function of the
-tortoise coordinate, one frame per recorded snapshot -> GIF.
+"""Animate the 1+1D radial psi(x,t): the 1D analogue of the project-level
+../../viz/cloud_movie.py's equatorial-slice movie (note: DIFFERENT directory
+from this file's own radial1d/viz/ -- that one is the 3+1D GRChombo movie
+tool, this one is 1D-radial-specific) -- Re[psi(x)] and |psi(x)| as a
+function of the tortoise coordinate, one frame per recorded snapshot -> GIF.
 
 Shows directly what the static-heatmap version couldn't as clearly: the
 ingoing wavefront reaching the horizon, the bound-state envelope settling in
 at the cloud peak, and (if PML reflection is present) any standing-wave
 ripple in |psi| near x_match.
 
-Run (needs a --save with --nsnap>0 from evolve.py):
+Run (needs a --save with --nsnap>0 from evolve.py; evolve.py lives one
+directory up, in radial1d/ itself, so run this from radial1d/, not from
+radial1d/viz/ -- or invoke evolve.py with its full path):
+    cd ..   # into radial1d/
     $GWENV evolve.py --alpha 0.50 --a 0.90 --T 3000 --N 4000 --nsnap 300 \
-        --save pml_a050_field.npz
+        --save viz/pml_a050_field.npz
+    cd viz
     $GWENV spacetime.py pml_a050_field.npz --out pml_a050_movie
 """
 import argparse

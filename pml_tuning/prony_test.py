@@ -3,6 +3,8 @@
 list so we can verify Prony genuinely finds a mode near Leaver, not just
 defaulting to the anchor with nothing nearby."""
 import numpy as np
+import sys
+sys.path.insert(0, "/global/scratch/projects/pc_heptheory/clwelch/software/GRChombo-Axion-SR/Examples/AxionSuperradiance/radial1d")
 import evolve as ev
 
 o = ev.run(alpha=0.50, a=0.90, N=4000, xmin=-120., xmax=220., T=3000.,

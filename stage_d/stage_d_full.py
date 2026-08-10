@@ -20,6 +20,7 @@ refinement can reuse the analysis.
 import numpy as np, sys, time
 sys.path.insert(0, "/global/scratch/projects/pc_heptheory/clwelch/software/GRChombo-Axion-SR/Examples/AxionSuperradiance/linear_rates")
 import leaver
+sys.path.insert(0, "/global/scratch/projects/pc_heptheory/clwelch/software/GRChombo-Axion-SR/Examples/AxionSuperradiance/radial1d")
 import evolve as ev
 
 alpha, a = 0.42, 0.99

@@ -20,6 +20,16 @@ sys.path.insert(0, _RD)
 import evolve as ev
 
 
+def spectral_peak(t, psi):
+    """Dominant frequency E of psi ~ e^{-iEt} (np.fft peak sits at omega=-E).
+    Used to RE-CENTER freqfilter on the amplitude-DETUNED peak: at finite A the
+    Hermitian cubic shifts E up toward m*Omega_H, and a filter pinned to the
+    linear Leaver E clips the shifted mode and returns garbage (seen at A>=2)."""
+    N = len(t); w = np.fft.fft(psi)
+    omega = 2 * np.pi * np.fft.fftfreq(N, d=(t[-1] - t[0]) / (N - 1))
+    return -omega[np.argmax(np.abs(w))]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", default=_HERE, help="directory of tower_gamma_*.npz")
@@ -39,7 +49,7 @@ def main():
         t = d["t"]; psi = d["psi"]; ls = list(np.atleast_1d(d["ls"]))
         chan = {}
         for i, l in enumerate(ls):
-            E, G = ev.freqfilter(t, psi[i], E_peak=w.real, kbins=q.kbins)
+            E, G = ev.freqfilter(t, psi[i], E_peak=spectral_peak(t, psi[i]), kbins=q.kbins)
             chan[int(l)] = (E, G)
         E1, G1 = chan[1]
         rows.append(dict(l_max=int(d["l_max"]), A=float(d["amp"]), lam=float(d["lam"]),
@@ -74,7 +84,7 @@ def main():
         ax[0].axhline(GL, color="k", ls="--", lw=1, label=f"Leaver +{GL:.2e}")
         ax[0].axhline(0, color="0.5", lw=0.8)
         ax[0].set_xlabel("seed amplitude A"); ax[0].set_ylabel("Gamma_l1 (freqfilter)")
-        ax[0].set_title("l=1 growth rate vs amplitude\n(l_max=1 control flat; higher l_max falls)")
+        ax[0].set_title("l=1 growth rate vs amplitude\n(l_max curves coincide => detuning-dominated, not multi-mode)")
         ax[0].legend(fontsize=8)
         ax[1].set_xscale("log"); ax[1].set_yscale("log")
         ax[1].set_xlabel("seed amplitude A"); ax[1].set_ylabel("|ΔΓ| = |Γ(A) − Γ_baseline|")

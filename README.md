@@ -804,16 +804,28 @@ in 10.2 says: a Hermitian, amplitude^2, linear-in-lambda frequency shift.
      - validate Hermiticity + detuning scaling (selfint_test.py)          [DONE, all pass]
      - calibrate detuning k & predict saturation amplitude (detuning_sweep.py) [DONE, Sec 10.6]
      - attractive branch: push amplitude, look for radial self-focusing (bosenova onset)
-[B] coupled (l, m=1) tower: Phi = sum_l psi_l(t,r) Y_l1 / r
+[B] coupled (l, m=1) tower: Phi = sum_l psi_l(t,r) Y_l1 / r        [DONE -- see docs/TIER1.5_NONLINEAR_SATURATION_RESULTS.md]
      - resonant quartic couples l=1 -> 3,5 at SAME omega (not 3-omega-suppressed)
-     - THIS is where the dominant (multi-mode) saturation lives -- the real deliverable
-     - converge in l_max; answer "how many angular modes does saturation need?"
+     - RESULT: the multi-mode cascade is WEAK -- l=3,5 are forced OFF-RESONANT
+       sidebands (no l=3 bound state at omega_211), ~0.1% of the growth
+       suppression. Saturation here is DETUNING-dominated (Gamma(A,l_max=1) ==
+       Gamma(A,l_max=3)). The dominant physical saturation (level transitions,
+       BH spindown) is at OTHER frequencies / a backreaction effect and is
+       structurally out of reach of the frozen-Kerr RWA tower.
 [C] add tidal m-coupling (companion BH): Phi = sum_lm psi_lm(t,r) Y_lm / r
      - breaks axisymmetry, m no longer conserved; tidal vs axion nonlinearity compete
      - Tier-2 bridge; if the (l,m) spectrum blows up -> genuine 2+1/3+1 needed
 ```
-Next concrete actions: (1) `selfint_test.py` -- DONE (Sec 10.4, all pass);
-(2) `detuning_sweep.py` -- DONE (Sec 10.6); (3) begin the (l, m=1) tower [B].
+Status: [A] DONE (Sec 10.4/10.6), [B] DONE -- results written up in
+`docs/TIER1.5_NONLINEAR_SATURATION_RESULTS.md` (tower gate 4/4, clean eigenmode
+seed, Gamma(A,l_max) growth-suppression sweep; detuning-dominated). Note this is
+detuning-dominated BY CONSTRUCTION (the RWA keeps only the resonant piece; level
+transitions are the non-resonant terms dropped, BH spindown the frozen
+backreaction) -- not a discovered result. That the dominant saturation is thus
+outside this tool motivates the next step: BACKREACTION (adiabatic BH spindown),
+the Tier-1 foundation piece still open on branch
+feat/eigenmode-seed-and-backreaction. [C] tidal m-coupling remains the later
+Tier-2 bridge.
 
 ### 10.6 Detuning calibration & saturation-amplitude prediction (`detuning_sweep.py`)
 

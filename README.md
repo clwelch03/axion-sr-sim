@@ -453,6 +453,17 @@ radial1d/
     selfint_test.py          Hermiticity + detuning-scaling sanity tests (Sec 10.4)
     detuning_sweep.py        calibrate k_detune, predict A_sat (Sec 10.6)
     *.png                    detuning_sweep[_grow].png, selfint_test.png
+  backreaction/      Tier 1: adiabatic Kerr spin-down baseline
+    README.md                 endpoint comparison, assumptions, and reproduction
+    adiabatic_endpoint.py     flux-based endpoint + fixed-frequency exact control
+  multilevel/        Tier 1.5: 211<->322 level-transfer scaffold (not the (l,m=1) tower)
+    README.md                 mode labels, selection rule, six validation gates
+    gate_test.py              runs all six gates, 7/7 passing
+    mode_catalog.py           (n,ell,m) labels + Leaver frequencies
+    couplings.py               angular + radial-weighted quartic coupling tensor
+    radial_modes.py            Leaver radial-mode wrapper (peak-normalized)
+    linear_driver.py           independent-channel multimode evolver
+    transition_demo.py         coherent 211+100->322 amplitude demo + optional loss sink
   viz/               space-time visualization (not part of the Gamma pipeline)
     spacetime.py             renders a psi(x,t) snapshot sequence -> movie
     plots/                   rendered frames/movies (gitignored)

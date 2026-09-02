@@ -73,24 +73,50 @@ def main():
         nl = sorted({r["l_max"] for r in rows if r["lam"] != 0.0})
         fig, ax = plt.subplots(1, 2, figsize=(12.5, 5))
         CL = {1: "C0", 3: "C1", 5: "C2", 7: "C3"}
+
+        # Left panel is the actual with/without-detuning comparison: the
+        # WITHOUT curve is the same lambda=0 amplitude sweep (self-interaction
+        # off), measured with the identical freqfilter pipeline as the WITH
+        # curve, so both are directly comparable -- not the analytic Leaver
+        # value, which uses a different extraction method entirely and only
+        # serves as an independent cross-check (plotted thin, separately).
+        without_detuning = sorted(
+            [r for r in rows if r["lam"] == 0.0], key=lambda r: r["A"]
+        )
+        if without_detuning:
+            # Without self-interaction, Gamma has no amplitude dependence, so
+            # a single measurement (at whichever A it was run at) fixes the
+            # whole horizontal reference line for comparison against the
+            # amplitude-dependent WITH curves.
+            all_A = [r["A"] for r in rows if r["lam"] != 0.0] or [without_detuning[0]["A"]]
+            A0_span = [min(all_A + [without_detuning[0]["A"]]),
+                      max(all_A + [without_detuning[0]["A"]])]
+            G0 = without_detuning[0]["G1"]
+            ax[0].plot(A0_span, [G0, G0], "s-", color="0.35", lw=2, ms=7,
+                      markevery=[0],
+                      label=f"WITHOUT detuning (λ=0, measured at A={without_detuning[0]['A']:g})")
         for lm in nl:
             pts = sorted([r for r in rows if r["l_max"] == lm and r["lam"] != 0.0],
                          key=lambda r: r["A"])
             if not pts: continue
             A = [r["A"] for r in pts]; G = [r["G1"] for r in pts]
-            ax[0].plot(A, G, "o-", color=CL.get(lm, "k"), label=f"l_max={lm}")
+            ax[0].plot(A, G, "o-", color=CL.get(lm, "k"),
+                      label=f"WITH detuning (λ=0.02, l_max={lm})")
             dG = [abs(r["G1"] - G_base) for r in pts]
             ax[1].plot(A, dG, "o-", color=CL.get(lm, "k"), label=f"l_max={lm}")
-        ax[0].axhline(GL, color="k", ls="--", lw=1, label=f"Leaver +{GL:.2e}")
+        ax[0].axhline(GL, color="k", ls=":", lw=1, label=f"Leaver analytic +{GL:.2e} (cross-check)")
         ax[0].axhline(0, color="0.5", lw=0.8)
         ax[0].set_xlabel("seed amplitude A"); ax[0].set_ylabel("Gamma_l1 (freqfilter)")
-        ax[0].set_title("l=1 growth rate vs amplitude\n(l_max curves coincide => detuning-dominated, not multi-mode)")
+        ax[0].set_title("superradiant growth rate: with vs without self-interaction detuning\n"
+                        "WITHOUT is amplitude-independent; WITH falls as detuning throttles E toward m$\\Omega_H$",
+                        fontsize=10)
         ax[0].legend(fontsize=8)
         ax[1].set_xscale("log"); ax[1].set_yscale("log")
         ax[1].set_xlabel("seed amplitude A"); ax[1].set_ylabel("|ΔΓ| = |Γ(A) − Γ_baseline|")
-        ax[1].set_title("growth suppression vs A\n(slope 2 ⇒ ΔΓ ∝ A²; l_max convergence)")
+        ax[1].set_title("growth suppression vs A\nl_max=1 and l_max=3 coincide ⇒ detuning-dominated, not multi-mode",
+                        fontsize=10)
         ax[1].legend(fontsize=8)
-        fig.tight_layout(); fig.savefig(q.plot, dpi=120); print("\nsaved", q.plot)
+        fig.tight_layout(rect=[0, 0, 1, 0.94]); fig.savefig(q.plot, dpi=120); print("\nsaved", q.plot)
 
 
 if __name__ == "__main__":

@@ -39,11 +39,18 @@ _U, _W = leggauss(64)
 
 
 def _Lambda(l, m, u):
-    """Real theta-part of the spherical harmonic Y_{lm} (m >= 0):
-    Lambda_{lm}(u) = N_{lm} P_l^m(u), with u = cos(theta) and the Condon-Shortley
-    phase carried by scipy's lpmv. Normalized so INT |Lambda|^2 2*pi = 1."""
-    norm = np.sqrt((2 * l + 1) / (4 * np.pi) * factorial(l - m) / factorial(l + m))
-    return norm * lpmv(m, l, u)
+    """Real theta-part of spherical harmonic ``Y_lm`` for signed ``m``."""
+    absolute_m = abs(m)
+    if absolute_m > l:
+        raise ValueError("must satisfy |m| <= l")
+    norm = np.sqrt(
+        (2 * l + 1) / (4 * np.pi)
+        * factorial(l - absolute_m) / factorial(l + absolute_m)
+    )
+    theta_factor = norm * lpmv(absolute_m, l, u)
+    if m < 0:
+        theta_factor = (-1) ** absolute_m * theta_factor
+    return theta_factor
 
 
 def cos2_coupling(j, l, m=1):
@@ -59,8 +66,24 @@ def quartic_overlap(j, a, b, c, m=1):
     (all azimuthal indices = m, so the phi integral is 2*pi). This is the
     resonant-cubic angular coupling: channel j is sourced by the product
     psi_a psi_b* psi_c."""
+    return quartic_overlap_general(j, m, a, m, b, m, c, m)
+
+
+def quartic_overlap_general(output_l, output_m, first_l, first_m,
+                            conjugate_l, conjugate_m, third_l, third_m):
+    """Four-harmonic overlap with independent signed azimuthal labels.
+
+    The projected cubic has the structure ``psi_a psi_b* psi_c`` and therefore
+    requires ``m_output = m_first - m_conjugate + m_third``.
+    """
+    if output_m != first_m - conjugate_m + third_m:
+        return 0.0
     return 2 * np.pi * np.sum(
-        _W * _Lambda(j, m, _U) * _Lambda(a, m, _U) * _Lambda(b, m, _U) * _Lambda(c, m, _U)
+        _W
+        * _Lambda(output_l, output_m, _U)
+        * _Lambda(first_l, first_m, _U)
+        * _Lambda(conjugate_l, conjugate_m, _U)
+        * _Lambda(third_l, third_m, _U)
     )
 
 

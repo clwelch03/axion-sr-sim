@@ -46,6 +46,51 @@ history if anything needs to be checked against it.
   falloff at `r_max ~ 500M` (right, `Mν ~ (M/r_max)^4`). Simpler than the old
   build's extra `gout` knob; drop that.
 
+## How the PML fits the pipeline (design notes)
+
+**State = three fields**, each shaped `(n_channels, n_points)`:
+- `ψ` — the scalar field per channel. The only observable; everything else is
+  machinery to evolve it.
+- `π ≡ ∂_t ψ` — its "velocity." Exists because the wave equation is 2nd-order
+  in time; we split into two 1st-order eqs (`ψ̇ = π` and an eq for `π̇`).
+- `χ` — the PML auxiliary field. Pure bookkeeping, nonzero only in the PML
+  strip, never an observable. It's the local-in-time "memory" variable that
+  makes complex-coordinate stretching work.
+
+**Everything is Method of Lines:** one RHS function maps `(ψ,π,χ) → (ψ̇,π̇,χ̇)`,
+and RK4 marches all three together. Inside one RHS call:
+1. stencils compute `ψ'`, `ψ''`, `χ'` (globally, 4th-order Eq. 37);
+2. `ψ̇ = π` — free, no solve; *this* is the equation that advances `ψ`;
+3. `π̇` = `thomas_solve(A, b)` (full Eq. 25, channel-coupled) **plus** the PML
+   source `−χ' − imΩχ − γ(π + imΩψ)` added on top *only where `γ>0`*;
+4. `χ̇ = γ(ψ' − χ + imΩψ) − imΩχ` — its own algebraic formula, auto-zero where
+   `γ=0`.
+
+So the Thomas solve and the PML don't "combine" — they live in **different
+parts of the same `π̇`**: Thomas gives `π̇` in the coupled interior, the PML
+terms dominate `π̇` in the decoupled absorbing strip. `χ` only feeds `π̇`
+through `−χ'−imΩχ`. RK4 steps `(ψ,π,χ)` forward at once; we read `ψ`, discard `χ`.
+
+**Two design decisions that make this clean:**
+- **The PML does NOT enter the Thomas solve.** The channel coupling *is* a `~Δ`
+  term (`A` off-diagonals `= a²Δ c_{l,l±2}`; `b` coupling `= a²μ²Δ c_{l,l±2}`),
+  and the PML lives exactly where `~Δ` terms are dropped. So `A` is diagonal in
+  the PML strip — no tridiagonal system there. Thomas (interior) and PML
+  (near-horizon strip) never overlap in space.
+- **No two-region solver / no seam matching.** As `Δ→0` the interior `π̇ = b/A`
+  limits *exactly* onto Eq. (44) with `γ=χ=0` (since `A→(r²+a²)²`, the `ψ''`
+  coeff `→1`, `2iam(r²+a²)/A→2imΩ`, `V_l→0`). So we run the full Eq. (25)
+  everywhere and just *add* the PML source where `γ>0`. `γ(x)` itself is the
+  switch (PML region ≡ `γ>0`); it must ramp **smoothly from exactly 0** at the
+  interior edge `x_pml_start` (a hard jump reflects) — polynomial ramp
+  `γ_max·((x_s−x)/(x_s−x_left))^p`, `p=2–3` — and `x_s` sits deep enough that
+  `Δ` is already negligible, making the unit-`ψ''` normalization self-consistent
+  (this *is* Dolan's "neglect `~Δ`" statement). `Ω_H = a/(r₊²+a²)`.
+
+**Only change from the step-1 solver:** state grows `(ψ,π) → (ψ,π,χ)`; `rhs`
+gains the `χ̇` equation and the PML terms on `π̇`. Stencils, Thomas solve, and
+`ψ̇ = π` are untouched.
+
 Still needed from the paper: Sec. III.A-C (Eq. 20/25 derivation, the `c^m_jl`
 coupling coefficients — we have these from the old build's README, should
 re-derive/confirm from the paper directly), and Sec. IV for his own benchmark

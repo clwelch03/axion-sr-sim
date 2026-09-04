@@ -54,19 +54,38 @@ trust).
 
 ## Plan (small steps, in order)
 
-1. Grid + single decoupled channel (ℓ=1, no tridiagonal solve, no PML yet) —
-   just the interior equation and stencils on Dolan's exact grid convention.
-2. Add the PML (Eq. 44) and hard boundaries (III.F). Validate against the
-   known Leaver damped benchmark (a=0.9, α=0.5, Γ=-5.205e-4) as a first
-   checkpoint — this re-derives the old single-mode result but under Dolan's
-   exact discretization.
-3. Add the ℓ=3 channel and the tridiagonal `Aẋ=b` solve (Thomas algorithm).
-   Check convergence of Γ as the tower is truncated at different ℓ_max.
-4. Add ℓ=5, repeat the convergence check.
-5. Compare against any explicit benchmark Dolan gives in Sec. IV, not just
+**Design decision (changed from the original plan):** the code is *tower-native
+from day one*, not "single channel now, tower bolted on later." One `Tower`
+object holds all same-parity channels `l ∈ {|m|, |m|+2, …, l_max}`; the
+tridiagonal `Aẋ=b` solve runs for every `l_max`. `l_max=|m|` is just the
+one-rung case and goes through the *identical* `rhs` — so there is no
+single-channel version to replace, and the ℓ-tower cannot get orphaned the way
+it did last time. The build order below still validates at `l_max=1` first,
+because that isolates the grid/stencil/PML machinery from the coupling with a
+cheap decisive checkpoint — but that is a *validation* order, not a "defer the
+hard part" order. The coupling code exists and is unit-tested from the start.
+
+1. **[DONE]** `solver.py`: grid, Kerr tortoise `r(x)`, coupling matrix
+   `c^m_{jl}` (via the `cosθ` ladder, no Clebsch–Gordan needed), Eq. (25)/(26)
+   coefficients, 4th-order stencils (Eq. 37), Thomas solve, RK4/MoL. All
+   unit-tested: stencils show exact 4th-order (16× per halving); Thomas matches
+   `np.linalg.solve` to machine precision at `n_ch=1,3,5`; single-channel `rhs`
+   exactly equals the plain `b/D(r)` divide; tower run leaks ℓ=1→ℓ=3 through
+   the coupling as expected.
+2. **[NEXT]** Add the PML (Eq. 44) near the left edge + hard boundaries
+   (III.F). Validate at `l_max=1` against the Leaver damped benchmark (a=0.9,
+   α=0.5, Γ=-5.205e-4). NOTE: single-channel will *not* hit Leaver exactly —
+   Leaver's continued fraction already resums all ℓ-coupling, so single-channel
+   lands close and the *tower* closes the residual gap. That gap closing is the
+   real coupling validation (step 3).
+3. Run `l_max=3`, then `5` — zero new code, pure runtime — and watch Γ converge
+   toward Leaver. This convergence *is* the proof the coupling is right.
+4. Compare against any explicit benchmark Dolan gives in Sec. IV, not just
    Leaver.
 
 ## Status
 
-Nothing built yet. Old `radial1d/` staged for deletion (uncommitted). This
-README is step 0.
+**Step 1 DONE, validated.** `solver.py` holds the full tower solver (see step 1
+above for the test list). Currently hard Dirichlet at *both* edges, no PML yet,
+so reflections contaminate any long run — the machinery is proven to propagate,
+but no physics until the PML (step 2) is in. Next: PML (Eq. 44).

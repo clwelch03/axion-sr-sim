@@ -117,20 +117,70 @@ hard part" order. The coupling code exists and is unit-tested from the start.
    `np.linalg.solve` to machine precision at `n_ch=1,3,5`; single-channel `rhs`
    exactly equals the plain `b/D(r)` divide; tower run leaks ℓ=1→ℓ=3 through
    the coupling as expected.
-2. **[NEXT]** Add the PML (Eq. 44) near the left edge + hard boundaries
-   (III.F). Validate at `l_max=1` against the Leaver damped benchmark (a=0.9,
-   α=0.5, Γ=-5.205e-4). NOTE: single-channel will *not* hit Leaver exactly —
-   Leaver's continued fraction already resums all ℓ-coupling, so single-channel
-   lands close and the *tower* closes the residual gap. That gap closing is the
-   real coupling validation (step 3).
-3. Run `l_max=3`, then `5` — zero new code, pure runtime — and watch Γ converge
-   toward Leaver. This convergence *is* the proof the coupling is right.
-4. Compare against any explicit benchmark Dolan gives in Sec. IV, not just
-   Leaver.
+2. **[DONE]** PML (Eq. 44) as an additive source on the Eq. 25 solver
+   (`x_pml_center`, `pml_width`, `pml_gamma`, `Omega_H`, three-field `(ψ,π,χ)`
+   rhs). Dolan's geometry (Sec. III.E/F): a *symmetric bump* centered at x=−100M
+   (width 10M) with a hard ψ=π=0 wall at x=−200M and a dead buffer between.
+   Reduces exactly to the two-field solver in the interior. Deep placement forced
+   the tortoise inversion to be recast in the horizon displacement `s=r−r₊`
+   (log-space Newton), so it converges at x≲−100 instead of crashing.
+3. **[DONE] Γ measurement.** `qbs_eigenmode.py` (`solve_qbs` — the QBS as an
+   eigenvector of the linear generator) and `measure_gamma.py` (Dolan's
+   *time-domain* method: seed the eigenmode, evolve, fit `log(interior norm)`
+   slope → Γ). Benchmark is `leaver.py` (Dolan-2007 continued fraction),
+   evaluated at **runtime** via `leaver_benchmark(tower)` — no hardcoded constant.
+   See "What we learned" for how the two Γ estimates compare.
+
+## What we learned (corrects the earlier premise)
+
+The organizing assumption above — "single channel lands close, the *tower*
+closes the gap to Leaver" — **is wrong at a=0.9, α=0.5, and we verified it
+directly.** Findings:
+
+- **The ℓ-tower is negligible here.** The ℓ=3 channel populates at only ~4e-4
+  of ℓ=1 (ℓ=5 ~0), so its effect on Γ is ~1e-7. `l_max`=1, 3, 5 give *identical*
+  Γ to 5 sig figs. The coupling is correctly implemented — it is just physically
+  tiny at this spin/coupling (weak spheroidal mixing, `aω≈0.43`).
+- **There was no gap: the eigenvalue Γ matches Leaver to ~0.01%.** The earlier
+  "~1% short of Leaver" compared against the *flat* Λ=l(l+1) continued fraction.
+  Our operator carries the spheroidal angular correction (the `a²μ²cos²θ` term),
+  so the apples-to-apples benchmark is `leaver.py` with `spheroidal=True`.
+  Against that, the **eigenvalue** Γ=Im(ω) from `solve_qbs` reproduces *both* ω_R
+  and Γ to ~0.01% (a=0.9, α=0.5), and is *flat* against PML width, PML reflection,
+  x_right, and dx — a converged, robust operator property (verified 2026-09-08
+  with the deep-bump PML). The old "push `x_left` deeper → 0.95→0.99" trend was
+  the shallow PML eating the near-horizon mode; the deep bump removes it.
+- **The time-domain *fit* is separately PML-contaminated.** The fitted slope Γ
+  runs ~2.5% high vs. spheroidal Leaver and *drifts with PML width* — a limitation
+  of the slope-fit extraction, not the operator. For rates, prefer the eigenvalue
+  method; a faithful time-domain extraction needs Dolan's frequency-filter method
+  (Sec. IV A 2), not a plain log-slope.
+- **We still need the tower** — just not as the Leaver gap-closer here. It is
+  the faithful equation, and it is expected to matter at higher spin/coupling
+  (stronger spheroidal mixing) and for multi-mode/nonlinear work. Confirming
+  where it becomes non-negligible is a live thread.
 
 ## Status
 
-**Step 1 DONE, validated.** `solver.py` holds the full tower solver (see step 1
-above for the test list). Currently hard Dirichlet at *both* edges, no PML yet,
-so reflections contaminate any long run — the machinery is proven to propagate,
-but no physics until the PML (step 2) is in. Next: PML (Eq. 44).
+**Solver + deep-bump PML + eigenvalue Γ all DONE and validated** (2026-09-08).
+The eigenvalue method reproduces full-spheroidal Leaver (ω_R *and* Γ) to ~0.01% at
+a=0.9, α=0.5, robust against every numerical knob. `leaver.py` restored as the
+runtime frequency-domain benchmark. Remaining loose end: the *time-domain*
+extraction — the log-slope fit is PML-contaminated (~2.5%, width-dependent); a
+faithful rate needs Dolan's frequency-filter method (Sec. IV A 2).
+
+**Next direction — toward Dolan Fig. 13** (growth rates vs α at a=0.99, n=0 & n=1):
+- *Tier A (the curves, via the eigenvalue method):* (1) growth-sign sanity check
+  at a=0.99, α≈0.42 (is Im ω > 0, ~1e-7?); (2) re-validate PML placement at
+  near-extremal spin — the tortoise scale changes a lot (`coeff_plus` ~3.3→8.1),
+  so x=−100 is far shallower in r; (3) overtone-selective seeding for n=1;
+  (4) an α-sweep driver.
+- *Tier B (the time-domain points):* additionally needs the frequency-filter
+  method and ultra-long (t_max~1e5 M) runs — the real "faithful reproduction" cost.
+
+**Future upgrade path (parked):** hyperboloidal slicing replaces the PML+wall
+entirely — a real coordinate change to slices reaching the horizon and scri⁺,
+exactly reflectionless (no γ tuning, no reflection floor) and QBS-regular; now
+the community default for QNM/QBS/superradiance time-domain work (Zenginoğlu
+2008/2011; Panosso Macedo 2020; review arXiv:2409.11478). Worth it only if the
+PML placement gets fiddly — not a mid-reproduction switch.

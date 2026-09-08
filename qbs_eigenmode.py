@@ -109,16 +109,33 @@ def _generalized_matrices(tower):
     return K, M
 
 
-def solve_qbs(tower, omega_R_guess=0.4782):
+def solve_qbs(tower, omega_R_guess=0.4782, omega_guess=None, maxiter=None):
     """Return (omega, psi_profile) for the quasi-bound state of `tower`.
 
     omega is complex (omega_R + i Gamma); psi_profile is shaped
     (n_channels, num_points), normalised to unit peak, ready to seed as
     psi with pi = -i omega psi.
+
+    omega_guess (complex) targets the full frequency omega_R + i Gamma, which is
+    needed to pick a specific overtone near threshold -- the fundamental and the
+    first overtone share almost the same omega_R and separate only in Gamma, so a
+    real-only target cannot tell them apart. Falls back to omega_R_guess (real)
+    when omega_guess is None.
+
+    maxiter caps the ARPACK iterations. The scipy default is 10*N (~1e5 here), so
+    a point where shift-invert cannot isolate the mode spins for minutes; pass a
+    modest maxiter (e.g. 2000) to make such a point raise ArpackNoConvergence fast
+    instead of hanging, and let the caller record it and move on.
     """
     K, M = _generalized_matrices(tower)
-    target = -1j * omega_R_guess                       # lambda ~ Gamma - i omega_R
-    eigenvalues, eigenvectors = spla.eigs(K, M=M, k=12, sigma=target, which="LM")
+    # lambda = Gamma - i omega_R = -i * omega, so target lambda = -i * (guess omega)
+    guess = omega_guess if omega_guess is not None else omega_R_guess
+    target = -1j * guess
+    # We need only the eigenpair nearest the accurate complex target.  Asking
+    # ARPACK for a wider cluster makes near-threshold solves pathological: the
+    # QBS converges quickly, but unnecessary neighbouring modes do not.
+    eigenvalues, eigenvectors = spla.eigs(K, M=M, k=1, sigma=target, which="LM",
+                                          maxiter=maxiter)
 
     # pick the eigenvalue closest to the expected QBS frequency
     best = np.argmin(np.abs(eigenvalues - target))

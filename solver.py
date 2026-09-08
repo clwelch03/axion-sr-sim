@@ -77,37 +77,68 @@ class KerrTortoise:
     def delta(self, r):
         return r**2 - 2 * self.mass * r + self.spin**2 
 
-    def x_r(self, r):
-        log_plus_term = self.r_plus * np.log(np.abs(r - self.r_plus) / (2 * self.mass))
-        log_minus_term = self.r_minus * np.log(np.abs(r - self.r_minus) / (2 * self.mass))
+    def x_of_s(self, s):
+        """Tortoise x as a function of the horizon displacement s = r - r_plus.
 
-        return r + (2 * self.mass) / (self.r_plus - self.r_minus) * (log_plus_term - log_minus_term)
+        Writing x in terms of s rather than r is the whole trick for the deep
+        near-horizon inversion.  At a node like x = -100M, s ~ 6e-14; forming it
+        as (r - r_plus) by subtracting two O(1) floats keeps only ~2 digits
+        (catastrophic cancellation), which is what stalled the old Newton solve.
+        Here s is the primary variable and is never reconstructed by subtraction.
+
+            x = (r_plus + s) + coeff_plus ln(s/2M) + coeff_minus ln((s+g)/2M),
+
+        with g = r_plus - r_minus, so s + g = r - r_minus.  This is algebraically
+        identical to x_r; only the grouping (and the accuracy near s=0) differs.
+        """
+        two_m = 2.0 * self.mass
+        gap = self.r_plus - self.r_minus
+        return (self.r_plus + s
+                + self.coeff_plus * np.log(s / two_m)
+                + self.coeff_minus * np.log((s + gap) / two_m))
+
+    def x_r(self, r):
+        return self.x_of_s(r - self.r_plus)
 
     def dx_dr(self, r):
         return (r**2 + self.spin**2) / self.delta(r)
 
-    def r_x(self, x_target, tol=1e-10, max_iter=100):
-        """Invert x(r) by Newton's method, vectorized over x_target.
+    def r_x(self, x_target, tol=1e-12, max_iter=100):
+        """Invert x(r) for r, iterating in u = ln(s) with s = r - r_plus.
 
-        Grid is uniform in x; we need r at each node.  Seed from the two
-        analytic limits -- far out x ~ r, near-horizon x ~ coeff_plus *
-        ln((r - r_plus)/M) -- then Newton with r' = 1/dx_dr.  Clamp r above
-        the horizon each step so the log arguments stay positive.
+        Newton in u is uniformly well conditioned.  Its derivative is
 
-        Convergence is on the *relative* x-residual |res| / (1 + |x|).  Near
-        the horizon dx/dr blows up, so a relative error in r at the float64
-        floor leaves an absolute x-residual ~1e-9 no matter what; the relative
-        criterion is scale-free and reaches the float64 floor everywhere.
+            dx/du = s dx/ds = ((r_plus + s)^2 + a^2) / (s + g),
+
+        which -> coeff_plus (a finite constant) as s -> 0 instead of blowing up
+        like dx/dr did at the horizon.  So the iteration converges in a handful
+        of steps at every x, no clamping needed, and u carries the exponentially
+        small near-horizon displacement without ever cancelling.
+
+        We return r = r_plus + s.  For x more negative than ~-117M (a=0.9), s
+        drops below the float64 spacing of r and the returned r rounds to r_plus
+        exactly -- harmless, because that deep inside the PML/buffer Delta only
+        ever multiplies negligible terms (see Tower).  Convergence is judged on
+        the relative x-residual |res| / (1 + |x|).
         """
         x_target = np.asarray(x_target, dtype=float)
-        near_horizon_seed = self.r_plus + self.mass * np.exp(x_target / self.coeff_plus)
-        far_seed = np.maximum(x_target, self.r_plus + 1.0)
-        r = np.where(x_target > 0.0, far_seed, near_horizon_seed)
+        two_m = 2.0 * self.mass
+        gap = self.r_plus - self.r_minus
+
+        # seed s: far field x ~ r  =>  s ~ x - r_plus; near horizon invert the
+        # dominant log, x ~ r_plus + coeff_plus ln(s/2M) + coeff_minus ln(g/2M).
+        near_seed = two_m * np.exp(
+            (x_target - self.r_plus - self.coeff_minus * np.log(gap / two_m))
+            / self.coeff_plus)
+        far_seed = x_target - self.r_plus
+        s = np.where(far_seed > two_m, far_seed, near_seed)
+        u = np.log(np.maximum(s, np.finfo(float).tiny))
 
         for _ in range(max_iter):
-            residual = self.x_r(r) - x_target
-            r = r - residual / self.dx_dr(r)
-            r = np.maximum(r, self.r_plus * (1.0 + 1e-14))
+            s = np.exp(u)
+            residual = self.x_of_s(s) - x_target
+            dx_du = ((self.r_plus + s)**2 + self.spin**2) / (s + gap)
+            u = u - residual / dx_du
             if np.max(np.abs(residual) / (1.0 + np.abs(x_target))) < tol:
                 break
         else:
@@ -115,7 +146,7 @@ class KerrTortoise:
                 f"r_x Newton failed to converge: max relative residual "
                 f"{np.max(np.abs(residual) / (1.0 + np.abs(x_target))):.3e}"
             )
-        return r
+        return self.r_plus + np.exp(u)
 
 
 class Tower:
@@ -131,12 +162,15 @@ class Tower:
     coupling (so mu = alpha here).
     """
 
-    def __init__(self, spin, alpha, m, l_max, x_left, x_right, n, x_pml_start):
+    def __init__(self, spin, alpha, m, l_max, x_left, x_right, n,
+                 x_pml_center, pml_width):
         self.mass = 1.0
         self.spin = spin
         self.alpha = alpha
         self.m = m
         self.n = n
+        self.x_pml_center = x_pml_center
+        self.pml_width = pml_width
         self.dx = self.mass / n
         self.c_matrix, self.l_values = cos2_theta_matrix(m, l_max)
         self.n_channels = len(self.l_values)
@@ -176,7 +210,7 @@ class Tower:
         # PML: horizon angular velocity Omega_H and the damping profile gamma(x).
         # Eq. (44) uses the constant horizon Omega since the PML lives at r -> r_+.
         self.Omega_H = self.spin / (self.tortoise.r_plus**2 + self.spin**2)
-        self.pml_gamma = pml_profile(self.x, x_pml_start)
+        self.pml_gamma = pml_profile(self.x, x_pml_center, pml_width)
 
     def first_derivative(self, f):
         """4th-order centered 5-point d/dx, Dolan Eq. (37).
@@ -287,35 +321,45 @@ class Tower:
             for si, a, b, c, d in zip(state, k1, k2, k3, k4)
         )
 
-def pml_profile(x, x_pml_start, target_reflection=1e-6, power=3):
-    """Canonical polynomial-graded PML damping profile gamma(x).
+def pml_profile(x, x_pml_center, pml_width, target_reflection=1e-6, power=3):
+    """Symmetric polynomial-graded PML damping profile gamma(x): a bump.
 
-    Standard Berenger / Collino-Monk grading: gamma ramps from exactly 0 at
-    the interior edge x_pml_start up to gamma_max at the left grid edge,
+    Dolan's PML is a bump centered deep in the near-horizon region (his x_c =
+    -100M, width 10M), not a ramp flush against the wall.  The shape is
+    symmetric and returns to exactly 0 at BOTH edges, because the layer must
+    absorb two waves: the ingoing wave entering from the right, and the
+    wall-reflection heading back out to the right.  A jump in gamma at either
+    interface would reflect, so gamma must ramp from 0 on both sides.
 
-        gamma(x) = gamma_max * ((x_pml_start - x) / L_pml)^power   (x < x_pml_start)
-                    = 0                                              (x >= x_pml_start)
+    With half-width h = pml_width/2 and depth-from-nearest-edge
+    d(x) = h - |x - x_c| (>0 only inside the bump),
 
-    with L_pml = x_pml_start - x_left.  gamma_max is fixed by the theoretical
-    reflection coefficient of a graded layer,
+        gamma(x) = gamma_max * (d/h)^power     inside  [x_c - h, x_c + h]
+                    = 0                          outside.
 
-        gamma_max = -(power + 1) ln(R_0) / (2 L_pml),
+    The amplitude follows Dolan's Eq. (42), where the field attenuates as
+    exp(-\int gamma dx); for this shape \int gamma dx = gamma_max * w/(power+1),
+    so a target single-pass residual R_0 fixes
 
-    valid because the near-horizon advective equation (Eq. 43) has unit
-    characteristic speed in the tortoise coordinate.  Starting at exactly 0
-    is essential -- a jump in gamma reflects.  Returns an array over nodes.
+        gamma_max = -(power + 1) ln(R_0) / pml_width.
 
-    :param x_pml_start: interior edge of the PML layer; must sit left of the
-        entire physical region so gamma is zero everywhere we measure.
-    :param target_reflection: R_0, target residual reflection (default 1e-6).
+    Because the wall behind the layer sends the wave back through the bump a
+    second time, the effective residual is ~R_0^2, so the exact wall position
+    is not critical.  Unit characteristic speed (Eq. 43) is what lets us use
+    the c=1 reflection formula.  Returns an array over nodes.
+
+    :param x_pml_center: center x_c of the bump (deep, where terms ~Delta are
+        negligible -- this placement, not the profile, is what makes the PML
+        valid; see README).
+    :param pml_width: full width w of the bump; it spans [x_c - w/2, x_c + w/2].
+    :param target_reflection: R_0, target single-pass residual (default 1e-6).
     :param power: grading exponent p; 3 (cubic) is the usual default.
     """
-    pml_thickness = x_pml_start - x[0]
-    depth = (x_pml_start - x) / pml_thickness      # 0 at x_pml_start and 1 at left grid edge
-    gamma_max = -(power+1) * np.log(target_reflection) / (2 * pml_thickness)
+    half_width = pml_width / 2.0
+    depth = half_width - np.abs(x - x_pml_center)   # >0 inside the bump, <=0 outside
+    gamma_max = -(power + 1) * np.log(target_reflection) / pml_width
 
-    # compute the profile of the PML
-    gamma = np.where(x < x_pml_start, gamma_max * depth**power, 0.0)
+    gamma = np.where(depth > 0.0, gamma_max * (depth / half_width)**power, 0.0)
     return gamma
 
 def thomas_solve(sub, diag, sup, rhs):

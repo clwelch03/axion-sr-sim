@@ -162,16 +162,16 @@ class Tower:
     coupling (so mu = alpha here).
     """
 
-    def __init__(self, spin, alpha, m, l_max, x_left, x_right, n,
+    def __init__(self, spin, alpha, m, l_max, x_left, x_right, grid_spacing_n,
                  x_pml_center, pml_width):
         self.mass = 1.0
         self.spin = spin
         self.alpha = alpha
         self.m = m
-        self.n = n
+        self.grid_spacing_n = grid_spacing_n
         self.x_pml_center = x_pml_center
         self.pml_width = pml_width
-        self.dx = self.mass / n
+        self.dx = self.mass / grid_spacing_n
         self.c_matrix, self.l_values = cos2_theta_matrix(m, l_max)
         self.n_channels = len(self.l_values)
         

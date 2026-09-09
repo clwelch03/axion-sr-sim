@@ -102,7 +102,7 @@ def evolve_tower_and_sample_lowest_channel(
                 tower.spin,
                 tower.alpha,
                 tower.m,
-                tower.n,
+                tower.grid_spacing_n,
                 tower.x_pml_center,
                 tower.pml_width,
             ])
@@ -153,7 +153,7 @@ def evolve_tower_and_sample_lowest_channel(
                     tower.spin,
                     tower.alpha,
                     tower.m,
-                    tower.n,
+                    tower.grid_spacing_n,
                     tower.x_pml_center,
                     tower.pml_width,
                 ]),
@@ -234,7 +234,7 @@ def main():
     parser.add_argument("--alpha", type=float, default=0.42)
     parser.add_argument("--m", type=int, default=1)
     parser.add_argument("--l-max", type=int, default=5)
-    parser.add_argument("--n", type=int, default=6)
+    parser.add_argument("--grid-spacing-n", type=int, default=6)
     parser.add_argument("--x-left", type=float, default=-200.0)
     parser.add_argument("--x-right", type=float, default=511.0)
     parser.add_argument("--x-pml-center", type=float, default=-100.0)
@@ -254,7 +254,7 @@ def main():
         l_max=arguments.l_max,
         x_left=arguments.x_left,
         x_right=arguments.x_right,
-        n=arguments.n,
+        grid_spacing_n=arguments.grid_spacing_n,
         x_pml_center=arguments.x_pml_center,
         pml_width=arguments.pml_width,
     )

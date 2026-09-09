@@ -39,7 +39,7 @@ def our_eigenvalue(alpha, leaver_omega):
     """Growth rate from our discretised-operator eigenvalue solve, targeting the
     full complex Leaver frequency so the right overtone is selected."""
     tower = Tower(spin=SPIN, alpha=alpha, m=1, l_max=1,
-                  x_left=-200.0, x_right=250.0, n=8,
+                  x_left=-200.0, x_right=250.0, grid_spacing_n=8,
                   x_pml_center=-100.0, pml_width=10.0)
     omega, _ = solve_qbs(tower, omega_guess=leaver_omega,
                          maxiter=ARPACK_MAXITER)

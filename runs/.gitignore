@@ -1,2 +1,6 @@
-# regenerable run artifacts (see runs/README.md); only README.md is tracked
+# Regenerable run artifacts (see README.md). SLURM job scripts (*.sh) and
+# README.md ARE tracked -- they define how the runs are reproduced.
+*.npz
+*.out
+*.err
 *.png

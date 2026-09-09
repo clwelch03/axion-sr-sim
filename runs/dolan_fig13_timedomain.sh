@@ -24,7 +24,7 @@ module load miniconda3/22.11.1-gcc-11.4.0
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate BHsuper
 
-python -u measure_gamma.py \
+python -u src/measure_gamma.py \
     --output runs/dolan_fig13_a099_alpha042_t100000.npz \
     --time-final 100000.0 \
     --spin 0.99 --alpha 0.42 --m 1 --l-max 5 --n 6 \

@@ -14,7 +14,7 @@ frequency-filter Gamma extraction.
 
 - **Output:** `dolan_fig13_a099_alpha042_t100000.npz` (gitignored, on scratch)
 - **Cost:** ~1h07m single-core on Lawrencium `lr6` (job 25713497)
-- **Analyse with:** `analyze_timedomain_run.py <npz>` (raw spectrum + Gamma table)
+- **Analyse with:** `python src/analyze_timedomain_run.py <npz>` (raw spectrum + Gamma table)
 
 ### Submit script (`dolan_fig13_timedomain.sh`)
 
@@ -36,7 +36,7 @@ module load miniconda3/22.11.1-gcc-11.4.0
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate BHsuper          # numpy/scipy/mpmath/matplotlib
 
-python -u measure_gamma.py \
+python -u src/measure_gamma.py \
     --output runs/dolan_fig13_a099_alpha042_t100000.npz \
     --time-final 100000.0 \
     --spin 0.99 --alpha 0.42 --m 1 --l-max 5 --grid-spacing-n 6 \
@@ -72,7 +72,7 @@ Each task is an independent t=10^6 M run into `runs/fig13/`.
   the ~3% time-domain extraction floor (filter ringing + n=1 SNR). Cost ~ n^2, so
   n=4 is 1/4 of n=8 for effectively the same curve. Pick grid n by that cheap
   eigenvalue test, not by defaulting high.
-- **Analyse:** `analyze_timedomain_run.py runs/fig13/<one>.npz` per point.
+- **Analyse:** `python src/analyze_timedomain_run.py runs/fig13/<one>.npz` per point.
 - **Caveat:** a fixed 10^6 M does not give uniform n=1 accuracy across alpha --
   the growth rate (hence SNR) shrinks at low alpha and near the n=1 zero-crossing
   (alpha~0.44), so the ends are noisier than the peak.

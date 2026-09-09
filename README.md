@@ -126,10 +126,11 @@ hard part" order. The coupling code exists and is unit-tested from the start.
    (log-space Newton), so it converges at x≲−100 instead of crashing.
 3. **[DONE] Γ measurement.** `qbs_eigenmode.py` (`solve_qbs` — the QBS as an
    eigenvector of the linear generator) and `measure_gamma.py` (Dolan's
-   *time-domain* method: seed the eigenmode, evolve, fit `log(interior norm)`
-   slope → Γ). Benchmark is `leaver.py` (Dolan-2007 continued fraction),
-   evaluated at **runtime** via `leaver_benchmark(tower)` — no hardcoded constant.
-   See "What we learned" for how the two Γ estimates compare.
+   *time-domain* method: evolve broadband Gaussian initial data, then extract Γ
+   with the frequency filter — see the Status section and `frequency_filter.py`;
+   this replaced the earlier eigenmode-seed/log-slope driver). Benchmark is
+   `leaver.py` (Dolan-2007 continued fraction), evaluated at **runtime** via
+   `leaver_benchmark(tower)` — no hardcoded constant.
 
 ## What we learned (corrects the earlier premise)
 
@@ -162,21 +163,52 @@ directly.** Findings:
 
 ## Status
 
-**Solver + deep-bump PML + eigenvalue Γ all DONE and validated** (2026-09-08).
-The eigenvalue method reproduces full-spheroidal Leaver (ω_R *and* Γ) to ~0.01% at
-a=0.9, α=0.5, robust against every numerical knob. `leaver.py` restored as the
-runtime frequency-domain benchmark. Remaining loose end: the *time-domain*
-extraction — the log-slope fit is PML-contaminated (~2.5%, width-dependent); a
-faithful rate needs Dolan's frequency-filter method (Sec. IV A 2).
+**Dolan Fig. 13 reproduced by BOTH methods** (2026-09-08). The linear
+reproduction is complete; what remains is polish and the eventual nonlinear step.
 
-**Next direction — toward Dolan Fig. 13** (growth rates vs α at a=0.99, n=0 & n=1):
-- *Tier A (the curves, via the eigenvalue method):* (1) growth-sign sanity check
-  at a=0.99, α≈0.42 (is Im ω > 0, ~1e-7?); (2) re-validate PML placement at
-  near-extremal spin — the tortoise scale changes a lot (`coeff_plus` ~3.3→8.1),
-  so x=−100 is far shallower in r; (3) overtone-selective seeding for n=1;
-  (4) an α-sweep driver.
-- *Tier B (the time-domain points):* additionally needs the frequency-filter
-  method and ultra-long (t_max~1e5 M) runs — the real "faithful reproduction" cost.
+**Tier A — eigenvalue Fig. 13: DONE.** `fig13_growth_rates.py` sweeps
+α∈[0.30, 0.44] at a=0.99 and overlays our `solve_qbs` eigenvalue points on
+spheroidal Leaver for *both* the n=0 fundamental and n=1 overtone. The points
+sit on the Leaver curves through the peak (α≈0.42, Mν≈1.5e-7), the rollover, and
+the n=1 sign change past α≈0.44 (`plots/fig13_growth_rates.png`). `solve_qbs`
+gained a complex `omega_guess` (to select the right overtone) and a `maxiter`
+cap (bad points raise `ArpackNoConvergence` fast instead of spinning). The
+eigenvalue operator also reproduces full-spheroidal Leaver (ω_R *and* Γ) to
+~0.01% at a=0.9, α=0.5, flat against every numerical knob (PML width/reflection,
+x_right, dx).
+
+**Tier B — time-domain frequency-filter: DONE (proof point).** This is the
+method that, unlike the eigenvalue solve, *extends to the nonlinear problem*.
+A checkpointed 10⁵ M evolution of Dolan's Gaussian initial data (Eq. 45) ran at
+the a=0.99, α=0.42 peak (job 25713497, lr6, ~1h07m; recipe in `runs/README.md`).
+- The raw probe spectrum is a textbook Dolan result: n=0 and n=1 peaks land
+  *exactly* on Leaver, with a resolved tower of higher overtones.
+- Dolan's frequency filter (`frequency_filter.py`, Eq. 46/49) recovers the
+  growth rate: **n=0 Γ = 1.49e-7 vs Leaver 1.50e-7 (ratio 0.992, 0.8%)**;
+  n=1 Γ = 4.68e-8 vs 5.36e-8 (ratio 0.873, 13%).
+- Reproduce the spectrum + Γ table from the saved probe record with
+  `analyze_timedomain_run.py <run.npz>`.
+
+This supersedes the old plain log-slope extraction (which was PML-contaminated,
+~2.5% and width-dependent) — the frequency filter is Dolan's actual Sec. IV A 2
+method and is robust.
+
+**The ℓ-tower stays negligible here** (ℓ=3 populates at ~4e-4 of ℓ=1), as at
+a=0.9; `l_max`=1,3,5 give identical Γ. It is the faithful equation and is
+expected to matter at higher spin/coupling and for multi-mode/nonlinear work.
+
+**Immediate next steps (agreed order, 2026-09-08):**
+1. **[DONE] Consolidate & document** — this Status rewrite, plus `runs/README.md`
+   (run recipe) and `analyze_timedomain_run.py` (rerunnable spectrum + Γ table).
+2. **Diagnose the n=1 13% deficit** — likely frequency-filter bleed (the n=0/n=1
+   peaks are only ~1.5 FFT bins apart at Δω≈6.3e-5) or the fit window. Cheap
+   knobs: `filter_bin_count`, `central_fraction`, probe position, longer record.
+3. **Full time-domain Fig. 13 curve** — a SLURM array of ~15 α points at 10⁵ M,
+   extracting Γ(α) time-domain for both overtones, to confirm the filter method
+   tracks Leaver across α (not just at the peak). ~15×1h.
+
+After that, the time-domain extractor is validated and the path opens to the
+actual science: turn on the `|ψ|²ψ` self-interaction and measure saturation.
 
 **Future upgrade path (parked):** hyperboloidal slicing replaces the PML+wall
 entirely — a real coordinate change to slices reaching the horizon and scri⁺,

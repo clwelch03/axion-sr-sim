@@ -14,6 +14,7 @@ import argparse
 import numpy as np
 
 import leaver
+from frequency_filter import fourier_amplitudes
 from measure_gamma import measure_filtered_mode
 
 # Dolan Fig. 13 tracks the l=m=1 fundamental (n=0) and first overtone (n=1).
@@ -47,12 +48,61 @@ def report_growth_rates(times, probe_signal, spin, alpha, m,
               f" {reference.imag:13.4e} {measured_gamma:13.4e} {ratio:7.3f}")
 
 
+def plot_raw_spectrum(times, probe_signal, spin, alpha, m, output_path):
+    """Save the raw probe power spectrum with the Leaver frequencies marked."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    angular_frequencies, amplitudes = fourier_amplitudes(times, probe_signal)
+    # solver convention psi ~ exp(-i wR t) places the peak at -wR; flip to the
+    # physical positive frequency for plotting.
+    physical_frequency = -angular_frequencies
+    power = np.abs(amplitudes) ** 2
+    power /= power.max()
+
+    colours = ["tab:red", "tab:blue"]
+    leaver_omega = {
+        label: complex(leaver.solve(alpha, spin, l=m, m=m, n=n_p,
+                                     spheroidal=True))
+        for label, n_p in OVERTONES
+    }
+
+    figure, (wide_axis, zoom_axis) = plt.subplots(2, 1, figsize=(9, 8))
+    for axis in (wide_axis, zoom_axis):
+        axis.semilogy(physical_frequency, power, "k-", lw=0.7)
+        for (label, _), colour in zip(OVERTONES, colours):
+            axis.axvline(
+                leaver_omega[label].real, color=colour, ls="--", lw=1.2,
+                label=f"Leaver {label}: "
+                      f"$\\omega M$ = {leaver_omega[label].real:.6f}")
+        axis.set_ylabel(r"normalized raw power  $|f(\omega)|^2$")
+        axis.legend(fontsize=8, loc="lower left")
+
+    wide_axis.set_xlim(0.0, 0.5)
+    wide_axis.set_ylim(1e-12, 2.0)
+    wide_axis.set_title(
+        f"Dolan Gaussian evolution: raw $\\ell=m={m}$ probe spectrum "
+        f"($a={spin}M$, $M\\mu={alpha}$, $t_{{\\max}}={times[-1]:.0f}M$)")
+
+    fundamental = leaver_omega["n=0"].real
+    zoom_axis.set_xlim(fundamental - 0.014, fundamental + 0.016)
+    zoom_axis.set_ylim(1e-8, 2.0)
+    zoom_axis.set_xlabel(r"physical frequency  $\omega M$")
+
+    figure.tight_layout()
+    figure.savefig(output_path, dpi=150)
+    print(f"\nsaved {output_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("npz_path", help="run .npz written by measure_gamma.py")
     parser.add_argument("--search-half-width", type=float, default=0.002,
                         help="frequency window (in omega*M) around each Leaver "
                              "peak for the filtered-mode search")
+    parser.add_argument("--spectrum-plot", default=None,
+                        help="if given, save the raw probe power spectrum here")
     arguments = parser.parse_args()
 
     times, probe_signal, spin, alpha, m = load_probe_record(arguments.npz_path)
@@ -60,6 +110,9 @@ def main():
           f"a={spin}, alpha={alpha}, m={m}")
     report_growth_rates(times, probe_signal, spin, alpha, m,
                         arguments.search_half_width)
+    if arguments.spectrum_plot is not None:
+        plot_raw_spectrum(times, probe_signal, spin, alpha, m,
+                          arguments.spectrum_plot)
 
 
 if __name__ == "__main__":

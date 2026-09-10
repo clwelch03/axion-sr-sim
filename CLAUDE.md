@@ -32,8 +32,9 @@ Long informative variable names: `cloud_norm`, not `anorm`; `x_pml_center`, not
 
 ## Say what you mean
 
-Plain statements. Avoid flowery language for its own sake and metaphor for the
-sake of metaphor. A design note should read like documentation, not an essay.
+Plain statements. Avoid mannered prose, overly flowerly language, and metaphor
+for the sake of metaphor. Instead of "this point earns its keep", write "this point
+still matters"; instead of "a dial worth turning", write "a parameter worth varying".
 
 ## Building from-scratch reproductions
 

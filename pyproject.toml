@@ -17,6 +17,7 @@ dependencies = ["numpy", "scipy", "mpmath", "matplotlib"]
 package-dir = { "" = "src" }
 py-modules = [
     "solver",
+    "hydrogenic",
     "leaver",
     "qbs_eigenmode",
     "frequency_filter",

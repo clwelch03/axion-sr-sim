@@ -35,6 +35,7 @@ import time
 import mpmath as mp
 import numpy as np
 import leaver
+import hydrogenic
 from scipy.sparse.linalg import ArpackNoConvergence
 from solver import Tower
 from qbs_eigenmode import solve_qbs
@@ -153,7 +154,7 @@ def compute(curves=None):
 GRID_MARKERS = {4: "s", 6: "D", 8: "^", 12: "v"}
 
 
-def plot(curves, results, timedomain_sets, path):
+def plot(curves, results, timedomain_sets, path, include_hydrogenic=False):
     """Draw Fig. 13: Leaver curves, eigenvalue points, time-domain points.
 
     ``results`` is optional (None to omit the eigenvalue points).
@@ -167,6 +168,11 @@ def plot(curves, results, timedomain_sets, path):
 
     fig, ax = plt.subplots(figsize=(7, 5.25))  # 4:3
     for label, n_p, colour in overtones:
+        if include_hydrogenic:
+            ax.plot(curve_alpha_values, hydrogenic.growth_rate(
+                curve_alpha_values, SPIN, radial_overtone=n_p - 2),
+                ":", color=colour, lw=1.5,
+                label=f"{label}  hydrogenic (small-alpha)")
         ax.plot(curve_alpha_values, curves[label].imag, "--", color=colour,
                 lw=1.3, label=f"{label}  Leaver (continued fraction)")
         if results is not None:
@@ -199,6 +205,8 @@ def plot(curves, results, timedomain_sets, path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--include-hydrogenic", action="store_true",
+                        help="overlay the leading small-alpha amplitude growth rate")
     parser.add_argument("--skip-eigenvalue", action="store_true",
                         help="omit the eigenvalue points, i.e. skip the slow "
                              "ARPACK sweep and redraw from the Leaver curves "
@@ -228,9 +236,11 @@ def main():
         fig13_timedomain_points.print_growth_rate_table(alpha_values, measured)
         timedomain_sets.append((grid_spacing_n, (alpha_values, measured)))
 
-    output_path = "plots/fig13_growth_rates.png"
+    output_path = ("plots/fig13_with_hydrogenic.png" if arguments.include_hydrogenic
+                   else "plots/fig13_growth_rates.png")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    plot(curves, results, timedomain_sets, output_path)
+    plot(curves, results, timedomain_sets, output_path,
+         include_hydrogenic=arguments.include_hydrogenic)
 
 
 if __name__ == "__main__":

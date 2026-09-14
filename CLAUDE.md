@@ -78,12 +78,15 @@ Heavy runs go through SLURM — see `runs/README.md` for the submit scripts.
 
 ### Tests
 
-There is no `tests/` suite yet. The validation checks described in `solver.py`
+`tests/test_hydrogenic.py` contains analytic normalization, overtone, threshold,
+broadcasting, and input checks for the small-alpha benchmark. Run with
+`PYTHONPATH=src python -m unittest discover -s tests` (also pytest-compatible).
+The validation checks described in `solver.py`
 (4th-order stencil convergence, Thomas vs dense solve, single-channel `rhs`
 identity, tower ℓ-leakage) were run ad hoc; a grid-convergence script
 (`convergence_test.py`) lives on the old fork branch
 `feat/eigenmode-seed-and-backreaction`. Turning those into a real `tests/`
-directory is a pending task (see `HANDOFF.md` / the repo-structure plan).
+suite is a pending task (see `HANDOFF.md` / the repo-structure plan).
 
 ## Module map
 

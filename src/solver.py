@@ -338,7 +338,7 @@ def pml_profile(x, x_pml_center, pml_width, target_reflection=1e-6, power=3):
                     = 0                          outside.
 
     The amplitude follows Dolan's Eq. (42), where the field attenuates as
-    exp(-\int gamma dx); for this shape \int gamma dx = gamma_max * w/(power+1),
+    exp(-int gamma dx); for this shape int gamma dx = gamma_max * w/(power+1),
     so a target single-pass residual R_0 fixes
 
         gamma_max = -(power + 1) ln(R_0) / pml_width.

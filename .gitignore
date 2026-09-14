@@ -1,0 +1,5 @@
+# Regenerable outputs and bytecode caches -- see runs/.gitignore for the
+# same convention applied to heavy run artifacts.
+__pycache__/
+*.pyc
+plots/

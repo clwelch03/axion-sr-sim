@@ -1,8 +1,17 @@
-"""Seed generator: the quasi-bound-state eigenmode profile for a Tower.
+"""Eigenvalue method: the quasi-bound state of a Tower, straight from the operator.
 
-This is a UTILITY, not the physics.  measure_gamma.py uses Dolan's time-domain
-evolution; it just needs a transient-free starting profile, and the cleanest
-such profile is the QBS eigenmode.
+Diagonalise the discretised linear generator and read off the QBS complex
+frequency omega = omega_R + i Gamma directly -- no time evolution. This is the
+frequency-domain growth rate; ``fig13_growth_rates.py`` uses it for the
+eigenvalue Fig. 13. It is cheap and accurate for the LINEAR problem but does not
+extend to the nonlinear one (no linear generator to diagonalise once the field
+self-interacts) -- that is what the time-domain path
+(``measure_gamma.py`` + ``frequency_filter.py``) is for.
+
+``solve_qbs`` also returns the eigenvector profile, which is a transient-free
+seed for a time-domain run. The current driver does not use it -- it seeds with
+a broadband Gaussian (Dolan Eq. 45) instead -- but the profile is still handy
+for diagnostics.
 
 How it works, in one idea: the linearised system is  d/dt u = G u  with
 u = [psi; pi; chi].  A single mode evolves as u ~ e^{lambda t}, so the QBS is an

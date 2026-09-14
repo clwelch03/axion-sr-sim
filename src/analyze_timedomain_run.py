@@ -16,6 +16,7 @@ import numpy as np
 import leaver
 from frequency_filter import fourier_amplitudes
 from measure_gamma import measure_filtered_mode
+import plotstyle  # sets the repo default colour cycle (C0..C9) on import
 
 # Dolan Fig. 13 tracks the l=m=1 fundamental (n=0) and first overtone (n=1).
 # leaver.py's principal number is n_p = l + 1 + n_radial, so n=0 -> n_p=2.
@@ -61,7 +62,7 @@ def plot_raw_spectrum(times, probe_signal, spin, alpha, m, output_path):
     power = np.abs(amplitudes) ** 2
     power /= power.max()
 
-    colours = ["tab:red", "tab:blue"]
+    colours = ["C0", "C1"]  # match fig13_growth_rates: n=0 -> C0, n=1 -> C1
     leaver_omega = {
         label: complex(leaver.solve(alpha, spin, l=m, m=m, n=n_p,
                                      spheroidal=True))

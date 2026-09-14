@@ -95,11 +95,18 @@ All modules are in `src/`. Library (imported by drivers):
 - `qbs_eigenmode.py` — `solve_qbs`: the QBS as an eigenvector of the linear
   generator; gives the eigenvalue Γ.
 - `frequency_filter.py` — Dolan's frequency filter (Eq. 46/49), pure importable.
+- `plotstyle.py` — the repo default plot palette; sets the matplotlib colour
+  cycle (five brand colours as C0..C4, topped up to ten distinct) on import.
+- `fig13_timedomain_points.py` — sweeps the finished `measure_gamma.py` runs and
+  extracts the frequency-filter Γ per α, selecting runs by the `grid_spacing_n`
+  recorded inside each `.npz`. Imported by `fig13_growth_rates` for the overlay.
 
 Drivers:
 - `measure_gamma.py` — time-domain evolution + probe recording; imports
   `frequency_filter`.
-- `fig13_growth_rates.py` — the eigenvalue Fig. 13 reproduction.
+- `fig13_growth_rates.py` — the Fig. 13 reproduction: Leaver curves, our
+  eigenvalue points, and (via `fig13_timedomain_points`) the time-domain Γ
+  points; `--grid-spacing-n 4 8` overlays several resolutions.
 - `analyze_timedomain_run.py` — spectrum + Γ table from a saved probe record.
 
 ## runs/ layout

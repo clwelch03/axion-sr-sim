@@ -253,9 +253,11 @@ class Tower:
                 sub[i] = self.a2Delta * self.c_matrix[i, i - 1]
         return sub, diag, sup
 
-    def rhs(self, state):
+    def rhs(self, state, *, additional_b=None):
         """Full Eq. (25) interior + Eq. (44) PML source.  state = (psi, pi, chi),
         each complex (n_channels, n_points).  Returns (psi_dot, pi_dot, chi_dot).
+        Optional additional_b has the same shape and is added before A is
+        inverted. PML terms and boundary freezing are then applied as usual.
 
         pi_dot = A^{-1} b   (the full coupled Eq. 25, computed everywhere)
                  + [ -chi' - imOmega chi - gamma (pi + imOmega psi) ]   (PML source)
@@ -287,6 +289,12 @@ class Tower:
             offdiag_c = self.c_matrix - np.diag(np.diag(self.c_matrix))
             coupling = np.einsum("ij,jn->in", offdiag_c, psi)
             b = b - self.alpha**2 * self.a2Delta * coupling
+
+        if additional_b is not None:
+            additional_b = np.asarray(additional_b)
+            if additional_b.shape != b.shape:
+                raise ValueError("additional_b must match the tower's channel/grid shape")
+            b = b + additional_b
 
         # solve A pi_dot = b (tridiagonal in channel, every node at once)
         sub, diag, sup = self.build_A_diagonals()

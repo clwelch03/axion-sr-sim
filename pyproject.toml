@@ -18,6 +18,8 @@ package-dir = { "" = "src" }
 py-modules = [
     "solver",
     "hydrogenic",
+    "nonlinear_source",
+    "nonlinear_tower",
     "leaver",
     "qbs_eigenmode",
     "frequency_filter",

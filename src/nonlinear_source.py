@@ -19,10 +19,19 @@ def sine_remainder(real_field):
     small_field = real_field[small]
     squared_field = small_field**2
     # Through Phi^11; the omitted Phi^13/13! is negligible below |Phi|=0.1.
-    remainder = np.array(remainder, copy=True)
-    remainder[small] = small_field**3 * (
-        1 / 6 + squared_field * (-1 / 120 + squared_field * (
-            1 / 5040 + squared_field * (-1 / 362880 + squared_field / 39916800))))
+    # Subtraction already made a fresh result; asarray also handles scalars.
+    remainder = np.asarray(remainder)
+    # Evaluate the same nested polynomial in Phi^2 using one work array.
+    polynomial = squared_field / 39916800
+    polynomial -= 1 / 362880
+    for coefficient in (1 / 5040, -1 / 120, 1 / 6):
+        polynomial *= squared_field
+        polynomial += coefficient
+    # Boolean indexing above made small_field a copy, so reusing it for Phi^3
+    # cannot modify the caller's input. Preserve the original operation order.
+    small_field *= squared_field
+    polynomial *= small_field
+    remainder[small] = polynomial
     return remainder
 
 
@@ -67,7 +76,8 @@ def nonlinear_source(coefficients, *, radius, spin, alpha, delta,
 
 
 def nonlinear_source_on_grid(coefficients, *, radii, spin, alpha, delta,
-                             harmonics, cosine_theta, solid_angle_weights):
+                             harmonics, cosine_theta, solid_angle_weights,
+                             contiguous_arrays=False):
     """Return b_NL with shape (channel, radial node), matching coefficients.
 
     radii and delta are one-dimensional arrays on the shared tower grid.
@@ -76,6 +86,7 @@ def nonlinear_source_on_grid(coefficients, *, radii, spin, alpha, delta,
     Process radial blocks with matrix products; temporary angular arrays are
     bounded to 256 radial slices rather than the entire simulation grid.
     Boundary freezing/PML remain the responsibility of the evolution operator.
+    contiguous_arrays enables an experimental matrix-layout comparison.
     """
     coefficients = np.asarray(coefficients, dtype=complex)
     radii = np.asarray(radii, dtype=float)
@@ -95,17 +106,28 @@ def nonlinear_source_on_grid(coefficients, *, radii, spin, alpha, delta,
     cosine_squared = np.broadcast_to(np.asarray(cosine_theta)[:, None]**2,
                                      angular_shape).ravel()
     projection = flat_harmonics.conj() * weights
+    harmonic_real, harmonic_imag = flat_harmonics.real, flat_harmonics.imag
+    projection_real, projection_imag = projection.real, projection.imag
+    if contiguous_arrays:
+        harmonic_real = np.ascontiguousarray(harmonic_real)
+        harmonic_imag = np.ascontiguousarray(harmonic_imag)
+        projection_real = np.ascontiguousarray(projection_real)
+        projection_imag = np.ascontiguousarray(projection_imag)
     # Phi is real: two real matrix products avoid complex angular-grid arrays.
     source = np.empty_like(coefficients)
     for start in range(0, radii.size, 256):
         stop = min(start + 256, radii.size)
         block = coefficients[:, start:stop]
+        coefficient_real, coefficient_imag = block.real, block.imag
+        if contiguous_arrays:
+            coefficient_real = np.ascontiguousarray(coefficient_real)
+            coefficient_imag = np.ascontiguousarray(coefficient_imag)
         radius = radii[start:stop]
         real_field = (2 / radius) * (
-            flat_harmonics.real.T @ block.real - flat_harmonics.imag.T @ block.imag)
+            harmonic_real.T @ coefficient_real - harmonic_imag.T @ coefficient_imag)
         weighted_remainder = sine_remainder(real_field) * (
             radius**2 + spin**2 * cosine_squared[:, None])
-        projected = (projection.real @ weighted_remainder
-                     + 1j * (projection.imag @ weighted_remainder))
+        projected = (projection_real @ weighted_remainder
+                     + 1j * (projection_imag @ weighted_remainder))
         source[:, start:stop] = alpha**2 * radius * delta[start:stop] * projected
     return source

@@ -34,12 +34,12 @@ Before long evolutions, benchmark and improve the angular source; consider a
 Julia kernel alongside a NumPy implementation using precomputed arrays and
 reusable buffers. A full solver port has not been started.
 
-`src/benchmark_nonlinear.py` provides a short, reproducible timing/profile probe:
+`src/dolan/benchmark_nonlinear.py` provides a short, reproducible timing/profile probe:
 
 ```bash
 module load miniconda3/22.11.1-gcc-11.4.0
 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 \
-  conda run -n BHsuper python src/benchmark_nonlinear.py --profile
+  PYTHONPATH=src conda run -n BHsuper python -m dolan.benchmark_nonlinear --profile
 ```
 
 Defaults: $a=0.99$, $\alpha=0.42$, $x/M\in[-200,511]$, 4267 radial nodes,

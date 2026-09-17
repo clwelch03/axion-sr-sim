@@ -13,7 +13,7 @@ from numpy.polynomial.legendre import leggauss
 from scipy.special import sph_harm_y
 import mpmath as mp
 
-from nonlinear_source import nonlinear_source, sine_remainder
+from dolan.nonlinear_source import nonlinear_source, sine_remainder
 
 
 def project_dipole_source(amplitude, polar_count=12, azimuth_count=24):

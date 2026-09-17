@@ -18,6 +18,10 @@ $$\mathbf{A}\dot{\mathbf{x}} = \mathbf{b},$$
 where $\mathbf{x}$ is a vector of all the coupled $\pi_\ell$ -- that is, $(\pi_{|m|}, \pi_{|m|+2}, \cdots)^\top$ or $(\pi_{|m|+1}, \pi_{|m|+3}, \cdots)^\top$ -- and $\mathbf{A}$ is a tridiagonal matrix. We implement this using `Tower` (see section 4) and solve it using the methods outlined in section 5.
 
 # 3. Module map
+
+Dolan modules live in `src/dolan/`; independent benchmarks and plotting live
+in `src/common/`. The new adiabatic method lives in `src/adiabatic/` and has its
+own checkpoint document, `adiabatic-repro.md`.
 * `solver.py`: `KerrTortoise` grid, `Tower` to model the same-parity $\ell$ spectrum of Dolan's eq. (25), and method of lines implementation.
 * `leaver.py`: Canonical continued-fraction solver as a benchmark to check our results against. Our operator contains an $a^2 \mu^2 \cos^2 \theta$ term, so we set `spheroidal=True` for Leaver to match.
 * `qbs_eigenmode.py`: Diagonalizes the `Tower` operator from `solver` to get the (linear) complex eigenfrequency cheaply.

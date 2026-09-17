@@ -9,7 +9,7 @@ import numpy as np
 from numpy.polynomial.legendre import leggauss
 from scipy.special import sph_harm_y
 
-from nonlinear_source import nonlinear_source, nonlinear_source_on_grid
+from dolan.nonlinear_source import nonlinear_source, nonlinear_source_on_grid
 
 
 class NonlinearSourceGridTests(unittest.TestCase):

@@ -19,7 +19,7 @@ near the top of the sweep -- at alpha=0.44 the n=1 root finder lands on
 Im(omega) ~ -0.1, which is not a quasi-bound state at all.  The branch-tracked
 curve in ``fig13_growth_rates.leaver_curve`` is the reliable source.
 
-    python src/fig13_timedomain_points.py --grid-spacing-n 4
+    PYTHONPATH=src python -m dolan.fig13_timedomain_points --grid-spacing-n 4
 """
 
 import argparse
@@ -27,8 +27,8 @@ import os
 
 import numpy as np
 
-from analyze_timedomain_run import load_probe_record
-from measure_gamma import measure_filtered_mode
+from dolan.analyze_timedomain_run import load_probe_record
+from dolan.measure_gamma import measure_filtered_mode
 
 # Dolan Fig. 13 tracks the l=m=1 fundamental (n=0) and first overtone (n=1).
 # leaver.py's principal number is n_p = l + 1 + n_radial, so n=0 -> n_p=2.
@@ -132,7 +132,7 @@ def main():
 
     # Imported here, not at module scope: fig13_growth_rates imports this
     # module for the overlay, so a top-level import would be circular.
-    from fig13_growth_rates import leaver_omega_by_alpha
+    from dolan.fig13_growth_rates import leaver_omega_by_alpha
 
     run_records = find_run_records(arguments.run_directory,
                                    arguments.grid_spacing_n)

@@ -14,11 +14,11 @@ been implemented or tested here.
 
 **What the repository currently evolves.**
 
-[solver.py](../src/solver.py) implements Dolan's fixed-Kerr scalar equations as
+[solver.py](../src/dolan/solver.py) implements Dolan's fixed-Kerr scalar equations as
 radial towers, with a tridiagonal solve over angular channels at each radial
 point. `Tower.__init__` fixes `mass = 1`, constructs `r(x)`, and caches the metric
 coefficients, potential and horizon angular velocity.
-[nonlinear_source.py](../src/nonlinear_source.py) reconstructs
+[nonlinear_source.py](../src/dolan/nonlinear_source.py) reconstructs
 
 \[
 \Phi(t,r,\theta,\varphi)=\frac{2}{r}\operatorname{Re}
@@ -27,9 +27,9 @@ coefficients, potential and horizon angular velocity.
 \]
 
 and projects the sine remainder into the scalar RHS before the tridiagonal
-solve. [nonlinear_tower.py](../src/nonlinear_tower.py) advances positive odd
+solve. [nonlinear_tower.py](../src/dolan/nonlinear_tower.py) advances positive odd
 \(m\) towers together, recomputing their common source at each RK4 stage.
-[sine_remainder.jl](../src/sine_remainder.jl) is an arithmetic kernel for that
+[sine_remainder.jl](../src/dolan/sine_remainder.jl) is an arithmetic kernel for that
 potential; gravitational coupling belongs in the common RHS and geometry
 machinery. The nonlinear progress note identifies physical energy,
 angular-momentum and flux diagnostics as outstanding work.

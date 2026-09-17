@@ -30,7 +30,7 @@ module load miniconda3/22.11.1-gcc-11.4.0
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate BHsuper          # numpy/scipy/mpmath/matplotlib
 
-python -u src/measure_gamma.py \
+PYTHONPATH=src python -u -m dolan.measure_gamma \
     --output "${output}" \
     --time-final 1000000.0 \
     --spin 0.99 --alpha "${alpha}" --m 1 --l-max 5 --grid-spacing-n "${grid_spacing_n}" \

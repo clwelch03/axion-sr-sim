@@ -1,9 +1,9 @@
-# radial1d time-domain runs
+# Dolan time-domain runs
 
 Heavy time-domain evolutions and their outputs. Per the repo `.gitignore`,
 everything regenerable lives here but stays *out* of git: the run `.npz`, the
-SLURM `.out`/`.err`, the `.sh` submit script, and any `.png`. Only this README
-is committed — it records how to regenerate the rest.
+SLURM `.out`/`.err`, and any `.png`. Submit scripts (`.sh`) and this README
+are tracked — they record how to regenerate the outputs.
 
 ## Dolan Fig. 13 time-domain point (a=0.99, alpha=0.42)
 
@@ -14,7 +14,7 @@ frequency-filter Gamma extraction.
 
 - **Output:** `dolan_fig13_a099_alpha042_t100000.npz` (gitignored, on scratch)
 - **Cost:** ~1h07m single-core on Lawrencium `lr6` (job 25713497)
-- **Analyse with:** `python src/analyze_timedomain_run.py <npz>` (raw spectrum + Gamma table)
+- **Analyse with:** `PYTHONPATH=src python -m dolan.analyze_timedomain_run <npz>` (raw spectrum + Gamma table)
 
 ### Submit script (`dolan_fig13_timedomain.sh`)
 
@@ -36,7 +36,7 @@ module load miniconda3/22.11.1-gcc-11.4.0
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate BHsuper          # numpy/scipy/mpmath/matplotlib
 
-python -u src/measure_gamma.py \
+PYTHONPATH=src python -u -m dolan.measure_gamma \
     --output runs/dolan_fig13_a099_alpha042_t100000.npz \
     --time-final 100000.0 \
     --spin 0.99 --alpha 0.42 --m 1 --l-max 5 --grid-spacing-n 6 \
@@ -52,7 +52,7 @@ with the same command plus `--resume`.
 ## Full Fig. 13 time-domain curve (a=0.99, alpha sweep)
 
 The whole curve as a SLURM array, one alpha per task -- script
-`dolan_fig13_array.sh` (a `.sh`, so gitignored; kept here as the committed recipe).
+`dolan_fig13_array.sh` (tracked alongside this recipe).
 Each task is an independent t=10^6 M run into `runs/fig13/`.
 
 - **alpha map:** `alpha = 0.30 + 0.01 * SLURM_ARRAY_TASK_ID` (task 0 -> 0.30,
@@ -72,7 +72,7 @@ Each task is an independent t=10^6 M run into `runs/fig13/`.
   the ~3% time-domain extraction floor (filter ringing + n=1 SNR). Cost ~ n^2, so
   n=4 is 1/4 of n=8 for effectively the same curve. Pick grid n by that cheap
   eigenvalue test, not by defaulting high.
-- **Analyse:** `python src/analyze_timedomain_run.py runs/fig13/<one>.npz` per point.
+- **Analyse:** `PYTHONPATH=src python -m dolan.analyze_timedomain_run runs/fig13/<one>.npz` per point.
 - **Caveat:** a fixed 10^6 M does not give uniform n=1 accuracy across alpha --
   the growth rate (hence SNR) shrinks at low alpha and near the n=1 zero-crossing
   (alpha~0.44), so the ends are noisier than the peak.

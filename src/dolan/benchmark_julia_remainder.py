@@ -1,6 +1,6 @@
 """Compare NumPy and Julia on identical float64 inputs; no Python-Julia bridge.
 
-Run: python src/benchmark_julia_remainder.py --julia /path/to/julia
+Run: PYTHONPATH=src python -m dolan.benchmark_julia_remainder --julia /path/to/julia
 Requires Julia Base only. Temporary binary files preserve inputs exactly.
 """
 
@@ -14,7 +14,7 @@ from time import perf_counter
 import mpmath as mp
 import numpy as np
 
-from nonlinear_source import sine_remainder
+from dolan.nonlinear_source import sine_remainder
 
 
 def main():

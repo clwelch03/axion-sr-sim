@@ -6,8 +6,8 @@ import numpy as np
 from numpy.polynomial.legendre import leggauss
 from scipy.special import sph_harm_y
 
-from nonlinear_tower import coupled_rk4_step
-from solver import Tower
+from dolan.nonlinear_tower import coupled_rk4_step
+from dolan.solver import Tower
 
 
 class CoupledRK4Tests(unittest.TestCase):

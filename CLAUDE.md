@@ -53,25 +53,26 @@ Environment: conda env `BHsuper` (numpy, scipy, mpmath, matplotlib). On
 Lawrencium: `module load miniconda3/22.11.1-gcc-11.4.0` then
 `conda activate BHsuper`.
 
-The modules live flat in `src/` and import each other by bare name
-(`from solver import Tower`). Run them as `python src/<script>.py` from the repo
-root — Python puts the script's own directory (`src/`) on the path, so the bare
-imports resolve. (`pytest` finds them via `pythonpath = ["src"]` in
-`pyproject.toml`; `pip install -e .` also works but is not needed.)
+Packages live under `src/dolan/`, `src/adiabatic/`, and `src/common/`.
+Use qualified imports (`from dolan.solver import Tower`) and run drivers from
+the repo root with `PYTHONPATH=src python -m dolan.<module>`.
+An editable install (`python -m pip install -e . --no-deps`) allows omitting
+`PYTHONPATH=src`. Pytest includes `src` through `pyproject.toml`.
+The adiabatic reproduction starts with the checkpoint in `docs/adiabatic-repro.md`.
 
 - **Eigenvalue growth rate (linear, fast):**
-  `python src/fig13_growth_rates.py` — sweeps α at a=0.99, overlays `solve_qbs`
+  `PYTHONPATH=src python -m dolan.fig13_growth_rates` — sweeps α at a=0.99, overlays `solve_qbs`
   eigenvalue points on spheroidal Leaver for n=0 and n=1. Writes a PNG.
 - **Time-domain growth rate (the path that extends to nonlinear):**
-  `python src/measure_gamma.py --output <run.npz> --time-final <T> --spin <a>
+  `PYTHONPATH=src python -m dolan.measure_gamma --output <run.npz> --time-final <T> --spin <a>
   --alpha <α> --m 1 --l-max 5 ...` — evolves Dolan's Gaussian initial data,
   saves the fixed-x complex probe series per channel. Checkpoints on an interval;
   resume a killed run with the same command plus `--resume`. Full argument set
   and the reference invocation are in `runs/README.md`.
 - **Analyse a finished time-domain run:**
-  `python src/analyze_timedomain_run.py <run.npz>` — raw probe spectrum plus the
+  `PYTHONPATH=src python -m dolan.analyze_timedomain_run <run.npz>` — raw probe spectrum plus the
   frequency-filter Γ table against the runtime Leaver benchmark.
-- **Leaver benchmark alone:** `python src/leaver.py --help` (continued fraction,
+- **Leaver benchmark alone:** `PYTHONPATH=src python -m common.leaver --help` (continued fraction,
   mpmath; use `spheroidal=True` for the apples-to-apples comparison).
 
 Heavy runs go through SLURM — see `runs/README.md` for the submit scripts.
@@ -90,7 +91,8 @@ suite is a pending task (see `HANDOFF.md` / the repo-structure plan).
 
 ## Module map
 
-All modules are in `src/`. Library (imported by drivers):
+Dolan modules are in `src/dolan/`; `leaver.py`, `hydrogenic.py`, and
+`plotstyle.py` are in `src/common/`. Library (imported by drivers):
 - `solver.py` — grid, Kerr tortoise `r(x)`, the `c^m_{jl}` coupling matrix,
   Eq. 25/26 coefficients, 4th-order stencils, Thomas solve, RK4/MoL. The `Tower`
   object is the core data model.

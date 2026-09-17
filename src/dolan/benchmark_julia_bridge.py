@@ -20,11 +20,11 @@ import numpy as np
 from numpy.polynomial.legendre import leggauss
 from scipy.special import sph_harm_y
 
-from julia_remainder_bridge import JuliaRemainder
-import nonlinear_source
-import nonlinear_tower
-from nonlinear_tower import coupled_rk4_step
-from solver import Tower
+from dolan.julia_remainder_bridge import JuliaRemainder
+from dolan import nonlinear_source
+from dolan import nonlinear_tower
+from dolan.nonlinear_tower import coupled_rk4_step
+from dolan.solver import Tower
 
 
 def profile_source_parts(towers, states, dt, angular, bridge, repeats):
@@ -178,7 +178,7 @@ def main():
             raise AssertionError('complex input must be rejected')
         if args.check_tests:
             with patch.object(nonlinear_source, 'sine_remainder', bridge):
-                suite = unittest.defaultTestLoader.discover(str(Path(__file__).resolve().parents[1] / 'tests'))
+                suite = unittest.defaultTestLoader.discover(str(Path(__file__).resolve().parents[2] / 'tests'))
                 result = unittest.TextTestRunner().run(suite)
                 if not result.wasSuccessful():
                     raise RuntimeError('Julia-backed regression tests failed')

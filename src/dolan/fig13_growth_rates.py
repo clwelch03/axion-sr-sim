@@ -25,8 +25,8 @@ trusting the time-domain rate when there is no Leaver curve to check against.
 Overtone convention: leaver.py's principal number n_p = l+1+n_radial, so the
 Fig.-13 fundamental n=0 is leaver n_p=2 and the overtone n=1 is n_p=3.
 
-    python src/fig13_growth_rates.py                     # both methods
-    python src/fig13_growth_rates.py --skip-eigenvalue   # Leaver + time domain
+    PYTHONPATH=src python -m dolan.fig13_growth_rates                     # both methods
+    PYTHONPATH=src python -m dolan.fig13_growth_rates --skip-eigenvalue   # Leaver + time domain
 """
 import argparse
 import os
@@ -34,13 +34,13 @@ import time
 
 import mpmath as mp
 import numpy as np
-import leaver
-import hydrogenic
+from common import leaver
+from common import hydrogenic
 from scipy.sparse.linalg import ArpackNoConvergence
-from solver import Tower
-from qbs_eigenmode import solve_qbs
-import fig13_timedomain_points
-import plotstyle  # sets the repo default colour cycle (C0..C9) on import
+from dolan.solver import Tower
+from dolan.qbs_eigenmode import solve_qbs
+from dolan import fig13_timedomain_points
+from common import plotstyle  # sets the repo default colour cycle (C0..C9) on import
 
 SPIN = 0.99
 curve_alpha_values = np.linspace(0.30, 0.44, 71)  # d_alpha=0.002

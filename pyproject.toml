@@ -5,28 +5,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "axion-sr-sim"
 version = "0.1.0"
-description = "From-scratch reproduction of Dolan 1212.1477 Sec. III: massive-scalar quasi-bound-state superradiance on Kerr"
+description = "Time-domain and adiabatic reproductions of axion superradiance on Kerr"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = ["numpy", "scipy", "mpmath", "matplotlib"]
 
-# Flat modules under src/. Day-to-day they are run directly
-# (`python src/measure_gamma.py ...`), which puts src/ on sys.path. This section
-# only matters if someone runs `pip install -e .`.
-[tool.setuptools]
-package-dir = { "" = "src" }
-py-modules = [
-    "solver",
-    "hydrogenic",
-    "nonlinear_source",
-    "nonlinear_tower",
-    "leaver",
-    "qbs_eigenmode",
-    "frequency_filter",
-    "measure_gamma",
-    "fig13_growth_rates",
-    "analyze_timedomain_run",
-]
+# Installable packages; PYTHONPATH=src also supports running from a checkout.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["dolan*", "adiabatic*", "common*"]
+
+[tool.setuptools.package-data]
+dolan = ["*.jl"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

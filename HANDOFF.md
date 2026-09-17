@@ -112,26 +112,14 @@ Sections 3, 4, 5 first (mechanical — they force a code read-through). Then 2
 and 6 (the vocabulary is in place). Then 1, 7, 8 (harvest from README + the
 fork's memory files).
 
-## Repo layout (agreed direction, not yet done)
+## Repo layout (updated 2026-09-17)
 
-Keep the library modules flat at root for now — they import each other by bare
-name (`from solver import Tower`), so a `src/` package reshuffle breaks that
-and isn't worth it yet. When you do restructure:
-
-```
-axion-sr-sim/
-├── pyproject.toml          # not yet written
-├── solver.py leaver.py qbs_eigenmode.py frequency_filter.py   # library
-├── measure_gamma.py fig13_growth_rates.py analyze_timedomain_run.py  # drivers
-├── runs/                   # SLURM recipes (tracked) + .npz (ignored)
-├── tests/                  # the unit tests from solver.py's docstring, made real
-└── docs/
-    ├── DESIGN.md           # move here from root when ready
-    └── dolan-repro.md      # rename of the current README.md
-```
-`frequency_filter` is a pure importable library; `measure_gamma` is a driver
-that imports it — that library/driver seam is the thing to organize on, not
-topic grouping.
+The code is packaged under `src/dolan/`, `src/adiabatic/`, and `src/common/`.
+Dolan contains the existing time-domain and nonlinear work; common contains
+Leaver, the hydrogenic benchmark, and plotting. Adiabatic is the new reproduction
+of Omiya, Takahashi & Tanaka (2201.04382), starting with the linear radial problem.
+See `README.md` for commands and `docs/adiabatic-repro.md` for the next checkpoint.
+Run outputs remain in place under `runs/`.
 
 ## Working conventions (carry into CLAUDE.md)
 

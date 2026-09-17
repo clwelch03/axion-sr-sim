@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from hydrogenic import growth_rate
+from common.hydrogenic import growth_rate
 
 
 class HydrogenicRateTests(unittest.TestCase):

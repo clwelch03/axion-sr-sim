@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from nonlinear_source import nonlinear_source_on_grid
+from dolan.nonlinear_source import nonlinear_source_on_grid
 
 
 def coupled_tower_rhs(towers, states, *, harmonics, cosine_theta,

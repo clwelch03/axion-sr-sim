@@ -11,8 +11,8 @@ import numpy as np
 from numpy.polynomial.legendre import leggauss
 from scipy.special import sph_harm_y
 
-from solver import Tower
-from nonlinear_source import nonlinear_source, project_real_source
+from dolan.solver import Tower
+from dolan.nonlinear_source import nonlinear_source, project_real_source
 
 
 class NonlinearSourceNormalizationTests(unittest.TestCase):

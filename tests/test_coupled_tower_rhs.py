@@ -6,9 +6,9 @@ import numpy as np
 from numpy.polynomial.legendre import leggauss
 from scipy.special import sph_harm_y
 
-from nonlinear_source import nonlinear_source_on_grid
-from nonlinear_tower import coupled_tower_rhs
-from solver import Tower
+from dolan.nonlinear_source import nonlinear_source_on_grid
+from dolan.nonlinear_tower import coupled_tower_rhs
+from dolan.solver import Tower
 
 
 class CoupledTowerRHSTests(unittest.TestCase):

@@ -13,10 +13,10 @@ import argparse
 
 import numpy as np
 
-import leaver
-from frequency_filter import fourier_amplitudes
-from measure_gamma import measure_filtered_mode
-import plotstyle  # sets the repo default colour cycle (C0..C9) on import
+from common import leaver
+from dolan.frequency_filter import fourier_amplitudes
+from dolan.measure_gamma import measure_filtered_mode
+from common import plotstyle  # sets the repo default colour cycle (C0..C9) on import
 
 # Dolan Fig. 13 tracks the l=m=1 fundamental (n=0) and first overtone (n=1).
 # leaver.py's principal number is n_p = l + 1 + n_radial, so n=0 -> n_p=2.

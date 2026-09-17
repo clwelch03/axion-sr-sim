@@ -12,7 +12,7 @@ import time
 
 import numpy as np
 
-from frequency_filter import (
+from dolan.frequency_filter import (
     find_mode_frequency,
     fit_growth_rate,
     fourier_amplitudes,
@@ -245,7 +245,7 @@ def main():
                         help="physical time between checkpoints")
     arguments = parser.parse_args()
 
-    from solver import Tower
+    from dolan.solver import Tower
 
     tower = Tower(
         spin=arguments.spin,

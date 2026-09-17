@@ -1,13 +1,13 @@
 """Repo default plot palette: the project's five brand colours as the matplotlib
 colour cycle, topped up to ten distinct entries.
 
-Import it for its side effect -- ``import plotstyle`` at the top of a plotting
+Import it for its side effect -- ``from common import plotstyle`` at the top of a plotting
 driver sets the default cycle, so any artist drawn without an explicit colour
 (bare ``C0``..``C9``, or successive ``ax.plot`` calls) takes these colours in
 order. The five brand colours are C0..C4; C5..C9 are matplotlib defaults that
 do not collide, so a plot of up to ten series stays distinct.
 
-    import plotstyle          # applies on import
+    from common import plotstyle          # applies on import
     plotstyle.PALETTE[0]      # '#3DAE2B', the first brand colour
 
 An explicit ``color=`` on a plot call still wins -- this only sets the default

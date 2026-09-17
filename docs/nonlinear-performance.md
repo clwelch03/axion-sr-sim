@@ -7,7 +7,7 @@ compute-node runtime guarantee.
 
 ## 1. Where is the time going?
 
-The benchmark in [benchmark_nonlinear.py](../src/benchmark_nonlinear.py) uses
+The benchmark in [benchmark_nonlinear.py](../src/dolan/benchmark_nonlinear.py) uses
 4267 radial nodes, six retained angular modes, and 32×64 angular points.
 One RK4 step evaluates the nonlinear source four times: about 35 million
 field values per step.
@@ -178,7 +178,7 @@ installed. No C kernel was written. The next step is the small Julia
 
 ## 8. Standalone Julia loop: accuracy and timing checkpoint
 
-`src/sine_remainder.jl` now implements the same threshold and polynomial in a
+`src/dolan/sine_remainder.jl` now implements the same threshold and polynomial in a
 compiled loop. Each iteration chooses the polynomial or sine subtraction,
 then writes one result. No fast-math or explicit SIMD annotations are used.
 `sine_remainder!` writes into a supplied output array; the allocating wrapper
@@ -189,7 +189,7 @@ Reproduce the comparison (no additional Julia packages required):
 
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
-  python src/benchmark_julia_remainder.py \
+  PYTHONPATH=src python -m dolan.benchmark_julia_remainder \
   --julia /global/scratch/projects/pc_heptheory/clwelch/software/julia-1.13.0/bin/julia
 ```
 
@@ -238,7 +238,7 @@ substitutes the bridge for `sine_remainder` only inside the experiment:
 
 ```bash
 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 \
-  python src/benchmark_julia_bridge.py --check-tests \
+  PYTHONPATH=src python -m dolan.benchmark_julia_bridge --check-tests \
   --julia /global/scratch/projects/pc_heptheory/clwelch/software/julia-1.13.0/bin/julia
 ```
 

@@ -21,7 +21,8 @@ where $\mathbf{x}$ is a vector of all the coupled $\pi_\ell$ -- that is, $(\pi_{
 
 Dolan modules live in `src/dolan/`; independent benchmarks and plotting live
 in `src/common/`. The new adiabatic method lives in `src/adiabatic/` and has its
-own checkpoint document, `adiabatic-repro.md`.
+own [design document](adiabatic-design.md) and
+[reproduction status](adiabatic-repro.md).
 * `solver.py`: `KerrTortoise` grid, `Tower` to model the same-parity $\ell$ spectrum of Dolan's eq. (25), and method of lines implementation.
 * `leaver.py`: Canonical continued-fraction solver as a benchmark to check our results against. Our operator contains an $a^2 \mu^2 \cos^2 \theta$ term, so we set `spheroidal=True` for Leaver to match.
 * `qbs_eigenmode.py`: Diagonalizes the `Tower` operator from `solver` to get the (linear) complex eigenfrequency cheaply.

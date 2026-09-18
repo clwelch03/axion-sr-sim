@@ -58,7 +58,8 @@ Use qualified imports (`from dolan.solver import Tower`) and run drivers from
 the repo root with `PYTHONPATH=src python -m dolan.<module>`.
 An editable install (`python -m pip install -e . --no-deps`) allows omitting
 `PYTHONPATH=src`. Pytest includes `src` through `pyproject.toml`.
-The adiabatic reproduction starts with the checkpoint in `docs/adiabatic-repro.md`.
+For adiabatic work, read `docs/adiabatic-design.md` for the numerical design and
+`docs/adiabatic-repro.md` for current results and remaining checkpoints.
 
 - **Eigenvalue growth rate (linear, fast):**
   `PYTHONPATH=src python -m dolan.fig13_growth_rates` — sweeps α at a=0.99, overlays `solve_qbs`
@@ -79,9 +80,10 @@ Heavy runs go through SLURM — see `runs/README.md` for the submit scripts.
 
 ### Tests
 
-`tests/test_hydrogenic.py` contains analytic normalization, overtone, threshold,
+`tests/dolan/test_hydrogenic.py` contains analytic normalization, overtone, threshold,
 broadcasting, and input checks for the small-alpha benchmark. Run with
-`PYTHONPATH=src python -m unittest discover -s tests` (also pytest-compatible).
+`PYTHONPATH=src python -m unittest discover -s tests/dolan` (also pytest-compatible).
+Julia adiabatic checks: `julia --project=. tests/adiabatic/runtests.jl`.
 The validation checks described in `solver.py`
 (4th-order stencil convergence, Thomas vs dense solve, single-channel `rhs`
 identity, tower ℓ-leakage) were run ad hoc; a grid-convergence script

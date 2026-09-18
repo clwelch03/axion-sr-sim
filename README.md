@@ -8,8 +8,11 @@ is being built incrementally in `src/adiabatic/`.
 
 - **`docs/dolan-repro.md`** — living status doc: where the reproduction stands,
   what has been validated, what is next.
-- **`docs/adiabatic-repro.md`** — adiabatic method and first validation checkpoint.
-- **`docs/DESIGN.md`** — design doc: why the code is shaped the way it is.
+- **[`docs/adiabatic-design.md`](docs/adiabatic-design.md)** — adiabatic equations,
+  code structure, numerical choices, and nonlinear extension plan.
+- **[`docs/adiabatic-repro.md`](docs/adiabatic-repro.md)** — adiabatic validation
+  results, run commands, and remaining checkpoints.
+- **`docs/DESIGN.md`** — Dolan time-domain design.
 - **`CLAUDE.md`** — working conventions and how to run the solver, tests, and
   `runs/`.
 
@@ -47,4 +50,21 @@ occupation-number rate. Its radial overtone corresponds to Leaver's principal
 number minus `l+1`. The horizon factor retains the source approximation
 `omega_R = mu`, so its finite-alpha threshold is approximate too.
 
-Cheap analytic checks: `PYTHONPATH=src python -m unittest discover -s tests`.
+The adiabatic linear solver can be added to the same Fig. 13 axes as open diamonds:
+
+```
+PYTHONPATH=src python -m dolan.fig13_growth_rates --include-adiabatic
+```
+
+This requires the Julia project dependencies (`julia --project=.`); pass
+`--julia /path/to/julia` if Julia is not on `PATH`. It solves both radial overtones
+with angular modes `l=[1,3,5]`, using the Leaver real frequencies to select the
+branches and starting the imaginary frequency at zero. The figure remains
+`plots/fig13_growth_rates.png`; frequencies, residuals, and numerical settings
+are saved in `plots/fig13_adiabatic_points.csv`. Add `--skip-eigenvalue` to omit
+the ARPACK sweep, or combine with `--include-hydrogenic` for that comparison.
+Time-domain points default to `M/6`; use `--grid-spacing-n` to select another resolution.
+
+Python checks: `PYTHONPATH=src python -m unittest discover -s tests/dolan`.
+
+Julia adiabatic checks: `julia --project=. tests/adiabatic/runtests.jl`.

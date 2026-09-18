@@ -178,7 +178,7 @@ def main():
             raise AssertionError('complex input must be rejected')
         if args.check_tests:
             with patch.object(nonlinear_source, 'sine_remainder', bridge):
-                suite = unittest.defaultTestLoader.discover(str(Path(__file__).resolve().parents[2] / 'tests'))
+                suite = unittest.defaultTestLoader.discover(str(Path(__file__).resolve().parents[2] / 'tests' / 'dolan'))
                 result = unittest.TextTestRunner().run(suite)
                 if not result.wasSuccessful():
                     raise RuntimeError('Julia-backed regression tests failed')

@@ -2,7 +2,7 @@
 coupling alpha at a=0.99M, for the l=m=1 fundamental (n=0) and first overtone
 (n=1).
 
-THREE THINGS ON ONE SET OF AXES, and the difference between them is the point:
+The main axes compare three methods:
 
 1. Leaver (dashed lines) -- leaver.py's Dolan-2007 continued fraction, the
    independent frequency-domain benchmark both of our methods are measured
@@ -12,7 +12,7 @@ THREE THINGS ON ONE SET OF AXES, and the difference between them is the point:
    accurate, but it DOES NOT EXTEND TO THE NONLINEAR PROBLEM: once the field
    self-interacts (|psi|^2 psi) or backreacts there is no linear generator to
    diagonalise.
-3. Our time-domain measurement (filled squares) -- Dolan's Gaussian initial data
+3. Our time-domain measurement (filled markers) -- Dolan's Gaussian initial data
    evolved to t=10^6 M, then the frequency filter of Sec. IV A 2 (Eq. 46/49)
    applied to the fixed-x probe series. No linear generator appears anywhere in
    that chain, so this is the path that carries over to the nonlinear problem.
@@ -22,11 +22,17 @@ So (2) validates the discretisation and (3) validates the extraction method we
 actually intend to use later. Agreement of (3) with (1) is what licenses
 trusting the time-domain rate when there is no Leaver curve to check against.
 
+With --include-adiabatic, open diamonds compare the Julia adiabatic radial
+matching solver (linear limit, l=[1,3,5]) with the same Leaver curves. Leaver
+real frequencies seed the radial branches; the matching solver finds their
+complex frequencies with its initial imaginary frequency set to zero.
+
 Overtone convention: leaver.py's principal number n_p = l+1+n_radial, so the
 Fig.-13 fundamental n=0 is leaver n_p=2 and the overtone n=1 is n_p=3.
 
     PYTHONPATH=src python -m dolan.fig13_growth_rates                     # both methods
     PYTHONPATH=src python -m dolan.fig13_growth_rates --skip-eigenvalue   # Leaver + time domain
+    PYTHONPATH=src python -m dolan.fig13_growth_rates --include-adiabatic
 """
 import argparse
 import os
@@ -154,13 +160,16 @@ def compute(curves=None):
 GRID_MARKERS = {4: "s", 6: "D", 8: "^", 12: "v"}
 
 
-def plot(curves, results, timedomain_sets, path, include_hydrogenic=False):
+def plot(curves, results, timedomain_sets, path, include_hydrogenic=False,
+         adiabatic_results=None):
     """Draw Fig. 13: Leaver curves, eigenvalue points, time-domain points.
 
     ``results`` is optional (None to omit the eigenvalue points).
     ``timedomain_sets`` is a list of ``(grid_spacing_n, (alpha_values,
     measured))`` -- one entry per time-domain resolution to overlay.  Each grid
     gets its own marker and a legend label naming dx = M / grid_spacing_n.
+    ``adiabatic_results`` optionally supplies {label: omega array} at the
+    point alpha values, drawn as open diamonds on the same axes.
     """
     import matplotlib
     matplotlib.use("Agg")
@@ -185,6 +194,11 @@ def plot(curves, results, timedomain_sets, path, include_hydrogenic=False):
             ax.plot(alpha_values, measured_gamma, marker, color=colour, ms=5,
                     label=fr"{label}  time domain, $\Delta x = M/{grid_spacing_n}$")
 
+        if adiabatic_results is not None:
+            ax.plot(point_alpha_values, adiabatic_results[label].imag,
+                    "D", color=colour, ms=7, mfc="none",
+                    label=f"{label}  adiabatic (linear limit)")
+
     ax.axhline(0, color="0.6", lw=0.6)
     ax.set_ylim(bottom=-0.1e-7)  # crop the deep n=4 n=1 outlier at alpha=0.44
     ax.set_xlabel(r"mass coupling  $M\mu = \alpha$")
@@ -200,6 +214,7 @@ def plot(curves, results, timedomain_sets, path, include_hydrogenic=False):
     #         color="0.35", style="italic")
     fig.tight_layout()
     fig.savefig(path, dpi=150)
+    plt.close(fig)
     print(f"\nsaved {path}")
 
 
@@ -207,17 +222,27 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--include-hydrogenic", action="store_true",
                         help="overlay the leading small-alpha amplitude growth rate")
+    parser.add_argument("--include-adiabatic", action="store_true",
+                        help="overlay Julia adiabatic radial-matching points (linear limit)")
+    parser.add_argument("--julia", default="julia",
+                        help="Julia executable for --include-adiabatic (default: julia)")
     parser.add_argument("--skip-eigenvalue", action="store_true",
                         help="omit the eigenvalue points, i.e. skip the slow "
                              "ARPACK sweep and redraw from the Leaver curves "
                              "and the finished time-domain runs alone")
-    parser.add_argument("--grid-spacing-n", type=int, nargs="+", default=[4],
+    parser.add_argument("--grid-spacing-n", type=int, nargs="+", default=[6],
                         help="grid resolution(s) of the time-domain runs to "
-                             "overlay; pass several to compare, e.g. "
+                             "overlay (default: 6, meaning M/6); pass several to compare, e.g. "
                              "--grid-spacing-n 4 8")
     arguments = parser.parse_args()
 
     curves = leaver_curves()
+    adiabatic_results = None
+    if arguments.include_adiabatic:
+        from adiabatic.fig13_points import growth_rate_points
+        adiabatic_results = growth_rate_points(
+            point_alpha_values, leaver_omega_by_alpha(curves), SPIN,
+            "plots/fig13_adiabatic_points.csv", julia=arguments.julia)
     results = None if arguments.skip_eigenvalue else compute(curves)
 
     omega_by_alpha = leaver_omega_by_alpha(curves)
@@ -240,7 +265,8 @@ def main():
                    else "plots/fig13_growth_rates.png")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     plot(curves, results, timedomain_sets, output_path,
-         include_hydrogenic=arguments.include_hydrogenic)
+         include_hydrogenic=arguments.include_hydrogenic,
+         adiabatic_results=adiabatic_results)
 
 
 if __name__ == "__main__":

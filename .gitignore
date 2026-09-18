@@ -2,4 +2,6 @@
 # same convention applied to heavy run artifacts.
 __pycache__/
 *.pyc
-plots/
+plots/*
+# Keep the Fig. 13 comparison in the repository.
+!plots/fig13_growth_rates.png

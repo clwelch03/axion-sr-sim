@@ -1,6 +1,7 @@
 using Test
 
 include(joinpath(@__DIR__, "../../src/adiabatic/angular.jl"))
+include(joinpath(@__DIR__, "../../src/adiabatic/nonlinear.jl"))
 include(joinpath(@__DIR__, "../../src/adiabatic/tortoise.jl"))
 include(joinpath(@__DIR__, "../../src/adiabatic/radial.jl"))
 include(joinpath(@__DIR__, "../../src/adiabatic/boundary_series.jl"))
@@ -59,5 +60,10 @@ end
 
 include("test_tortoise.jl")
 include("test_boundaries.jl")
+include("test_boundary_state.jl")
 include("test_integration.jl")
 include("test_matching.jl")
+include("test_nonlinear.jl")
+include("test_nonlinear_radial.jl")
+include("test_nonlinear_integration.jl")
+include("test_nonlinear_matching.jl")

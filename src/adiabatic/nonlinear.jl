@@ -17,14 +17,34 @@ Return a real array with polar rows and azimuthal columns. R is the paper's
 unrescaled radial profile: there is no 1/r or 1/sqrt(2pi) here.
 """
 function reconstruct_field(radial_values, polar_values, azimuthal_values, grid)
+    # Rows are polar nodes; columns are azimuthal nodes.
     field = zeros(length(grid.cosine_theta_nodes), length(grid.azimuth_nodes))
+
     for ((l, m), amplitude) in radial_values
         0 < m <= l || throw(ArgumentError("require positive m <= l"))
-        # transpose makes an outer product without conjugating exp(+i*m*varphi).
+
+        # transpose preserves exp(+imϕ); ' would conjugate it.
         harmonic = polar_values[(l, m)] * transpose(azimuthal_values[m])
+
+        # Include the complex-conjugate partner to make the field real.
         field .+= 2 .* real.(amplitude .* harmonic)
     end
+
     return field
+end
+
+"""Project an angular field onto the requested (l,m) modes."""
+function project_field(field, modes, polar_values, azimuthal_values, grid)
+    # Integrate over dx dϕ/(2π). Polar weights broadcast down the rows.
+    weighted_field = field .* grid.polar_weights .* grid.azimuth_weight
+
+    return Dict(
+        (l, m) => sum(
+            weighted_field .* polar_values[(l, m)] .*
+            transpose(conj.(azimuthal_values[m]))
+        )
+        for (l, m) in modes
+    )
 end
 
 """Return the nonlinear radial source N_lm as a dictionary for the requested modes.
@@ -54,4 +74,38 @@ function nonlinear_source(radial_values, radius, spin, alpha,
     return Dict((l, m) => sum(weighted_source .* polar_values[(l, m)] .*
                              transpose(conj.(azimuthal_values[m])))
                 for (l, m) in modes)
+end
+
+"""Evaluate the coupled nonlinear radial RHS for state=[R; Q]."""
+function nonlinear_tortoise_rhs!(
+    derivative, state, tortoise_radius, spin, alpha, frequency,
+    modes, couplings, polar_values, azimuthal_values, grid;
+    fundamental_m=1,
+    )
+    # Start with the linear equations, including the harmonic frequencies.
+    linear_tortoise_rhs!(
+        derivative, state, tortoise_radius, spin, alpha,
+        frequency, modes, couplings; fundamental_m,
+    )
+
+    count = length(modes)
+    geometry = tortoise_geometry(tortoise_radius, spin)
+
+    # Only R enters the local potential; Q contains radial derivatives.
+    radial_values = Dict(
+        mode => state[index] for (index, mode) in enumerate(modes)
+    )
+
+    source = nonlinear_source(
+        radial_values, geometry.radius, spin, alpha,
+        polar_values, azimuthal_values, grid; modes,
+    )
+
+    # Convert the source from the r-coordinate equation to dQ/dr_*.
+    source_scale = geometry.delta / geometry.radial_factor^2
+    for (index, mode) in enumerate(modes)
+        derivative[count + index] -= source_scale * source[mode]
+    end
+
+    return derivative
 end

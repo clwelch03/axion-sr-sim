@@ -68,3 +68,54 @@ function matching_residual(frequency, horizon_amplitudes, outer_amplitudes,
     # Requiring both halves to vanish joins the profiles and their slopes.
     return from_horizon - from_infinity
 end
+
+
+"""Return the nonlinear mismatch [R_horizon-R_outer; Q_horizon-Q_outer].
+
+frequency is omega_0. Both amplitude vectors follow modes order.
+All positions are tortoise coordinates. Fixing A0 and solving for the
+remaining unknowns will be handled by a separate function.
+"""
+function nonlinear_matching_residual(
+    frequency, horizon_amplitudes, outer_amplitudes,
+    spin, alpha, modes, couplings,
+    polar_values, azimuthal_values, grid;
+    fundamental_m=1, step=0.05,
+    inner=-100.0, outer=100.0, match=5.0,
+    horizon_order=3, outer_order=7,
+)
+    inner < match < outer ||
+        throw(ArgumentError("match must lie between endpoints"))
+
+    # Assemble all harmonic blocks, using their respective frequencies
+    # and ingoing, decaying, or outgoing boundary conditions.
+    horizon_state = boundary_state(
+        :horizon, inner, spin, alpha, frequency,
+        modes, couplings, horizon_amplitudes;
+        fundamental_m, horizon_order,
+    )
+    outer_state = boundary_state(
+        :outer, outer, spin, alpha, frequency,
+        modes, couplings, outer_amplitudes;
+        fundamental_m, outer_order,
+    )
+
+    # Both integrations use the same coupled nonlinear equations.
+    # Angular tables are reused at every RK4 evaluation.
+    rhs! = (derivative, state, position) -> nonlinear_tortoise_rhs!(
+        derivative, state, position, spin, alpha, frequency,
+        modes, couplings, polar_values, azimuthal_values, grid;
+        fundamental_m,
+    )
+
+    from_horizon = integrate_radial(
+        rhs!, horizon_state, inner, match; step,
+    )
+    from_outer = integrate_radial(
+        rhs!, outer_state, outer, match; step,
+    )
+
+    # A smooth solution requires agreement in every R and every Q.
+    return from_horizon - from_outer
+end
+

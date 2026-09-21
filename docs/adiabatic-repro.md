@@ -7,11 +7,48 @@ module responsibilities, and the planned nonlinear extension.
 
 ## Status
 
-2026-09-18: the Julia linear radial matching solver is implemented and checked.
-It includes spherical harmonics, angular couplings, stable tortoise geometry,
-boundary series, radial RK4 integration, and a normalized complex-frequency
-solve. Nonlinear profiles, continuation, energy/flux integrals, and slow
-amplitude evolution are not implemented yet.
+2026-09-21: the Julia solver includes linear matching, cosine nonlinear source
+projection, nonlinear matching with a real Jacobian, and a small-amplitude
+continuation driver. The local saved continuation contains seven solutions
+from A0=1e-4 to 0.0011390625. Radial profiles can now be retained for inspection.
+Energy/flux integrals, the other two potentials in Fig. 2, continuation into
+the strongly nonlinear regime, and slow amplitude evolution remain unfinished.
+
+## Fig. 2: current ingredient — retaining radial profiles
+
+The target is both panels at spin=0.99, alpha=0.42, with quartic, sextic,
+and cosine potentials. We are working through the ingredients incrementally.
+The saved small-amplitude branch is not yet a reproduction of these curves.
+
+`integrate_radial(...; save_profile=true)` now returns `positions` and `states`.
+Each column of `states` contains `[R; Q]`, where Q=dR/dr_*. The default still
+returns only the final state, avoiding profile storage during Newton solves.
+Calling `nonlinear_matching_residual(...; save_profile=true)` with an already
+solved frequency and boundary amplitudes returns `from_horizon`, `from_outer`,
+and `residual`. Both branches run from their boundary to the matching point;
+the outer branch is therefore in decreasing coordinate order. Both matching
+states are retained without averaging. Request this after solving, not as an
+option to `solve_nonlinear_mode`, which requires a residual vector.
+
+At the existing settings (step=0.05, inner=-100, outer=100, match=5), replaying
+the first and last locally saved solutions reproduces their residuals exactly:
+
+| A0 | norm of R mismatch / A0 | norm of Q mismatch / A0 |
+|---|---:|---:|
+| 0.0001 | 2.31e-12 | 1.80e-12 |
+| 0.0011390625 | 1.17e-14 | 1.56e-14 |
+
+Analytic integration tests check every retained sample in both directions.
+This validates profile retention and matching continuity at these settings;
+it does not establish accuracy of energy or flux integrals.
+
+Next, derive and implement the energy and signed boundary fluxes with the
+paper's angular normalization. The decisive small-amplitude check is
+F_tot approximately -2 Im(omega) E, with E proportional to A0 squared.
+Then introduce the quartic and sextic potentials consistently in both the
+source and energy, extend continuation, and check radial/angular truncation
+and endpoints before comparing full curves. Plot F_tot versus E in amplitude
+order so the quartic branch's turning point is preserved.
 
 ## Completed checkpoint: the linear radial problem
 
@@ -63,14 +100,10 @@ comparison when redrawing.
 
 ## Following checkpoints
 
-1. Retain and inspect the radial profiles; check continuity at the matching point.
-2. Reconstruct the real field and project the nonlinear remainder. Resolve the
-   source convention noted in the design doc; test cubic scaling and the linear limit.
-3. Add amplitude continuation and a real-and-imaginary Newton system, including
-   the radiative harmonics.
-4. Compute cloud energy and horizon/outer fluxes, then evolve the amplitude
+1. Compute cloud energy and horizon/outer fluxes, then evolve the amplitude
    using E'(A0) dA0/dt = -F_tot (PDF equation 24). Check the small-amplitude limit.
-5. Reproduce the energy/flux curves and evolution at the initial parameter
+2. Add the quartic and sextic potentials and extend amplitude continuation.
+3. Reproduce the energy/flux curves and evolution at the initial parameter
    point, then study parameter and harmonic-truncation dependence.
 
 ## Code boundaries

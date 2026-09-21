@@ -6,6 +6,8 @@ using FastGaussQuadrature: gausslegendre
 Compute the polar part of the spherical harmonic Y_{lm}(cos theta) via the recurrence relation.
 
 Builds Y_{mm} first, then increases l until we reach the desired harmonic. Normalized over d(cos theta).
+
+Return
 """
 function polar_harmonic(l::Int, m::Int, cos_theta::Real)
     0 <= m <= l || throw(ArgumentError("require 0 <= m <= l"))

@@ -3,6 +3,16 @@
 using Mmap
 include(joinpath(@__DIR__, "sine_remainder.jl"))
 
+"""
+    main(input_path, output_path, capacity)
+
+Serve sine-remainder requests using memory-mapped `Float64` buffers.
+
+Map `capacity` elements from each existing file and overwrite requested prefixes
+of `output_path`. Compile the kernel, print `ready`, then read element counts
+from standard input. Each count must lie in `0:capacity`; print and flush `done`
+after each request. Stop on `quit` or end of input and close the output file.
+"""
 function main(input_path, output_path, capacity)
     field = Mmap.mmap(input_path, Vector{Float64}, capacity; grow=false)
     output_file = open(output_path, "r+")

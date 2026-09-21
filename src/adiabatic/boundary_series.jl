@@ -16,6 +16,17 @@ using LinearAlgebra: I, Diagonal
 
 # Linear angular block in Delta*R'' + Delta'*R' + (K^2/Delta + D)*R=0,
 # with D=-alpha^2*r^2*I + constant_potential. All entries have the same m, omega.
+"""
+    boundary_angular_block(spin, alpha, frequency, l_values, m, couplings,
+                           amplitudes) -> (identity_matrix, constant_potential)
+
+Build the constant angular potential matrix for a fixed-frequency, fixed-`m` block.
+
+Use units `M = 1` and the actual harmonic `frequency`. Rows and columns follow
+the distinct `l_values`, each at least `abs(m)`; require one amplitude per entry.
+The returned matrices define `D = -alpha^2*r^2*identity_matrix + constant_potential`
+in the radial equation. Include diagonal and off-diagonal angular couplings.
+"""
 function boundary_angular_block(spin, alpha, frequency, l_values, m, couplings, amplitudes)
     count = length(l_values)
     count > 0 && length(amplitudes) == count || throw(DimensionMismatch("one amplitude per l"))
@@ -31,13 +42,22 @@ function boundary_angular_block(spin, alpha, frequency, l_values, m, couplings, 
     return identity_matrix, constant_potential
 end
 
-"""Return the ingoing exponent p and vectors v_0,...,v_order near the horizon.
+"""
+    horizon_series(spin, alpha, frequency, l_values, m, couplings, amplitudes;
+                   order=3)
 
-The ansatz R=s^p sum(v_j*s^j), s=r-r_plus, factors out the non-polynomial
-wave behavior before expanding the remaining smooth part in powers of s.
-This is a Frobenius series. v_0=amplitudes fixes the local normalization;
-it need not equal the horizon amplitude convention in the prefactor of
-PDF Eq. (22). The ingoing exponent is the same.
+Compute the ingoing Frobenius exponent and coefficient vectors near the horizon.
+
+Return a named tuple with `exponent = p` and `coefficients`, where
+`coefficients[j+1] = v_j` in `R = s^p * sum(v_j*s^j)` and `s = r-r_plus`.
+Retain powers through the nonnegative integer `order`. Each vector follows
+`l_values` order; `v_0 = amplitudes` fixes the local normalization.
+Use the actual harmonic `frequency`, a common `m`, and units `M = 1`.
+
+This normalization need not equal the horizon prefactor in PDF Eq. (22),
+although the ingoing exponent agrees. Reject resonant recurrences.
+
+See also [`horizon_boundary_data`](@ref), [`outer_series`](@ref).
 """
 function horizon_series(spin, alpha, frequency, l_values, m, couplings, amplitudes; order=3)
     order isa Integer && order >= 0 || throw(ArgumentError("require nonnegative series order"))
@@ -95,15 +115,33 @@ end
 
 # Fetch the coefficient of r^degree, treating absent powers as zero. This
 # lets the outer recurrence ask for degrees -2,-1,... without special arrays.
+"""
+    polynomial_coefficient(coefficients, degree)
+
+Return the coefficient of the requested polynomial degree, or zero if absent.
+
+Store coefficients in ascending powers, so degree zero corresponds to index one.
+Negative degrees and degrees beyond the stored polynomial return scalar zero.
+"""
 polynomial_coefficient(coefficients, degree) =
     0 <= degree < length(coefficients) ? coefficients[degree + 1] : 0
 
-"""Return k, p, and vectors v_0,...,v_order for the large-radius expansion.
+"""
+    outer_series(spin, alpha, frequency, l_values, m, couplings, amplitudes;
+                 kind=:bound, order=7)
 
-R=exp(i*k*r)*r^p sum(v_j/r^j), with v_0=amplitudes. The power p already
-includes the geometric 1/r falloff. kind selects the branch of k through
-outer_wave_number in boundaries.jl. This is the form of PDF Eq. (23),
-with angular mixing retained as matrix operations on each v_j.
+Compute the wave number, exponent, and coefficient vectors of the large-radius series.
+
+Return a named tuple with `wave_number = k`, `exponent = p`, and `coefficients`
+for `R = exp(im*k*r) * r^p * sum(v_j/r^j)`. Store `v_j` at `coefficients[j+1]`
+through the nonnegative integer `order`, with `v_0 = amplitudes` in `l_values`
+order. Use the actual harmonic `frequency`, a common `m`, and units `M = 1`.
+
+The exponent includes the geometric `1/r` falloff. Select `kind` through
+[`outer_wave_number`](@ref). This is PDF Eq. (23) with angular mixing retained
+as matrix operations on each coefficient vector.
+
+See also [`outer_boundary_data`](@ref), [`horizon_series`](@ref).
 """
 function outer_series(spin, alpha, frequency, l_values, m, couplings, amplitudes;
                       kind=:bound, order=7)

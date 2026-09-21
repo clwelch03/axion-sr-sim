@@ -4,6 +4,22 @@ for file in ("angular", "tortoise", "radial", "boundary_series", "boundaries", "
     include(joinpath(@__DIR__, file * ".jl"))
 end
 
+"""
+    write_growth_rate_points(seed_path, output_path;
+                             spin=0.99, step=0.05, decay_lengths=15.0)
+
+Solve seeded linear bound modes and write their growth rates and diagnostics to CSV.
+
+Read headerless rows `(radial_overtone, alpha, omega_real, omega_imag)` from
+`seed_path`; use the real frequency as the branch seed and initialize growth
+at zero. Overwrite `output_path` with a header and one row per seed, flushing
+rows and printing progress as each solve completes. Return `nothing`.
+
+Use `spin` in units `M = 1`, positive maximum RK4 spacing `step`, and outer
+endpoint `max(150.0, decay_lengths/sqrt(alpha^2-omega_real^2))`. Fix the inner
+endpoint at `-120.0` and use `l_values = [1, 3, 5]`, `m = 1`. Throw an error
+if the real frequency differs from its seed by `1e-4` or more.
+"""
 function write_growth_rate_points(seed_path, output_path;
                                   spin=0.99, step=0.05, decay_lengths=15.0)
     grid = angular_grid(16, 31)

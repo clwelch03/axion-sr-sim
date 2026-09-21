@@ -2,6 +2,17 @@
 # File I/O, startup, and compilation are outside the timed regions.
 include(joinpath(@__DIR__, "sine_remainder.jl"))
 
+"""
+    main(directory)
+
+Benchmark allocating and in-place sine remainders using binary files in `directory`.
+
+Read `Float64` data from `small.input`, `mixed.input`, `tiny.input`, `cloud.input`,
+and `edges.input`, and write corresponding `.output` files. Exclude file I/O and
+warmup from timings; print median times over eleven runs and allocation counts.
+Require one Julia thread and subnormal handling, and check that both kernels
+agree and preserve the input.
+"""
 function main(directory)
     @assert Threads.nthreads() == 1
     @assert !get_zero_subnormals()

@@ -1,4 +1,17 @@
-"""Evaluate phi-sin(phi) accurately even when phi is tiny (dimensionless field)."""
+"""
+    sine_remainder(field::Real)
+
+Evaluate `field - sin(field)` accurately for a dimensionless scalar field.
+
+For `abs(field) < 0.1`, use the Taylor polynomial through degree eleven to
+avoid cancellation; otherwise subtract directly.
+
+# Examples
+```jldoctest
+julia> sine_remainder(0.0)
+0.0
+```
+"""
 function sine_remainder(field::Real)
     if abs(field) < 0.1
         squared = field^2
@@ -9,12 +22,20 @@ function sine_remainder(field::Real)
     return field - sin(field)
 end
 
-"""Reconstruct phi=2Re(sum R_lm Y_lm exp(i*m*varphi)) at one radius and t=0.
+"""
+    reconstruct_field(radial_values, polar_values, azimuthal_values, grid)
 
-radial_values is a dictionary keyed by (l,m), containing only positive m.
-The conjugate partners are included by 2Re; m=0 needs a separate convention.
-Return a real array with polar rows and azimuthal columns. R is the paper's
-unrescaled radial profile: there is no 1/r or 1/sqrt(2pi) here.
+Reconstruct the real angular field at one radius and time zero.
+
+Supply `radial_values` keyed by `(l, m)` with `0 < m ≤ l`, and angular tables
+from [`build_polar_values`](@ref) and [`build_azimuthal_values`](@ref).
+Return a real matrix with polar rows and azimuthal columns on `grid`.
+
+Evaluate `ϕ = 2*real(sum(R_lm * Y_lm * exp(im*m*φ)))`; the factor of two
+includes the conjugate partners. The radial profile is unrescaled, with no
+`1/r` or `1/sqrt(2π)` factor. Zero and negative `m` are not supported.
+
+See also [`project_field`](@ref).
 """
 function reconstruct_field(radial_values, polar_values, azimuthal_values, grid)
     # Rows are polar nodes; columns are azimuthal nodes.
@@ -33,7 +54,17 @@ function reconstruct_field(radial_values, polar_values, azimuthal_values, grid)
     return field
 end
 
-"""Project an angular field onto the requested (l,m) modes."""
+"""
+    project_field(field, modes, polar_values, azimuthal_values, grid)
+
+Project an angular field onto the requested `(l, m)` modes.
+
+Supply `field` as a matrix with polar rows and azimuthal columns on `grid`.
+Return a dictionary keyed by each requested mode, integrating against the
+conjugate harmonic with measure `d(cos(θ)) * dφ/(2π)`.
+
+See also [`reconstruct_field`](@ref), [`nonlinear_source`](@ref).
+"""
 function project_field(field, modes, polar_values, azimuthal_values, grid)
     # Integrate over dx dϕ/(2π). Polar weights broadcast down the rows.
     weighted_field = field .* grid.polar_weights .* grid.azimuth_weight
@@ -47,18 +78,24 @@ function project_field(field, modes, polar_values, azimuthal_values, grid)
     )
 end
 
-"""Return the nonlinear radial source N_lm as a dictionary for the requested modes.
+"""
+    nonlinear_source(radial_values, radius, spin, alpha, polar_values,
+                     azimuthal_values, grid; modes=keys(radial_values))
 
-N_lm = mu^2 int dx dvarphi/(2pi) Y_lm exp(-i*m*varphi)
-                         * (r^2+a^2*x^2) * (phi-sin(phi)).
-The mass term is already in radial.jl: (Box-mu^2)phi+mu^2(phi-sin(phi))=0.
-Thus N enters the r-coordinate equation with a PLUS sign; Q' receives
--source_scale*N. No Delta or tortoise-coordinate factor is included here.
+Return the nonlinear radial source as a dictionary keyed by the requested modes.
 
-The printed V'(phi) term in PDF Eq. (21) appears inconsistent with its linear
-mass terms. This implementation follows the field equation, PDF Eq. (5).
-modes may include harmonics absent from radial_values, to measure generation.
-The full sine is retained; angular resolution must be checked at large amplitude.
+Reconstruct the field from `radial_values` and project
+`alpha^2 * (radius^2 + spin^2*cos(θ)^2) * (ϕ - sin(ϕ))` onto `modes`, using
+the measure and normalization of [`project_field`](@ref). Require `0 < m ≤ l`;
+`modes` may include harmonics absent from `radial_values` to measure generation.
+Use units `M = 1`, so `alpha` is the scalar mass in these units.
+
+The source `N` enters the radial equation with a plus sign and contributes
+`-source_scale*N` to `dQ/dr_*`. No tortoise factor is included here.
+This follows the field equation in PDF Eq. (5); the printed potential term in
+Eq. (21) appears inconsistent with its linear mass terms. Retain the full sine,
+with a small-field evaluation from [`sine_remainder`](@ref), and check angular
+resolution at large amplitude.
 """
 function nonlinear_source(radial_values, radius, spin, alpha,
                           polar_values, azimuthal_values, grid;
@@ -76,7 +113,18 @@ function nonlinear_source(radial_values, radius, spin, alpha,
                 for (l, m) in modes)
 end
 
-"""Evaluate the coupled nonlinear radial RHS for state=[R; Q]."""
+"""
+    nonlinear_tortoise_rhs!(derivative, state, tortoise_radius, spin, alpha,
+                            frequency, modes, couplings, polar_values,
+                            azimuthal_values, grid; fundamental_m=1)
+
+Write the coupled nonlinear radial derivative into `derivative` and return it.
+
+Use the state layout, harmonic frequencies, units, and nonaliasing requirements
+of [`linear_tortoise_rhs!`](@ref). Leave `state` unchanged and add the source
+from [`nonlinear_source`](@ref) to the slope derivatives after tortoise scaling.
+Supply angular tables evaluated on `grid` for every retained mode.
+"""
 function nonlinear_tortoise_rhs!(
     derivative, state, tortoise_radius, spin, alpha, frequency,
     modes, couplings, polar_values, azimuthal_values, grid;

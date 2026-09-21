@@ -10,12 +10,19 @@
 """
     radial_operator_coefficients(radius, spin, alpha, mode_frequency, l, m)
 
-Calculate the factors that multiply the radial profiles and their
-derivatives in the differential equation for R_{nl}.
+Compute the coefficients of the radial equation in Boyer–Lindquist radius.
 
-This is PDF Eq. (21) with the diagonal and off-diagonal angular corrections
-collected into C. local_coefficient is B and excludes every C contribution.
-Primes in this function's interpretation are derivatives with respect to r.
+Use units `M = 1`, with `spin = a/M`, `alpha = M*μ`, and `mode_frequency`
+equal to the actual harmonic frequency, rather than the fundamental frequency.
+For the unrescaled radial profile, the equation is
+`(Δ*R′)′ + B*R + coupling_scale*(C*R) + N = 0`, with primes denoting `d/dr`.
+
+Return a named tuple with `delta = Δ`, `delta_prime = dΔ/dr`,
+`local_coefficient = B`, and `coupling_scale = spin^2*(mode_frequency^2-alpha^2)`.
+The local coefficient excludes all angular coupling terms, including the
+diagonal of `C`. This is the radial operator in PDF Eq. (21).
+
+See also [`tortoise_operator_coefficients`](@ref).
 """
 function radial_operator_coefficients(radius, spin, alpha, mode_frequency, l, m)
     delta = radius^2 - 2*radius + spin^2
@@ -34,8 +41,14 @@ end
 """
     build_cosine_squared_couplings(l_max, polar_values, grid)
 
-Build a grid of angular couplings
-C_{l,l'}^m = int_{-1}^1 Y_{lm}(x) x^2 Y_{l',m}(x) dx.
+Compute the polar matrix elements of `cos(θ)^2` by quadrature.
+
+Return a dictionary keyed by `(l, other_l, m)` for `0 ≤ m ≤ l, other_l ≤ l_max`.
+Each entry integrates `Y_lm(x) * x^2 * Y_other_l,m(x)` over `x = cos(θ)` in
+`[-1, 1]`. Include diagonal entries; entries outside `other_l = l, l ± 2`
+vanish up to quadrature roundoff.
+
+Use tables from [`build_polar_values`](@ref) and weights from [`angular_grid`](@ref).
 """
 function build_cosine_squared_couplings(l_max, polar_values, grid)
     # x=cos(theta), so the polar integration measure is dx. The azimuthal
@@ -53,12 +66,17 @@ function build_cosine_squared_couplings(l_max, polar_values, grid)
         for m in 0:l_max for l in m:l_max for other_l in m:l_max
     )
 end
-"""Return d^2R/dr^2 for one mode by rearranging the r-coordinate equation.
+"""
+    radial_second_derivative(radial_value, radial_slope, coupled_value,
+                             nonlinear_source, coefficients)
 
-radial_slope=dR/dr. coupled_value=sum(C[l,l',m]*R[l',m]) includes the
-diagonal term. nonlinear_source is N before any tortoise-coordinate scaling.
-This helper contains divisions by Delta; the tortoise helper below combines
-those factors analytically before evaluating them near the horizon.
+Return `d²R/dr²` by rearranging the radial equation for one mode.
+
+Supply `radial_slope = dR/dr`, `coupled_value = (C*R)[l,m]` including the
+diagonal term, and the source `N` before tortoise scaling as `nonlinear_source`.
+Obtain `coefficients` from [`radial_operator_coefficients`](@ref).
+This expression divides by `Δ`; use [`tortoise_operator_coefficients`](@ref)
+to avoid that division near the horizon.
 """
 function radial_second_derivative(
     radial_value, radial_slope, coupled_value, nonlinear_source, coefficients
@@ -72,10 +90,15 @@ function radial_second_derivative(
 end
 
 """
-Coefficients of Q' = -slope_coefficient*Q - local_coefficient*R
-                   - coupling_scale*(C*R) - source_scale*N, with Q=dR/dr_*.
-Primes here mean d/dr_*. N is the source in the original r-coordinate
-equation. No division by Delta is evaluated, including near the horizon.
+    tortoise_operator_coefficients(geometry, spin, alpha, mode_frequency, l, m)
+
+Compute radial coefficients that remain regular near the horizon in tortoise coordinates.
+
+Use `geometry` from [`tortoise_geometry`](@ref), units `M = 1`, and the actual
+harmonic frequency `mode_frequency`. Return a named tuple defining
+`Q′ = -slope_coefficient*Q - local_coefficient*R - coupling_scale*(C*R) - source_scale*N`,
+where `Q = dR/dr_*` and the prime means `d/dr_*`. The source `N` belongs to the
+original radial equation. Combine factors analytically to avoid division by `Δ`.
 """
 function tortoise_operator_coefficients(geometry, spin, alpha, mode_frequency, l, m)
     radius, delta, radial_factor = geometry.radius, geometry.delta, geometry.radial_factor
@@ -95,14 +118,20 @@ function tortoise_operator_coefficients(geometry, spin, alpha, mode_frequency, l
 end
 
 """
-Linear first-order system in r_* for state=[R; Q], Q=dR/dr_*.
-Modes are (l,m), with positive m=n*fundamental_m; frequency is omega_0.
-Couplings use (l,other_l,m) keys. derivative and state must not alias.
-This computes an RHS only; it neither integrates nor solves for frequency.
+    linear_tortoise_rhs!(derivative, state, tortoise_radius, spin, alpha,
+                         frequency, modes, couplings; fundamental_m=1)
 
-For N retained modes, state[1:N] stores R and state[N+1:2N] stores Q,
-in the same order as modes. A complex state stores phases as well as amplitudes.
-The trailing ! means derivative is modified in place; state is read only.
+Write the linear radial derivative in tortoise coordinates into `derivative` and return it.
+
+For `N = length(modes)`, both arrays must have length `2N`: `state[1:N]`
+contains `R` and `state[N+1:2N]` contains `Q = dR/dr_*`, in `modes` order.
+The arrays must not alias; `state` is otherwise unchanged.
+
+Each mode is `(l, m)` with positive `m = n*fundamental_m`. Use the positive
+integer `fundamental_m` to assign frequency `n*frequency` to each harmonic.
+Supply angular `couplings` keyed by `(l, other_l, m)` and units `M = 1`.
+
+See also [`nonlinear_tortoise_rhs!`](@ref), [`integrate_radial`](@ref).
 """
 function linear_tortoise_rhs!(derivative, state, tortoise_radius, spin, alpha,
                               frequency, modes, couplings; fundamental_m=1)
@@ -118,8 +147,8 @@ function linear_tortoise_rhs!(derivative, state, tortoise_radius, spin, alpha,
             geometry, spin, alpha, (m ÷ fundamental_m) * frequency, l, m)
         coupled_value = zero(eltype(state))
         for (other_index, (other_l, other_m)) in enumerate(modes)
-            # Linear Kerr angular mixing preserves m. Nonlinear interactions
-            # between different m blocks will enter through the future source.
+            # Linear Kerr angular mixing preserves m. The nonlinear RHS adds
+            # interactions between different m blocks through nonlinear_source.
             other_m == m || continue
             coupled_value += couplings[(l, other_l, m)] * state[other_index]
         end

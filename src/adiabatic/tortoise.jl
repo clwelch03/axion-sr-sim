@@ -3,10 +3,20 @@
 # r is the Boyer-Lindquist radius; r_* is the tortoise integration coordinate.
 # Both describe the same exterior point, with dr/dr_* = Delta/(r^2+a^2).
 
-"""Return the event horizon r_plus, inner horizon r_minus, and their separation.
+"""
+    kerr_horizons(spin)
 
-The logarithmic coordinate formula below applies to nonextremal Kerr (|a|<1).
-Exactly extremal Kerr requires a different expression.
+Return the Kerr horizon radii and their separation in units `M = 1`.
+
+Require finite `spin = a/M` with `abs(spin) < 1`. The returned named tuple
+contains `r_plus`, `r_minus`, and `gap = r_plus - r_minus`. Evaluate the inner
+radius without subtractive cancellation at small spin. Extremal Kerr is excluded.
+
+# Examples
+```jldoctest
+julia> kerr_horizons(0.0)
+(r_plus = 2.0, r_minus = 0.0, gap = 2.0)
+```
 """
 function kerr_horizons(spin)
     isfinite(spin) && abs(spin) < 1 || throw(DomainError(spin, "require |spin| < 1"))
@@ -21,6 +31,17 @@ end
 # Using z=log(r-r_plus) preserves the horizon displacement even when adding
 # it to r_plus rounds away. The logarithms use M=1; this fixes the additive
 # constant in r_* = r + (2r_+/gap)log(r-r_+) - (2r_-/gap)log(r-r_-).
+"""
+    tortoise_from_log_distance(log_distance, horizons)
+
+Evaluate the tortoise coordinate from `log_distance = log(r - r_plus)`.
+
+Supply `horizons` from [`kerr_horizons`](@ref). In units `M = 1`, fix the additive
+constant by `r_* = r + (2r_plus/gap)*log(r-r_plus) - (2r_minus/gap)*log(r-r_minus)`.
+The logarithmic displacement preserves points whose radius rounds to `r_plus`.
+
+See also [`tortoise_coordinate`](@ref), [`tortoise_geometry`](@ref).
+"""
 function tortoise_from_log_distance(log_distance, horizons)
     distance = exp(log_distance)
     # s=distance, g=gap. Compute log(s+g) by factoring out the larger term.
@@ -35,21 +56,38 @@ function tortoise_from_log_distance(log_distance, horizons)
            (2horizons.r_plus / horizons.gap) * (log_distance - log_outer_distance)
 end
 
-"""Map the positive horizon displacement r-r_plus to tortoise radius r_*."""
+"""
+    tortoise_coordinate(horizon_distance, spin)
+
+Map a positive horizon displacement `horizon_distance = r - r_plus` to `r_*`.
+
+Require a finite, positive displacement and finite `abs(spin) < 1`.
+Use units `M = 1` and the additive constant defined by
+[`tortoise_from_log_distance`](@ref).
+
+See also [`tortoise_geometry`](@ref).
+"""
 function tortoise_coordinate(horizon_distance, spin)
     isfinite(horizon_distance) && horizon_distance > 0 ||
         throw(DomainError(horizon_distance, "require positive finite horizon distance"))
     return tortoise_from_log_distance(log(horizon_distance), kerr_horizons(spin))
 end
 
-"""Find the exterior geometry at a requested tortoise coordinate.
+"""
+    tortoise_geometry(tortoise_radius, spin)
 
-The numerical unknown is z=log(r-r_plus), not r itself. Near the horizon,
-r can round to r_plus even though the positive displacement remains
-representable. Keep horizon_distance and log_horizon_distance for this reason.
+Find the exterior Kerr geometry at the finite tortoise coordinate `tortoise_radius`.
 
-The returned named tuple also contains radius=r, delta=Delta,
-radial_factor=r^2+a^2, dr_drstar=dr/dr_*, and the horizon radii/gap.
+Solve for `log(r - r_plus)` with finite `abs(spin) < 1` in units `M = 1`.
+Return a named tuple containing `radius`, `delta = Δ`, `radial_factor = r^2+a^2`,
+`dr_drstar = Δ/(r^2+a^2)`, `horizon_distance`, `log_horizon_distance`,
+`r_plus`, `r_minus`, and `gap`.
+
+Near the horizon, `radius` can round to `r_plus` while the displacement remains
+positive. Use the displacement fields to preserve that information.
+Throw an error if inversion fails to converge or the displacement underflows.
+
+See also [`tortoise_coordinate`](@ref).
 """
 function tortoise_geometry(tortoise_radius, spin)
     isfinite(tortoise_radius) || throw(DomainError(tortoise_radius, "require finite r_*"))

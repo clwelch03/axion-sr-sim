@@ -1,10 +1,25 @@
 using LinearAlgebra: norm
 
 
-"""Solve F(state)=0 using damped Newton steps and centered differences.
+"""
+    newton_solve(residual, initial; <keyword arguments>)
 
-Real initial values produce a real Jacobian, allowing general real systems.
-Complex initial values require F to be analytic in its complex arguments.
+Solve `residual(state) = 0` using damped Newton steps and centered differences.
+
+Leave `initial` unchanged and return a named tuple with `state`, `residual`,
+and `iterations`. Real initial values produce a real Jacobian; complex initial
+values require a residual analytic in its complex arguments. Throw an error on
+nonfinite residuals, inadmissible differences, failed descent, or iteration exhaustion.
+
+# Arguments
+- `tolerance=1e-10`: positive finite upper bound on the residual norm.
+- `max_iterations=15`: nonnegative integer maximum number of Newton steps.
+- `difference_step=1e-6`: positive finite difference scale, multiplied by
+  `max(1, abs(state[j]))` for each component.
+- `admissible=state -> true`: predicate restricting guesses and trial states;
+  both points of each centered difference must also satisfy it.
+
+See also [`real_newton`](@ref), [`complex_newton`](@ref).
 """
 function newton_solve(residual, initial; tolerance=1e-10, max_iterations=15,
                         difference_step=1e-6, admissible=state -> true)
@@ -49,10 +64,28 @@ function newton_solve(residual, initial; tolerance=1e-10, max_iterations=15,
 end
 
 
-"""Store all real parts first, followed by all imaginary parts."""
+"""
+    pack_complex(values)
+
+Pack complex values into a vector of real parts followed by imaginary parts.
+
+See also [`unpack_complex`](@ref).
+
+# Examples
+```jldoctest
+julia> pack_complex([1 + 2im, 3 + 4im]) == [1, 3, 2, 4]
+true
+```
+"""
 pack_complex(values) = vcat(real.(values), imag.(values))
 
-"""Recover complex values from [real parts; imaginary parts]."""
+"""
+    unpack_complex(values::AbstractVector{<:Real})
+
+Recover a complex vector from equally sized real and imaginary halves.
+
+Require even length, and interpret `values` in the layout of [`pack_complex`](@ref).
+"""
 function unpack_complex(values::AbstractVector{<:Real})
     iseven(length(values)) ||
         throw(DimensionMismatch("expected equally sized real and imaginary halves"))
@@ -61,7 +94,19 @@ function unpack_complex(values::AbstractVector{<:Real})
     return complex.(values[1:count], values[count+1:end])
 end
 
-"""Solve a possibly nonanalytic complex system using a real Jacobian."""
+"""
+    real_newton(residual, initial; admissible=state -> true, kwargs...)
+
+Solve a possibly nonanalytic complex system using a real Jacobian.
+
+Pass complex vectors to `residual` and `admissible`, while packing real and
+imaginary parts separately for [`newton_solve`](@ref). Forward `kwargs...`
+(`tolerance`, `max_iterations`, and `difference_step`) to that solver with its
+defaults. Return a named tuple with complex `state`, complex `residual`, and
+`iterations`; leave `initial` unchanged.
+
+See also [`complex_newton`](@ref).
+"""
 function real_newton(residual, initial;
                      admissible=state -> true, kwargs...)
     # Physics functions receive complex values; Newton receives real vectors.
@@ -84,22 +129,49 @@ function real_newton(residual, initial;
 end
 
 
-"""Solve an analytic complex system using a complex Jacobian."""
+"""
+    complex_newton(residual, initial; kwargs...)
+
+Solve an analytic complex system using a complex Jacobian.
+
+Convert `initial` to complex values and forward keyword arguments to
+[`newton_solve`](@ref), including its defaults for `tolerance`, `max_iterations`,
+`difference_step`, and `admissible`. Return its named tuple containing `state`,
+`residual`, and `iterations`; leave `initial` unchanged.
+
+See also [`real_newton`](@ref) for residuals involving complex conjugates.
+"""
 function complex_newton(residual, initial; kwargs...)
     return newton_solve(residual, complex.(initial); kwargs...)
 end
 
 
-"""Find a linear bound mode, fixing outer_amplitudes[1]=1.
+"""
+    solve_linear_mode(frequency_guess, spin, alpha, l_values, m, couplings;
+                      <keyword arguments>)
 
-Use l_values=[1,3,5], m=1 for the fundamental cloud. The fixed coefficient
-belongs to the FIRST supplied l, so put the mode used for normalization first.
-For N modes the 2N complex unknowns are [frequency; N horizon amplitudes;
-N-1 outer amplitudes]. Matching supplies 2N complex equations for them.
+Find a linear bound mode with the first outer amplitude fixed to one.
 
-step, inner, outer, and match are forwarded to matching_residual. A small
-residual establishes matching at these numerical settings; endpoint and step
-convergence are separate checks, especially for the small imaginary frequency.
+Put the normalization mode first in `l_values`; use `[1, 3, 5]` and `m = 1`
+for the fundamental cloud. Solve for the frequency, all horizon amplitudes,
+and the remaining outer amplitudes in units `M = 1`. Require the real frequency
+to lie strictly between zero and `alpha` during Newton iteration.
+
+Return a named tuple with `frequency`, `horizon_amplitudes`, `outer_amplitudes`,
+`residual`, `residual_norm`, and `iterations`. A small mismatch at the selected
+settings does not establish endpoint or step convergence, especially for the
+small imaginary frequency.
+
+# Arguments
+- `horizon_guess=ones(length(l_values))`: initial horizon amplitudes in `l_values` order.
+- `outer_tail_guess=zeros(length(l_values)-1)`: initial free outer amplitudes.
+- `tolerance=1e-10`: positive finite matching-residual norm tolerance.
+- `max_iterations=15`: nonnegative integer Newton iteration limit.
+- `difference_step=1e-6`: positive finite relative scale for centered differences.
+- `integration_options...`: keywords for [`matching_residual`](@ref): `step=0.05`,
+  `inner=-100.0`, `outer=100.0`, and `match=5.0`.
+
+See also [`solve_nonlinear_mode`](@ref).
 """
 function solve_linear_mode(frequency_guess, spin, alpha, l_values, m, couplings;
                            horizon_guess=ones(length(l_values)),
@@ -127,11 +199,34 @@ function solve_linear_mode(frequency_guess, spin, alpha, l_values, m, couplings;
               iterations=solution.iterations)
 end
 
-"""Solve the nonlinear matching problem at fixed positive outer amplitude A0.
+"""
+    solve_nonlinear_mode(frequency_guess, amplitude, spin, alpha, modes, couplings,
+                         polar_values, azimuthal_values, grid; <keyword arguments>)
 
-Put the fundamental normalization mode first in modes.
-horizon_guess and outer_tail_guess contain physical boundary amplitudes.
-Newton uses amplitudes scaled by A0; tolerance applies to residual/A0.
+Solve nonlinear matching at the fixed positive outer amplitude `amplitude = A0`.
+
+Put the fundamental normalization mode first in `modes`. Supply physical
+boundary amplitudes as guesses; Newton scales them by `A0` and applies its
+tolerance to `residual/A0`. Require positive finite real `amplitude` and keep
+the fundamental frequency on the bound branch in units `M = 1`.
+
+Return a named tuple with `frequency`, physical `horizon_amplitudes` and
+`outer_amplitudes`, physical `residual` and `residual_norm`, `scaled_residual_norm`,
+and `iterations`. The first outer amplitude remains `A0`. Check step, endpoint,
+series-order, and angular convergence separately from the matching tolerance.
+
+# Arguments
+- `horizon_guess`: required vector of one physical amplitude per mode.
+- `outer_tail_guess`: required vector of physical outer amplitudes for `modes[2:end]`.
+- `fundamental_m=1`: positive integer azimuthal number of the fundamental.
+- `tolerance=1e-10`: positive finite tolerance on the scaled residual norm.
+- `max_iterations=15`: nonnegative integer Newton iteration limit.
+- `difference_step=1e-6`: positive finite relative scale for centered differences.
+- `integration_options...`: keywords for [`nonlinear_matching_residual`](@ref):
+  `step=0.05`, `inner=-100.0`, `outer=100.0`, `match=5.0`, `horizon_order=3`,
+  and `outer_order=7`.
+
+See also [`solve_linear_mode`](@ref), [`real_newton`](@ref).
 """
 function solve_nonlinear_mode(
     frequency_guess, amplitude, spin, alpha, modes, couplings,

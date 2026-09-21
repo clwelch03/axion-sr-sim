@@ -1,6 +1,13 @@
 using LinearAlgebra: norm
 
-# Differentiate the explicit series term by term for independent ODE residuals.
+"""
+    differentiated_series(coefficients, argument) -> (value, first, second)
+
+Evaluate a vector polynomial and its first two derivatives term by term.
+
+Store coefficients in ascending powers. Differentiate with respect to `argument`
+to provide an independent reference for boundary ODE residual tests.
+"""
 function differentiated_series(coefficients, argument)
     value, first, second = zero(coefficients[1]), zero(coefficients[1]), zero(coefficients[1])
     for (index, coefficient) in enumerate(coefficients)

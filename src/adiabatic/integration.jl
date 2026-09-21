@@ -1,9 +1,16 @@
-"""Integrate from start to stop in r_* using fixed-step RK4.
+"""
+    integrate_radial(rhs!, initial_state, start, stop; step=0.05)
 
-rhs!(derivative, state, position) fills the derivative without changing state.
-For our radial system, state=[R; Q] with Q=dR/dr_*. Return only the final
-state; initial_state is left unchanged. step is a positive maximum spacing,
-not an error tolerance: accuracy must be checked by reducing it.
+Integrate from `start` to `stop` using fixed-step fourth-order Runge–Kutta.
+
+The callback `rhs!(derivative, state, position)` must fill `derivative` without
+changing `state`. Return only the final state as a complex floating-point array;
+leave `initial_state` unchanged. Integrate in either direction and adjust the
+spacing to land on `stop`.
+
+For radial evolution, positions are tortoise coordinates and `state = [R; Q]`
+with `Q = dR/dr_*`. Require positive finite `step`, which sets the maximum
+spacing, not an error tolerance. Check accuracy by reducing it.
 """
 function integrate_radial(rhs!, initial_state, start, stop; step=0.05)
     isfinite(step) && step > 0 ||
@@ -31,16 +38,24 @@ function integrate_radial(rhs!, initial_state, start, stop; step=0.05)
     return state
 end
 
-"""Return [R_horizon-R_outer; Q_horizon-Q_outer] at the matching point.
+"""
+    matching_residual(frequency, horizon_amplitudes, outer_amplitudes,
+                      spin, alpha, l_values, m, couplings; <keyword arguments>)
 
-This is a linear bound-state calculation for one positive fundamental m.
-frequency is its complex frequency; amplitude vectors follow l_values order.
-All positions are tortoise coordinates. The boundary series use their default
-orders (3 near the horizon, 7 at infinity).
+Return the linear mismatch `[R_horizon-R_outer; Q_horizon-Q_outer]` at `match`.
 
-A later root solve must fix one nonzero amplitude, such as the outer l=1
-coefficient, to exclude the trivial zero field. This function only evaluates
-the mismatch; it neither enforces that normalization nor finds a frequency.
+Use one positive fundamental `m` and complex bound-state `frequency` in units
+`M = 1`. Both amplitude vectors follow `l_values` order. Horizon and outer
+series use orders three and seven, respectively. A root solve must fix one
+nonzero amplitude to exclude the trivial zero field.
+
+# Arguments
+- `step=0.05`: positive finite maximum RK4 spacing in tortoise radius.
+- `inner=-100.0`: inner endpoint in tortoise radius.
+- `outer=100.0`: outer endpoint in tortoise radius.
+- `match=5.0`: matching coordinate, with `inner < match < outer`.
+
+See also [`solve_linear_mode`](@ref), [`nonlinear_matching_residual`](@ref).
 """
 function matching_residual(frequency, horizon_amplitudes, outer_amplitudes,
                            spin, alpha, l_values, m, couplings;
@@ -70,11 +85,29 @@ function matching_residual(frequency, horizon_amplitudes, outer_amplitudes,
 end
 
 
-"""Return the nonlinear mismatch [R_horizon-R_outer; Q_horizon-Q_outer].
+"""
+    nonlinear_matching_residual(frequency, horizon_amplitudes, outer_amplitudes,
+                                spin, alpha, modes, couplings, polar_values,
+                                azimuthal_values, grid; <keyword arguments>)
 
-frequency is omega_0. Both amplitude vectors follow modes order.
-All positions are tortoise coordinates. Fixing A0 and solving for the
-remaining unknowns will be handled by a separate function.
+Return the nonlinear mismatch `[R_horizon-R_outer; Q_horizon-Q_outer]` at `match`.
+
+Use the fundamental `frequency` in units `M = 1`; both amplitude vectors follow
+`modes` order. Construct linear asymptotic boundaries with [`boundary_state`](@ref)
+and integrate the coupled nonlinear equations from each endpoint. Supply angular
+tables on `grid` for all modes. This evaluates the mismatch without fixing a
+normalization or finding a frequency.
+
+# Arguments
+- `fundamental_m=1`: positive integer azimuthal number of the fundamental.
+- `step=0.05`: positive finite maximum RK4 spacing in tortoise radius.
+- `inner=-100.0`: inner endpoint in tortoise radius.
+- `outer=100.0`: outer endpoint in tortoise radius.
+- `match=5.0`: matching coordinate, with `inner < match < outer`.
+- `horizon_order=3`: nonnegative integer order of the horizon series.
+- `outer_order=7`: nonnegative integer order of the outer series.
+
+See also [`solve_nonlinear_mode`](@ref), [`matching_residual`](@ref).
 """
 function nonlinear_matching_residual(
     frequency, horizon_amplitudes, outer_amplitudes,

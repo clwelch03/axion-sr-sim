@@ -2,12 +2,21 @@
 # Units and time convention: M=1, exp(-i*omega*t). frequency is omega_n
 # for the actual harmonic, whereas linear_tortoise_rhs! accepts omega_0.
 # The outputs are vectors in l_values order, ready to form state=[R; Q].
-# They are boundary guesses for a future matching solve, not a solved cloud.
+# They supply asymptotic boundary data to the matching solvers.
 
-"""Choose the decaying (:bound) or positive-frequency outgoing (:outgoing) sheet.
+"""
+    outer_wave_number(frequency, alpha; kind=:bound)
 
-An explicit choice keeps a bound mode decaying even for Im(omega)<0.
-Exactly zero wave number needs a different expansion and is rejected.
+Choose the decaying or positive-frequency outgoing wave number.
+
+Use units `M = 1` and time dependence `exp(-im*frequency*t)`. Require finite
+`real(frequency) > 0` and finite `alpha ≥ 0`. For `kind = :bound`, require
+`real(frequency) < alpha` and return `im*sqrt(complex(alpha^2-frequency^2))`;
+this branch decays even for negative imaginary frequency. For `kind = :outgoing`,
+require `real(frequency) ≥ alpha` and return `sqrt(complex(frequency^2-alpha^2))`.
+Reject zero wave number, which requires a separate threshold expansion.
+
+See also [`outer_series`](@ref).
 """
 function outer_wave_number(frequency, alpha; kind=:bound)
     isfinite(frequency) && real(frequency) > 0 || throw(DomainError(frequency, "require Re(omega)>0"))
@@ -31,11 +40,15 @@ function outer_wave_number(frequency, alpha; kind=:bound)
     return wave_number
 end
 
-"""Evaluate a vector polynomial and its derivative with respect to its argument.
+"""
+    boundary_polynomial(coefficients, argument) -> (value, derivative)
 
-For y(z)=v_0+v_1*z+...+v_N*z^N, Horner's rule repeatedly forms z*y+v_j,
-starting with v_N. Differentiating that update gives z*y'+y. z is s near
-the horizon and 1/r at the outer boundary; the caller applies the chain rule.
+Evaluate a vector polynomial and its derivative using Horner's rule.
+
+Store the coefficient of power `j` in `coefficients[j+1]`, starting with the
+constant term. Return the value and derivative with respect to `argument`.
+For boundary series, this argument is `r-r_plus` or `1/r`; apply the chain rule
+separately to obtain a radial derivative.
 """
 function boundary_polynomial(coefficients, argument)
     value = copy(coefficients[end])
@@ -48,10 +61,18 @@ function boundary_polynomial(coefficients, argument)
     return value, derivative
 end
 
-"""Ingoing boundary values (R,Q=dR/dr_*) for one same-frequency, same-m block.
+"""
+    horizon_boundary_data(tortoise_radius, spin, alpha, frequency, l_values,
+                          m, couplings, amplitudes; order=3)
 
-amplitudes are coefficients of s^p, s=r-r_plus (a local normalization).
-Linear Frobenius corrections are included through the requested order.
+Evaluate ingoing boundary profiles and tortoise slopes for one fixed-frequency block.
+
+Return a named tuple with vectors `values = R` and `tortoise_slopes = dR/dr_*`
+in `l_values` order. The `frequency` is the actual harmonic frequency and
+`amplitudes` contains the leading coefficients of `(r-r_plus)^p` in units `M = 1`.
+Include linear Frobenius corrections through the nonnegative integer `order`.
+
+See also [`horizon_series`](@ref), [`outer_boundary_data`](@ref).
 """
 function horizon_boundary_data(tortoise_radius, spin, alpha, frequency,
                                l_values, m, couplings, amplitudes; order=3)
@@ -72,12 +93,22 @@ function horizon_boundary_data(tortoise_radius, spin, alpha, frequency,
     return (; values, tortoise_slopes)
 end
 
-"""Outer boundary values including inverse-radius corrections (PDF Eq. 23).
+"""
+    outer_boundary_data(tortoise_radius, spin, alpha, frequency, l_values,
+                        m, couplings, amplitudes; kind=:bound, order=7)
 
-amplitudes are the coefficients multiplying exp(i*k*r)*r^p at infinity;
-the fundamental bound coefficient is A0 in PDF Eq. 20, with M=1.
-order=7 retains terms through 1/r^7. Finite endpoint/order convergence must
-still be checked in a profile solve. These are linear asymptotic boundaries.
+Evaluate outer boundary profiles and tortoise slopes with inverse-radius corrections.
+
+Return a named tuple with vectors `values = R` and `tortoise_slopes = dR/dr_*`
+in `l_values` order. Supply the actual harmonic `frequency` in units `M = 1`.
+The `amplitudes` multiply `exp(im*k*r)*r^p` at infinity; the fundamental bound
+coefficient is `A0` in PDF Eq. (20).
+
+Select `kind` as in [`outer_wave_number`](@ref). The nonnegative integer `order`
+retains terms through `1/r^order`. These are linear asymptotic boundaries;
+check endpoint and series-order convergence when solving a profile.
+
+See also [`outer_series`](@ref), [`horizon_boundary_data`](@ref).
 """
 function outer_boundary_data(tortoise_radius, spin, alpha, frequency,
                              l_values, m, couplings, amplitudes; kind=:bound, order=7)
@@ -97,11 +128,22 @@ function outer_boundary_data(tortoise_radius, spin, alpha, frequency,
     return (; values, tortoise_slopes)
 end
 
-"""Assemble boundary state=[R; Q] for all modes, preserving their ordering.
+"""
+    boundary_state(side, position, spin, alpha, frequency, modes, couplings,
+                   amplitudes; fundamental_m=1, horizon_order=3, outer_order=7)
 
-frequency is omega_0; amplitudes follows the same ordering as modes.
-side is :horizon or :outer. Boundary series remain linear asymptotic
-approximations, whose accuracy must be checked by moving the endpoints.
+Assemble the complex boundary state `[R; Q]` in `modes` order, with `Q = dR/dr_*`.
+
+Choose `side = :horizon` or `:outer` and a tortoise `position`. Supply one
+amplitude per `(l, m)` mode. The `frequency` is fundamental; each positive
+`m = n*fundamental_m` receives frequency `n*frequency`, with positive integer
+`fundamental_m`. At the outer boundary, select the bound or outgoing branch
+according to each harmonic's real frequency relative to `alpha`.
+
+Use nonnegative integer `horizon_order` and `outer_order` for the respective
+linear asymptotic series. Check accuracy by varying orders and endpoints.
+
+See also [`horizon_boundary_data`](@ref), [`outer_boundary_data`](@ref).
 """
 function boundary_state(
     side, position, spin, alpha, frequency, modes, couplings, amplitudes;

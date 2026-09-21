@@ -1,13 +1,15 @@
 using FastGaussQuadrature: gausslegendre
 
 """
-    polar_harmonic(l, m, cos_theta)
+    polar_harmonic(l::Int, m::Int, cos_theta::Real)
 
-Compute the polar part of the spherical harmonic Y_{lm}(cos theta) via the recurrence relation.
+Compute the normalized polar harmonic at `cos_theta` using a recurrence.
 
-Builds Y_{mm} first, then increases l until we reach the desired harmonic. Normalized over d(cos theta).
+Require `0 ≤ m ≤ l` and `-1 ≤ cos_theta ≤ 1`. Include the Condon–Shortley
+phase and normalize the squared harmonic to integrate to one over
+`d(cos_theta)`. Build the `l = m` harmonic first, then increase `l`.
 
-Return
+See also [`build_polar_values`](@ref).
 """
 function polar_harmonic(l::Int, m::Int, cos_theta::Real)
     0 <= m <= l || throw(ArgumentError("require 0 <= m <= l"))
@@ -30,7 +32,10 @@ end
 """
     build_polar_values(l_max, cosine_theta_nodes)
 
-Construct a grid of polar harmonic values for l <= l_max, m <= l.
+Tabulate polar harmonics for `0 ≤ m ≤ l ≤ l_max`.
+
+Return a dictionary keyed by `(l, m)`, with vectors of values in
+`cosine_theta_nodes` order. Use the normalization of [`polar_harmonic`](@ref).
 """
 function build_polar_values(l_max, cosine_theta_nodes)
     return Dict(
@@ -42,7 +47,11 @@ end
 """
     build_azimuthal_values(m_max, azimuth_nodes)
 
-Construct a grid of azimuthal harmonic values for m <= m_max.
+Tabulate `exp(im * m * ϕ)` at `azimuth_nodes` for `0 ≤ m ≤ m_max`.
+
+Return a dictionary keyed by `m`, with vectors in node order. No additional
+normalization factor is included; [`angular_grid`](@ref) supplies weights
+for the normalized azimuthal measure `dϕ / (2π)`.
 """
 function build_azimuthal_values(m_max, azimuth_nodes)
     return Dict(
@@ -51,6 +60,26 @@ function build_azimuthal_values(m_max, azimuth_nodes)
     )
 end
 
+"""
+    angular_grid(n_polar, n_azimuth)
+
+Construct a Gauss–Legendre polar grid and a uniform periodic azimuthal grid.
+
+Return a named tuple with `cosine_theta_nodes`, `polar_weights`, `azimuth_nodes`,
+and the scalar `azimuth_weight`. Polar weights integrate over `[-1, 1]` and
+sum to two; azimuthal nodes span `[0, 2π)` with weight `1 / n_azimuth` each.
+
+# Examples
+```jldoctest
+julia> grid = angular_grid(4, 8);
+
+julia> (length(grid.cosine_theta_nodes), length(grid.azimuth_nodes))
+(4, 8)
+
+julia> grid.azimuth_weight
+0.125
+```
+"""
 function angular_grid(n_polar, n_azimuth)
     cosine_theta_nodes, polar_weights = gausslegendre(n_polar)
     azimuth_nodes = 2π .* (0:n_azimuth-1) ./ n_azimuth

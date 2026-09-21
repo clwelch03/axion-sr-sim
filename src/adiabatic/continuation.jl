@@ -1,3 +1,6 @@
+# Run with `julia --project=. src/adiabatic/continuation.jl` from the repository root.
+# Solve a small-amplitude seed, then continue through six increasing amplitudes.
+# Overwrite runs/adiabatic/continuation.jls with the seed and each completed step.
 using Serialization
 
 include("angular.jl")

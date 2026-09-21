@@ -1,5 +1,5 @@
 """
-    integrate_radial(rhs!, initial_state, start, stop; step=0.05)
+    integrate_radial(rhs!, initial_state, start, stop; step=0.05, save_profile=false)
 
 Integrate from `start` to `stop` using fixed-step fourth-order Runge–Kutta.
 
@@ -11,8 +11,13 @@ spacing to land on `stop`.
 For radial evolution, positions are tortoise coordinates and `state = [R; Q]`
 with `Q = dR/dr_*`. Require positive finite `step`, which sets the maximum
 spacing, not an error tolerance. Check accuracy by reducing it.
+
+With `save_profile=true`, return `(positions, states)` including both endpoints.
+Column `j` of `states` is the state at `positions[j]`; positions follow the
+integration direction. The default stores only the final state, as needed
+during Newton iterations.
 """
-function integrate_radial(rhs!, initial_state, start, stop; step=0.05)
+function integrate_radial(rhs!, initial_state, start, stop; step=0.05, save_profile=false)
     isfinite(step) && step > 0 ||
         throw(ArgumentError("step must be positive and finite"))
 
@@ -22,6 +27,9 @@ function integrate_radial(rhs!, initial_state, start, stop; step=0.05)
     spacing = (stop - start) / count
     state = complex.(float.(initial_state))
     k1, k2, k3, k4 = (similar(state) for _ in 1:4)
+    positions = save_profile ? collect(range(start, stop; length=count + 1)) : nothing
+    states = save_profile ? Matrix{eltype(state)}(undef, length(state), count + 1) : nothing
+    save_profile && (states[:, 1] = state)
 
     for index in 0:(count - 1)
         position = start + index * spacing
@@ -33,9 +41,10 @@ function integrate_radial(rhs!, initial_state, start, stop; step=0.05)
         rhs!(k4, state .+ spacing .* k3, position + spacing)
 
         state .+= (spacing / 6) .* (k1 .+ 2 .* k2 .+ 2 .* k3 .+ k4)
+        save_profile && (states[:, index + 2] = state)
     end
 
-    return state
+    return save_profile ? (; positions, states) : state
 end
 
 """
@@ -106,6 +115,9 @@ normalization or finding a frequency.
 - `match=5.0`: matching coordinate, with `inner < match < outer`.
 - `horizon_order=3`: nonnegative integer order of the horizon series.
 - `outer_order=7`: nonnegative integer order of the outer series.
+- `save_profile=false`: when true, return `(from_horizon, from_outer, residual)`.
+  Each branch contains `positions` and `states` from its boundary to `match`.
+  Keep both matching-point states so a discontinuity is visible, not averaged.
 
 See also [`solve_nonlinear_mode`](@ref), [`matching_residual`](@ref).
 """
@@ -116,6 +128,7 @@ function nonlinear_matching_residual(
     fundamental_m=1, step=0.05,
     inner=-100.0, outer=100.0, match=5.0,
     horizon_order=3, outer_order=7,
+    save_profile=false,
 )
     inner < match < outer ||
         throw(ArgumentError("match must lie between endpoints"))
@@ -142,13 +155,16 @@ function nonlinear_matching_residual(
     )
 
     from_horizon = integrate_radial(
-        rhs!, horizon_state, inner, match; step,
+        rhs!, horizon_state, inner, match; step, save_profile,
     )
     from_outer = integrate_radial(
-        rhs!, outer_state, outer, match; step,
+        rhs!, outer_state, outer, match; step, save_profile,
     )
 
     # A smooth solution requires agreement in every R and every Q.
+    if save_profile
+        residual = from_horizon.states[:, end] - from_outer.states[:, end]
+        return (; from_horizon, from_outer, residual)
+    end
     return from_horizon - from_outer
 end
-

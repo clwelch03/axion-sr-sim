@@ -27,6 +27,18 @@ using LinearAlgebra: norm
     end
     @test integrate_radial(oscillator!, [1, 0], 0.0, 0.0) == [1, 0]
     @test_throws ArgumentError integrate_radial(oscillator!, [1, 0], 0.0, 1.0; step=0)
+
+    # Check every saved state against an analytic, position-dependent solution
+    # in both directions. This also catches aliased snapshots of the final state.
+    for (start, stop) in ((0.0, 1.0), (1.0, 0.0))
+        profile = integrate_radial(polynomial!, [im * start^3], start, stop;
+            step=0.13, save_profile=true)
+        @test first(profile.positions) == start
+        @test last(profile.positions) == stop
+        @test vec(profile.states) ≈ im .* profile.positions .^ 3
+        @test profile.states[:, end] == integrate_radial(
+            polynomial!, [im * start^3], start, stop; step=0.13)
+    end
 end
 
 @testset "Linear boundary matching" begin

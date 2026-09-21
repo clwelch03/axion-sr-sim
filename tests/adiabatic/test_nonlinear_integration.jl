@@ -44,6 +44,16 @@
     @test all(isfinite, fine)
     @test horizon_amplitudes == saved_horizon
     @test outer_amplitudes == saved_outer
+    profile = nonlinear_matching_residual(
+        frequency, horizon_amplitudes, outer_amplitudes,
+        spin, alpha, modes, couplings, polar_values, azimuthal_values, grid;
+        inner=-10.0, outer=20.0, match=5.0, horizon_order=0, outer_order=0,
+        step=0.1, save_profile=true,
+    )
+    @test profile.residual == fine
+    @test profile.from_horizon.states[:, 1] == inner_state
+    @test profile.from_outer.states[:, 1] == outer_state
+    @test last(profile.from_horizon.positions) == last(profile.from_outer.positions) == 5.0
     @test_throws ArgumentError nonlinear_matching_residual(
         frequency, horizon_amplitudes, outer_amplitudes,
         spin, alpha, modes, couplings, polar_values, azimuthal_values, grid;

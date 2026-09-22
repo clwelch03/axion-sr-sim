@@ -2,7 +2,7 @@ using Serialization
 using LinearAlgebra: norm
 
 for filename in ("angular", "nonlinear", "tortoise", "radial",
-                 "boundary_series", "boundaries", "integration")
+                 "boundary_series", "boundaries", "integration", "energy")
     include(joinpath(@__DIR__, filename * ".jl"))
 end
 
@@ -43,6 +43,26 @@ println(
     "Reproduces saved residual: ",
     profiles.residual == solution.residual,
 )
+
+# Investigate energies
+inner_energy = integrate_energy_branch(
+    profiles.from_horizon,
+    solution.frequency, saved.spin, saved.alpha, saved.modes,
+    polar_values, azimuthal_values, grid,
+)
+
+outer_energy = integrate_energy_branch(
+    profiles.from_outer,
+    solution.frequency, saved.spin, saved.alpha, saved.modes,
+    polar_values, azimuthal_values, grid,
+)
+
+total_energy = inner_energy + outer_energy
+
+println("Inner-branch E/Fa² = ", inner_energy)
+println("Outer-branch E/Fa² = ", outer_energy)
+println("Total E/Fa² = ", total_energy)
+println("E/(Fa² A0²) = ", total_energy / entry.amplitude^2)
 
 # Export branches for plotting
 output_path = joinpath(@__DIR__, "../../runs/adiabatic/profiles.csv")

@@ -8,6 +8,7 @@ include(joinpath(@__DIR__, "../../src/adiabatic/boundary_series.jl"))
 include(joinpath(@__DIR__, "../../src/adiabatic/boundaries.jl"))
 include(joinpath(@__DIR__, "../../src/adiabatic/integration.jl"))
 include(joinpath(@__DIR__, "../../src/adiabatic/matching.jl"))
+include(joinpath(@__DIR__, "../../src/adiabatic/energy.jl"))
 
 @testset "Angular quadrature and polar orthonormality" begin
     grid = angular_grid(16, 31)
@@ -67,3 +68,4 @@ include("test_nonlinear.jl")
 include("test_nonlinear_radial.jl")
 include("test_nonlinear_integration.jl")
 include("test_nonlinear_matching.jl")
+include("test_energy.jl")

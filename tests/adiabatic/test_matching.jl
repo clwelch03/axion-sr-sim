@@ -15,6 +15,26 @@
     @test_throws ArgumentError complex_newton(residual, initial; admissible=state -> false)
 end
 
+@testset "Newton correction until convergence" begin
+    # This distant initial guess needs more than ten corrections to reach sqrt(2).
+    residual = state -> state.^2 .- 2
+    @test_throws ErrorException newton_solve(residual, [1e5]; max_iterations=10)
+    history = Tuple{Int,Float64}[]
+    solution = newton_solve(residual, [1e5]; max_iterations=nothing,
+        progress_callback=(iteration, mismatch) -> push!(history, (iteration, mismatch)))
+    @test solution.iterations > 10
+    @test only(solution.state) ≈ sqrt(2)
+    @test norm(solution.residual) <= 1e-10
+    @test length(history) == solution.iterations + 1
+    @test all(diff(last.(history)) .< 0)
+
+    # An intentionally strict progress requirement exercises the stagnation guard.
+    @test_throws ErrorException newton_solve(residual, [1e5];
+        max_iterations=nothing, minimum_progress=0.99, stagnation_limit=2)
+    @test_throws ArgumentError newton_solve(residual, [1.0]; minimum_progress=0)
+    @test_throws ArgumentError newton_solve(residual, [1.0]; stagnation_limit=0)
+end
+
 @testset "Real coordinates for complex unknowns" begin
     state = ComplexF64[1 + 2im, -3 + 4im]
     @test pack_complex(state) == [1, -3, 2, 4]

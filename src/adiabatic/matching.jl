@@ -10,30 +10,47 @@ Leave `initial` unchanged and return a named tuple with `state`, `residual`,
 and `iterations`. Real initial values produce a real Jacobian; complex initial
 values require a residual analytic in its complex arguments. Throw an error on
 nonfinite residuals, inadmissible differences, failed descent, or iteration exhaustion.
+With `max_iterations=nothing`, continue until the residual meets `tolerance`,
+unless a correction fails or the residual stagnates.
 
 # Arguments
 - `tolerance=1e-10`: positive finite upper bound on the residual norm.
-- `max_iterations=15`: nonnegative integer maximum number of Newton steps.
+- `max_iterations=15`: nonnegative integer step limit, or `nothing` for no fixed limit.
 - `difference_step=1e-6`: positive finite difference scale, multiplied by
   `max(1, abs(state[j]))` for each component.
 - `admissible=state -> true`: predicate restricting guesses and trial states;
   both points of each centered difference must also satisfy it.
+- `progress_callback=nothing`: optional function called with `(iteration, residual_norm)`
+  at the initial state and after every accepted correction.
+- `stagnation_limit=8`: positive number of consecutive insufficient improvements
+  allowed before reporting stagnation.
+- `minimum_progress=1e-3`: minimum fractional residual decrease per correction
+  that resets the stagnation counter; require a value strictly between zero and one.
 
 See also [`real_newton`](@ref), [`complex_newton`](@ref).
 """
 function newton_solve(residual, initial; tolerance=1e-10, max_iterations=15,
-                        difference_step=1e-6, admissible=state -> true)
+                        difference_step=1e-6, admissible=state -> true,
+                        progress_callback=nothing, stagnation_limit=8,
+                        minimum_progress=1e-3)
     isfinite(tolerance) && tolerance > 0 && isfinite(difference_step) && difference_step > 0 &&
-        max_iterations isa Integer && max_iterations >= 0 ||
+        (isnothing(max_iterations) || (max_iterations isa Integer && max_iterations >= 0)) ||
         throw(ArgumentError("require positive tolerances and nonnegative iteration limit"))
+    stagnation_limit isa Integer && stagnation_limit > 0 &&
+        isfinite(minimum_progress) && 0 < minimum_progress < 1 ||
+        throw(ArgumentError("require positive stagnation limit and 0 < minimum_progress < 1"))
     state = float.(initial)
     admissible(state) || throw(ArgumentError("initial guess is outside the allowed domain"))
     mismatch = residual(state)
-    for iteration in 0:max_iterations
+    iteration, stagnant_steps = 0, 0
+    while true
         mismatch_norm = norm(mismatch)
         isfinite(mismatch_norm) || error("nonfinite Newton residual")
+        isnothing(progress_callback) || progress_callback(iteration, mismatch_norm)
         mismatch_norm <= tolerance && return (; state, residual=mismatch, iterations=iteration)
         iteration == max_iterations && error("Newton iteration limit reached; residual=$mismatch_norm")
+        stagnant_steps >= stagnation_limit &&
+            error("Newton residual stagnated after $iteration corrections; residual=$mismatch_norm")
 
         # J[i,j] measures how matching condition i changes with unknown j.
         jacobian = Matrix{eltype(state)}(undef, length(mismatch), length(state))
@@ -60,6 +77,9 @@ function newton_solve(residual, initial; tolerance=1e-10, max_iterations=15,
             end
         end
         accepted || error("Newton step could not reduce the residual ($mismatch_norm)")
+        stagnant_steps = norm(mismatch) > (1 - minimum_progress) * mismatch_norm ?
+            stagnant_steps + 1 : 0
+        iteration += 1
     end
 end
 
@@ -101,8 +121,8 @@ Solve a possibly nonanalytic complex system using a real Jacobian.
 
 Pass complex vectors to `residual` and `admissible`, while packing real and
 imaginary parts separately for [`newton_solve`](@ref). Forward `kwargs...`
-(`tolerance`, `max_iterations`, and `difference_step`) to that solver with its
-defaults. Return a named tuple with complex `state`, complex `residual`, and
+(`tolerance`, `max_iterations`, `difference_step`, and progress/stagnation
+options) to that solver with its defaults. Return a named tuple with complex `state`, complex `residual`, and
 `iterations`; leave `initial` unchanged.
 
 See also [`complex_newton`](@ref).
@@ -220,8 +240,13 @@ series-order, and angular convergence separately from the matching tolerance.
 - `outer_tail_guess`: required vector of physical outer amplitudes for `modes[2:end]`.
 - `fundamental_m=1`: positive integer azimuthal number of the fundamental.
 - `tolerance=1e-10`: positive finite tolerance on the scaled residual norm.
-- `max_iterations=15`: nonnegative integer Newton iteration limit.
+- `max_iterations=15`: nonnegative integer Newton iteration limit, or `nothing`
+  to correct until convergence or numerical failure.
 - `difference_step=1e-6`: positive finite relative scale for centered differences.
+- `progress_callback=nothing`: optional `(iteration, residual_norm)` callback;
+  the reported norm is scaled by `A0`.
+- `stagnation_limit=8`, `minimum_progress=1e-3`: stagnation controls forwarded
+  to [`newton_solve`](@ref).
 - `integration_options...`: keywords for [`nonlinear_matching_residual`](@ref):
   `step=0.05`, `inner=-100.0`, `outer=100.0`, `match=5.0`, `horizon_order=3`,
   and `outer_order=7`.
@@ -234,6 +259,7 @@ function solve_nonlinear_mode(
     horizon_guess, outer_tail_guess,
     fundamental_m=1, tolerance=1e-10,
     max_iterations=15, difference_step=1e-6,
+    progress_callback=nothing, stagnation_limit=8, minimum_progress=1e-3,
     integration_options...,
 )
     amplitude isa Real && isfinite(amplitude) && amplitude > 0 ||
@@ -272,6 +298,7 @@ function solve_nonlinear_mode(
     solution = real_newton(
         residual, initial;
         tolerance, max_iterations, difference_step, admissible,
+        progress_callback, stagnation_limit, minimum_progress,
     )
 
     physical_residual = amplitude .* solution.residual

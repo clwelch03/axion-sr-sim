@@ -1,12 +1,12 @@
 # Preliminary run recipe. Run from repository root with julia --project=.
 using Serialization, LinearAlgebra
 root = normpath(joinpath(@__DIR__, "../../.."))
-for filename in ("angular", "nonlinear", "tortoise", "radial", "boundary_series", "boundaries", "integration", "matching", "energy")
+for filename in ("angular", "nonlinear", "tortoise", "radial", "boundary_series", "boundaries", "integration", "matching", "continuation_predictor", "energy")
     include(joinpath(root, "src/adiabatic", filename * ".jl"))
 end
-const output = joinpath(@__DIR__, "cosine_branch")
-const seed_path = isfile(output * ".jls") ? output * ".jls" :
-    joinpath(root, "runs/adiabatic/preliminary_cosine_20260922.jls")
+const output = get(ENV, "AXION_OUTPUT_PREFIX", joinpath(@__DIR__, "cosine_branch"))
+const seed_path = get(ENV, "AXION_SEED_PATH", isfile(output * ".jls") ? output * ".jls" :
+    joinpath(root, "runs/adiabatic/preliminary_cosine_20260922.jls"))
 const saved = deserialize(seed_path)
 const grid = angular_grid(saved.n_polar, saved.n_azimuth)
 const polar = build_polar_values(5, grid.cosine_theta_nodes)
@@ -15,6 +15,9 @@ const couplings = build_cosine_squared_couplings(5, polar, grid)
 const options = saved.options
 const modes = saved.modes
 const spin, alpha = saved.spin, saved.alpha
+const difference_step = parse(Float64, get(ENV, "AXION_DIFFERENCE_STEP", "1e-8"))
+isfinite(difference_step) && difference_step > 0 ||
+    throw(ArgumentError("AXION_DIFFERENCE_STEP must be positive and finite"))
 
 # Finite-radius outward current, with positive-m and conjugate normalization.
 function outward_flux(state, position, frequency)
@@ -49,7 +52,9 @@ end
 
 function checkpoint(continuation, rows)
     serialize(output * ".jls.tmp", (; spin, alpha, modes, options, n_polar=saved.n_polar,
-        n_azimuth=saved.n_azimuth, potential="cosine", tolerance=1e-9, continuation, rows))
+        n_azimuth=saved.n_azimuth, potential="cosine", tolerance=1e-9,
+        predictor="secant in A0 of physical boundary amplitudes and frequency",
+        newton_max_iterations=nothing, difference_step, continuation, rows))
     mv(output * ".jls.tmp", output * ".jls"; force=true)
     open(output * ".csv.tmp", "w") do io
         println(io, join(string.(keys(first(rows))), ','))
@@ -65,26 +70,46 @@ function main()
     runtime_seconds = parse(Float64, get(ENV, "AXION_RUN_SECONDS", "1000"))
     isfinite(runtime_seconds) && runtime_seconds > 0 ||
         throw(ArgumentError("AXION_RUN_SECONDS must be positive and finite"))
+    target_amplitude = parse(Float64, get(ENV, "AXION_TARGET_AMPLITUDE", "13"))
+    isfinite(target_amplitude) && target_amplitude > 0 ||
+        throw(ArgumentError("AXION_TARGET_AMPLITUDE must be positive and finite"))
     continuation, rows = copy(saved.continuation), copy(saved.rows)
-    amplitude, previous = last(continuation).amplitude, last(continuation).solution
-    factor = amplitude < 0.03 ? 2.0 : 1.5
+    amplitude = last(continuation).amplitude
+    # A saved-branch check validates a 25% jump with the finer Jacobian differences.
+    # Start at least at 10%, then let successful corrections grow the spacing.
+    amplitude_step = length(continuation) >= 2 ?
+        clamp(1.5 * (amplitude - continuation[end-1].amplitude), 0.1amplitude, 0.25amplitude) :
+        0.1amplitude
     checkpoint(continuation, rows)
-    while time()-started < runtime_seconds && amplitude < 13
-        target = min(13.0, amplitude*factor)
-        ratio = target / amplitude
+    while time()-started < runtime_seconds && amplitude < target_amplitude
+        target = min(target_amplitude, amplitude + amplitude_step)
+        prediction = predict_nonlinear_mode(continuation, target)
+        if !(isfinite(prediction.frequency) && 0 < real(prediction.frequency) < alpha &&
+             all(isfinite, prediction.horizon_amplitudes) && all(isfinite, prediction.outer_amplitudes))
+            amplitude_step /= 2
+            amplitude_step < 1e-5amplitude && error("No admissible continuation prediction")
+            continue
+        end
         println("Starting A0=$target (elapsed $(round(time()-started)) s)")
         flush(stdout)
+        progress = (iteration, residual_norm) -> begin
+            println("  Newton iteration=$iteration scaled_residual=$residual_norm")
+            flush(stdout)
+        end
         solution = try
-            solve_nonlinear_mode(previous.frequency, target,
+            solve_nonlinear_mode(prediction.frequency, target,
                 spin, alpha, modes, couplings, polar, azimuthal, grid;
-                horizon_guess=ratio .* previous.horizon_amplitudes,
-                outer_tail_guess=ratio .* previous.outer_amplitudes[2:end],
-                tolerance=1e-9, max_iterations=10, options...)
+                horizon_guess=prediction.horizon_amplitudes,
+                outer_tail_guess=prediction.outer_amplitudes[2:end],
+                tolerance=1e-9, max_iterations=nothing,
+                difference_step, progress_callback=progress, options...)
         catch exception
+            exception isa ErrorException || rethrow()
             println("FAILED A0=$target: ", sprint(showerror, exception))
             flush(stdout)
-            factor = sqrt(factor)
-            factor < 1.015 && break
+            amplitude_step /= 2
+            amplitude_step < 1e-5amplitude &&
+                error("Continuation step exhausted; last accepted A0=$amplitude")
             continue
         end
         row = diagnostics(target, solution)
@@ -93,10 +118,14 @@ function main()
         checkpoint(continuation, rows)
         println("SAVED ", row, " elapsed=", round(time()-started))
         flush(stdout)
-        amplitude, previous = target, solution
-        maximum_factor = amplitude < 0.03 ? 2.0 : amplitude < 0.3 ? 1.5 : 1.25
-        factor = min(maximum_factor, factor*1.1)
+        accepted_step = target - amplitude
+        amplitude = target
+        growth = solution.iterations <= 4 ? 1.6 : solution.iterations <= 8 ? 1.3 :
+            solution.iterations <= 16 ? 1.0 : 0.75
+        amplitude_step = min(growth * accepted_step, 0.25amplitude)
     end
     println("Finished at A0=", amplitude, " with ", length(rows), " saved points.")
 end
-main()
+if abspath(PROGRAM_FILE) == abspath(@__FILE__)
+    main()
+end

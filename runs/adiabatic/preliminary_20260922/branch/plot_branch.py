@@ -6,7 +6,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 run_directory = Path(__file__).resolve().parent
-root = run_directory.parents[2]
+root = run_directory.parents[3]
 data = np.atleast_1d(np.genfromtxt(run_directory / 'cosine_branch.csv', delimiter=',', names=True))
 fig, axes = plt.subplots(1, 2, figsize=(11, 4.2), constrained_layout=True)
 axes[0].plot(data['amplitude'], data['energy'], 'o-', color='blue', ms=4)

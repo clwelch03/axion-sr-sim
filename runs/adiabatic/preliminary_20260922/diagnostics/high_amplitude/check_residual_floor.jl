@@ -1,7 +1,7 @@
 # Diagnose the high-amplitude matching floor without changing the branch.
 ENV["AXION_SEED_PATH"] = get(ENV, "AXION_SEED_PATH",
-    joinpath(@__DIR__, "seed_before_residual_check.jls"))
-include(joinpath(@__DIR__, "continue_cosine.jl"))
+    joinpath(@__DIR__, "../../seeds/seed_before_residual_check.jls"))
+include(joinpath(@__DIR__, "../../branch/continue_cosine.jl"))
 
 function packed_residual(state, amplitude, integration_options)
     unpacked = unpack_complex(state)

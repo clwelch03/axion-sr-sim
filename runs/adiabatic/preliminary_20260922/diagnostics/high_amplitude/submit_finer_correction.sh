@@ -7,8 +7,8 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:15:00
-#SBATCH --output=runs/adiabatic/preliminary_20260922/finer-%j.out
+#SBATCH --output=runs/adiabatic/preliminary_20260922/logs/finer-%j.out
 set -euo pipefail
 export OPENBLAS_NUM_THREADS=1
 export JULIA_NUM_THREADS=1
-/global/home/users/clwelch/.juliaup/bin/julia --project=. runs/adiabatic/preliminary_20260922/check_finer_correction.jl
+/global/home/users/clwelch/.juliaup/bin/julia --project=. runs/adiabatic/preliminary_20260922/diagnostics/high_amplitude/check_finer_correction.jl

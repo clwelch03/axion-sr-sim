@@ -1,8 +1,8 @@
 # Compare derivative increments and continuation spacing at a fixed saved seed.
 using Test
 ENV["AXION_SEED_PATH"] = get(ENV, "AXION_SEED_PATH",
-    joinpath(@__DIR__, "seed_before_speed_check.jls"))
-include(joinpath(@__DIR__, "continue_cosine.jl"))
+    joinpath(@__DIR__, "../../seeds/seed_before_speed_check.jls"))
+include(joinpath(@__DIR__, "../../branch/continue_cosine.jl"))
 
 function measured_correction(label, continuation, target; difference_step=1e-8)
     prediction = predict_nonlinear_mode(continuation, target)

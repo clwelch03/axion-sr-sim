@@ -7,8 +7,8 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:20:00
-#SBATCH --output=runs/adiabatic/preliminary_20260922/speed-%j.out
+#SBATCH --output=runs/adiabatic/preliminary_20260922/logs/speed-%j.out
 set -euo pipefail
 export OPENBLAS_NUM_THREADS=1
 export JULIA_NUM_THREADS=1
-/global/home/users/clwelch/.juliaup/bin/julia --project=. runs/adiabatic/preliminary_20260922/check_continuation_speed.jl
+/global/home/users/clwelch/.juliaup/bin/julia --project=. runs/adiabatic/preliminary_20260922/diagnostics/speed/check_continuation_speed.jl

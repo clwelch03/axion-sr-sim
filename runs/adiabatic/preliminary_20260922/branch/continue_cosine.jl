@@ -1,6 +1,6 @@
 # Preliminary run recipe. Run from repository root with julia --project=.
 using Serialization, LinearAlgebra
-root = normpath(joinpath(@__DIR__, "../../.."))
+root = normpath(joinpath(@__DIR__, "../../../.."))
 for filename in ("angular", "nonlinear", "tortoise", "radial", "boundary_series", "boundaries", "integration", "matching", "continuation_predictor", "energy")
     include(joinpath(root, "src/adiabatic", filename * ".jl"))
 end

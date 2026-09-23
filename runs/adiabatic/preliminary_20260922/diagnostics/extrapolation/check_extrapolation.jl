@@ -1,8 +1,8 @@
 # Standalone comparison at the amplitude rejected by the original driver.
 using Test
 ENV["AXION_SEED_PATH"] = get(ENV, "AXION_SEED_PATH",
-    joinpath(@__DIR__, "seed_before_secant.jls"))
-include(joinpath(@__DIR__, "continue_cosine.jl"))
+    joinpath(@__DIR__, "../../seeds/seed_before_secant.jls"))
+include(joinpath(@__DIR__, "../../branch/continue_cosine.jl"))
 
 @testset "Saved branch: extrapolation and converged correction" begin
     target = 0.2782139804271685

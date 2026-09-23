@@ -1,5 +1,25 @@
 # Preliminary cosine continuation — 2026-09-22
 
+## Directory layout
+
+- `branch/`: production driver, submit scripts, accepted cosine CSV/checkpoint,
+  and plotting script. Figures are still written to the repository's `plots/`.
+- `seeds/`: preserved checkpoints used as inputs to diagnostic experiments.
+- `diagnostics/extrapolation/`: early rescaled-versus-secant comparison.
+- `diagnostics/speed/`: Jacobian increment and step-size performance checks.
+- `diagnostics/high_amplitude/`: residual-floor, Jacobian, and cubic-prediction
+  experiments near A0=10, together with their result files and submit scripts.
+- `logs/`: historical and future SLURM output.
+
+Run submit commands from the repository root. Serialized results and old logs
+retain their original provenance paths; use the locations above to find moved
+files. Numerical artifacts were moved without changing their contents.
+
+The production driver still uses the secant predictor and its original restart
+step rule. The successful cubic A0=10 result is a separate diagnostic; the next
+bounded step comparison belongs in `diagnostics/high_amplitude/` before any
+production restart.
+
 This run extends the existing small-amplitude adiabatic continuation toward
 finite amplitude. It is a preliminary cosine-potential branch, not a complete
 or converged reproduction of OTT Fig. 2. Quartic and sextic branches are absent.
@@ -30,14 +50,14 @@ accepted points. Those points remain in the checkpoint.
 
 The initial five points were produced before a login-node change, in
 `../preliminary_cosine_20260922.jls`. The shared driver resumes that checkpoint
-if its own `cosine_branch.jls` does not exist; otherwise it resumes its own
+if its own `branch/cosine_branch.jls` does not exist; otherwise it resumes its own
 latest solution. Checkpoints are replaced atomically after every accepted point.
 All successful points, frequencies, boundary amplitudes, and settings are retained.
 
 Run from the repository root:
 
 ```bash
-sbatch runs/adiabatic/preliminary_20260922/submit.sh
+sbatch runs/adiabatic/preliminary_20260922/branch/submit.sh
 ```
 
 Do not start a second job using the same output while the first is running.
@@ -51,7 +71,7 @@ when the original continuation stopping rule was reached. The tested secant
 driver resumed as job 26283970 on 2026-09-23 UTC. It was stopped after
 55 minutes to resume its saved checkpoint with the validated finer Jacobian
 differences and larger restart spacing as job **26286366**.
-The long recipe uses `submit_long.sh`, sets `AXION_RUN_SECONDS=13800`, targets A0=13,
+The long recipe uses `branch/submit_long.sh`, sets `AXION_RUN_SECONDS=13800`, targets A0=13,
 and refreshes the plot on normal completion. Failed Newton solves reduce
 the amplitude increment; repeated failures can end continuation before the
 target. A time-limit kill retains the last complete checkpoint.
@@ -59,7 +79,7 @@ target. A time-limit kill retains the last complete checkpoint.
 To repeat the long run after all existing jobs have finished:
 
 ```bash
-sbatch runs/adiabatic/preliminary_20260922/submit_long.sh
+sbatch runs/adiabatic/preliminary_20260922/branch/submit_long.sh
 ```
 
 The initial delivered plot contains nine points through A0=0.12301875,
@@ -68,10 +88,10 @@ about 32.5% below the small-amplitude value. Later checkpoints may extend
 this range; the CSV and SLURM logs are authoritative.
 
 To compare the two predictors at the original rejected amplitude
-A0=0.2782139804271685, run `submit_extrapolation_check.sh` through `sbatch`.
+A0=0.2782139804271685, run `diagnostics/extrapolation/submit_extrapolation_check.sh` through `sbatch`.
 This standalone check leaves the branch unchanged and writes
-`extrapolation_validation.csv`. It uses the preserved 21-point checkpoint
-`seed_before_secant.jls`; `AXION_SEED_PATH` can select another saved seed.
+`diagnostics/extrapolation/extrapolation_validation.csv`. It uses the preserved 21-point checkpoint
+`seeds/seed_before_secant.jls`; `AXION_SEED_PATH` can select another saved seed.
 `AXION_OUTPUT_PREFIX` optionally selects a separate continuation output.
 `AXION_TARGET_AMPLITUDE` optionally changes the default target of 13.
 
@@ -85,10 +105,10 @@ of the same speedup throughout the branch.
 
 ## Continuation speed check
 
-Run `sbatch runs/adiabatic/preliminary_20260922/submit_speed_check.sh` to
-repeat the comparison from `seed_before_speed_check.jls` without modifying
+Run `sbatch runs/adiabatic/preliminary_20260922/diagnostics/speed/submit_speed_check.sh` to
+repeat the comparison from `seeds/seed_before_speed_check.jls` without modifying
 the main branch. Job 26286005 passed all 16 assertions. Results are in
-`continuation_speed_validation.csv`.
+`diagnostics/speed/continuation_speed_validation.csv`.
 
 At A0=0.4018594396, replaying the same predictor with Jacobian difference
 scale 1e-8 instead of 1e-6 reduced correction count from 10 to 3. Energy
@@ -109,13 +129,13 @@ the current solver setting; historical rows retain their original results.
 After loading the BHsuper environment, redraw the latest saved points:
 
 ```bash
-python runs/adiabatic/preliminary_20260922/plot_branch.py
+python runs/adiabatic/preliminary_20260922/branch/plot_branch.py
 ```
 
 This writes PNG and PDF files to `plots/preliminary_cosine_branch_20260922.*`.
 The plot is a snapshot; rerun this command after additional points complete.
-Numerical data are in `cosine_branch.csv`, and full checkpoints in
-`cosine_branch.jls`.
+Numerical data are in `branch/cosine_branch.csv`, and full checkpoints in
+`branch/cosine_branch.jls`.
 
 ## Flux convention and checks
 

@@ -109,6 +109,7 @@ normalization or finding a frequency.
 
 # Arguments
 - `fundamental_m=1`: positive integer azimuthal number of the fundamental.
+- `potential=:cosine`: select `:cosine`, `:quartic`, or `:sextic`.
 - `step=0.05`: positive finite maximum RK4 spacing in tortoise radius.
 - `inner=-100.0`: inner endpoint in tortoise radius.
 - `outer=100.0`: outer endpoint in tortoise radius.
@@ -125,7 +126,7 @@ function nonlinear_matching_residual(
     frequency, horizon_amplitudes, outer_amplitudes,
     spin, alpha, modes, couplings,
     polar_values, azimuthal_values, grid;
-    fundamental_m=1, step=0.05,
+    fundamental_m=1, potential=:cosine, step=0.05,
     inner=-100.0, outer=100.0, match=5.0,
     horizon_order=3, outer_order=7,
     save_profile=false,
@@ -151,7 +152,7 @@ function nonlinear_matching_residual(
     rhs! = (derivative, state, position) -> nonlinear_tortoise_rhs!(
         derivative, state, position, spin, alpha, frequency,
         modes, couplings, polar_values, azimuthal_values, grid;
-        fundamental_m,
+        fundamental_m, potential,
     )
 
     from_horizon = integrate_radial(

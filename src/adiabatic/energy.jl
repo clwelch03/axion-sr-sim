@@ -23,7 +23,8 @@ and complex fundamental `frequency`; each harmonic has frequency
 
 Supply angular tables from [`build_polar_values`](@ref) and
 [`build_azimuthal_values`](@ref) on `grid` from [`angular_grid`](@ref).
-Use the cosine potential `V(φ) = alpha^2*(1-cos(φ))`.
+Use `V(φ) = alpha^2 * U(φ)`, with `U` supplied by
+[`potential_value`](@ref) for the selected potential.
 
 Evaluate time and potential terms by angular quadrature; integrate the
 remaining derivative terms using harmonic orthogonality. This implements
@@ -35,13 +36,14 @@ Return the real scalar `d(E/Fa²)/dr_*`, including the radial Jacobian
 
 # Arguments
 - `fundamental_m=1`: positive integer azimuthal number of the fundamental.
+- `potential=:cosine`: select `:cosine`, `:quartic`, or `:sextic`.
 
 See also [`reconstruct_field`](@ref), [`tortoise_geometry`](@ref).
 """
 function energy_per_tortoise_radius(
     state, tortoise_radius, frequency, spin, alpha, modes,
     polar_values, azimuthal_values, grid;
-    fundamental_m=1,
+    fundamental_m=1, potential=:cosine,
 )
     mode_count = length(modes)
     length(state) == 2mode_count ||
@@ -78,12 +80,13 @@ function energy_per_tortoise_radius(
     time_coefficient =
         (radial_factor .- jacobian .* spin^2 .* sine_squared) ./ 2
 
-    # Equivalent to alpha²*(1-cos(field)), without small-field cancellation.
-    potential = 2 .* alpha^2 .* sin.(field ./ 2).^2
+    # Restore the mass factor excluded from the dimensionless potential U.
+    potential_density =
+        alpha^2 .* potential_value.(field, Ref(potential))
 
     sampled_density =
         time_coefficient .* time_derivative.^2 .+
-        jacobian .* rho_squared .* potential
+        jacobian .* rho_squared .* potential_density
 
     # Existing azimuthal weights integrate dvarphi/(2pi).
     sampled_energy = 2π * grid.azimuth_weight *
@@ -126,13 +129,15 @@ separately.
 
 # Arguments
 - `fundamental_m=1`: positive integer azimuthal number of the fundamental.
+- `potential=:cosine`: select `:cosine`, `:quartic`, or `:sextic`;
+  use the same potential that generated the radial profiles.
 
 See also [`energy_per_tortoise_radius`](@ref).
 """
 function integrate_energy_branch(
     branch, frequency, spin, alpha, modes,
     polar_values, azimuthal_values, grid;
-    fundamental_m=1,
+    fundamental_m=1, potential=:cosine,
 )
     positions = branch.positions
     length(positions) >= 2 ||
@@ -155,7 +160,7 @@ function integrate_energy_branch(
             view(branch.states, :, index), positions[index],
             frequency, spin, alpha, modes,
             polar_values, azimuthal_values, grid;
-            fundamental_m,
+            fundamental_m, potential,
         )
         for index in order
     ]

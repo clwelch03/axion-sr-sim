@@ -23,6 +23,53 @@ function sine_remainder(field::Real)
 end
 
 """
+    potential_value(field::Real, potential::Symbol=:cosine)
+
+Evaluate the dimensionless scalar potential `U(field)`.
+
+Select `:cosine`, `:quartic`, or `:sextic`. Exclude the overall factor
+`alpha^2`, which the energy calculation supplies separately. Evaluate
+the cosine potential without small-field cancellation.
+
+See also [`potential_remainder`](@ref).
+"""
+function potential_value(field::Real, potential::Symbol=:cosine)
+    if potential === :cosine
+        return 2sin(field / 2)^2
+    elseif potential === :quartic
+        return field^2 / 2 - field^4 / 24
+    elseif potential === :sextic
+        return field^2 / 2 - field^4 / 24 + field^6 / 720
+    end
+
+    throw(ArgumentError("potential must be :cosine, :quartic, or :sextic"))
+end
+
+"""
+    potential_remainder(field::Real, potential::Symbol=:cosine)
+
+Evaluate `field - U'(field)` for the selected scalar potential.
+
+Return the nonlinear remainder after separating the linear mass term.
+Exclude the factor `alpha^2` and the geometric factor supplied by
+[`nonlinear_source`](@ref). Use [`sine_remainder`](@ref) for accurate
+evaluation of the cosine case near zero.
+
+See also [`potential_value`](@ref).
+"""
+function potential_remainder(field::Real, potential::Symbol=:cosine)
+    if potential === :cosine
+        return sine_remainder(field)
+    elseif potential === :quartic
+        return field^3 / 6
+    elseif potential === :sextic
+        return field^3 / 6 - field^5 / 120
+    end
+
+    throw(ArgumentError("potential must be :cosine, :quartic, or :sextic"))
+end
+
+"""
     reconstruct_field(radial_values, polar_values, azimuthal_values, grid)
 
 Reconstruct the real angular field at one radius and time zero.
@@ -80,43 +127,55 @@ end
 
 """
     nonlinear_source(radial_values, radius, spin, alpha, polar_values,
-                     azimuthal_values, grid; modes=keys(radial_values))
+                     azimuthal_values, grid;
+                     modes=keys(radial_values), potential=:cosine)
 
 Return the nonlinear radial source as a dictionary keyed by the requested modes.
 
 Reconstruct the field from `radial_values` and project
-`alpha^2 * (radius^2 + spin^2*cos(θ)^2) * (ϕ - sin(ϕ))` onto `modes`, using
-the measure and normalization of [`project_field`](@ref). Require `0 < m ≤ l`;
-`modes` may include harmonics absent from `radial_values` to measure generation.
-Use units `M = 1`, so `alpha` is the scalar mass in these units.
+`alpha^2 * (radius^2 + spin^2*cos(θ)^2) * (ϕ - U′(ϕ))` onto `modes`,
+using the measure and normalization of [`project_field`](@ref).
+Require positive `m ≤ l`. Requested modes may include harmonics absent
+from `radial_values` to measure generation. Use units `M = 1`.
 
-The source `N` enters the radial equation with a plus sign and contributes
+The source enters the radial equation with a plus sign and contributes
 `-source_scale*N` to `dQ/dr_*`. No tortoise factor is included here.
-This follows the field equation in PDF Eq. (5); the printed potential term in
-Eq. (21) appears inconsistent with its linear mass terms. Retain the full sine,
-with a small-field evaluation from [`sine_remainder`](@ref), and check angular
-resolution at large amplitude.
+
+# Arguments
+- `modes=keys(radial_values)`: harmonics onto which the source is projected.
+- `potential=:cosine`: select `:cosine`, `:quartic`, or `:sextic`.
+
+See also [`potential_remainder`](@ref), [`nonlinear_tortoise_rhs!`](@ref).
 """
 function nonlinear_source(radial_values, radius, spin, alpha,
                           polar_values, azimuthal_values, grid;
-                          modes=keys(radial_values))
+                          modes=keys(radial_values), potential=:cosine)
     all(mode -> 0 < mode[2] <= mode[1], modes) ||
         throw(ArgumentError("require positive m <= l for projected modes"))
-    field = reconstruct_field(radial_values, polar_values, azimuthal_values, grid)
-    # Polar vectors broadcast along rows. azimuth_weight integrates dvarphi/(2pi).
+
+    field = reconstruct_field(
+        radial_values, polar_values, azimuthal_values, grid,
+    )
+
     rho_squared = radius^2 .+ spin^2 .* grid.cosine_theta_nodes.^2
-    weighted_source = alpha^2 .* rho_squared .* sine_remainder.(field) .*
-                      grid.polar_weights .* grid.azimuth_weight
-    # Projection uses exp(-i*m*varphi), unlike reconstruction above.
-    return Dict((l, m) => sum(weighted_source .* polar_values[(l, m)] .*
-                             transpose(conj.(azimuthal_values[m])))
-                for (l, m) in modes)
+    weighted_source =
+        alpha^2 .* rho_squared .*
+        potential_remainder.(field, Ref(potential)) .*
+        grid.polar_weights .* grid.azimuth_weight
+
+    return Dict(
+        (l, m) => sum(
+            weighted_source .* polar_values[(l, m)] .*
+            transpose(conj.(azimuthal_values[m]))
+        )
+        for (l, m) in modes
+    )
 end
 
 """
     nonlinear_tortoise_rhs!(derivative, state, tortoise_radius, spin, alpha,
                             frequency, modes, couplings, polar_values,
-                            azimuthal_values, grid; fundamental_m=1)
+                            azimuthal_values, grid; fundamental_m=1, potential=:cosine)
 
 Write the coupled nonlinear radial derivative into `derivative` and return it.
 
@@ -124,11 +183,18 @@ Use the state layout, harmonic frequencies, units, and nonaliasing requirements
 of [`linear_tortoise_rhs!`](@ref). Leave `state` unchanged and add the source
 from [`nonlinear_source`](@ref) to the slope derivatives after tortoise scaling.
 Supply angular tables evaluated on `grid` for every retained mode.
+
+
+# Arguments
+- `fundamental_m=1`: positive integer azimuthal number of the fundamental.
+- `potential=:cosine`: select `:cosine`, `:quartic`, or `:sextic`.
+
+See also [`nonlinear_source`](@ref).
 """
 function nonlinear_tortoise_rhs!(
     derivative, state, tortoise_radius, spin, alpha, frequency,
     modes, couplings, polar_values, azimuthal_values, grid;
-    fundamental_m=1,
+    fundamental_m=1, potential=:cosine,
     )
     # Start with the linear equations, including the harmonic frequencies.
     linear_tortoise_rhs!(
@@ -146,7 +212,7 @@ function nonlinear_tortoise_rhs!(
 
     source = nonlinear_source(
         radial_values, geometry.radius, spin, alpha,
-        polar_values, azimuthal_values, grid; modes,
+        polar_values, azimuthal_values, grid; modes, potential,
     )
 
     # Convert the source from the r-coordinate equation to dQ/dr_*.

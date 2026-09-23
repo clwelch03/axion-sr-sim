@@ -50,3 +50,53 @@ function predict_nonlinear_mode(continuation, amplitude)
     outer_amplitudes[1] = amplitude
     return (; frequency, horizon_amplitudes, outer_amplitudes)
 end
+
+"""
+    predict_nonlinear_mode_cubic(continuation, amplitude; history_spacing=0.05)
+
+Predict frequency and physical boundary amplitudes by cubic extrapolation.
+
+Select four accepted points near equally spaced offsets behind the latest
+amplitude, using their actual unequal spacing in the interpolation weights.
+Fall back to [`predict_nonlinear_mode`](@ref) when history is insufficient
+or the selected nodes are too close. Fix the fundamental outer amplitude
+exactly to `amplitude`. Leave accepted solutions unchanged.
+
+# Arguments
+- `history_spacing=0.05`: positive finite spacing for selecting history in A0.
+
+The prediction is an initial guess requiring correction and residual checks.
+"""
+function predict_nonlinear_mode_cubic(continuation, amplitude; history_spacing=0.05)
+    fallback = predict_nonlinear_mode(continuation, amplitude)
+    isfinite(history_spacing) && history_spacing > 0 ||
+        throw(ArgumentError("require positive finite history spacing"))
+    nodes = [entry.amplitude for entry in continuation]
+    all(value -> isfinite(value) && value > 0, nodes) &&
+        all(diff(nodes) .> 0) ||
+        throw(ArgumentError("require increasing positive finite history"))
+    indices = [findlast(value -> value <= last(nodes) - offset * history_spacing,
+                       nodes) for offset in 3:-1:0]
+    any(isnothing, indices) && return fallback
+    selected = continuation[Int.(indices)]
+    nodes = [entry.amplitude for entry in selected]
+    all(diff(nodes) .>= history_spacing / 2) || return fallback
+    for entry in selected
+        length(entry.solution.horizon_amplitudes) == length(fallback.horizon_amplitudes) &&
+            length(entry.solution.outer_amplitudes) == length(fallback.outer_amplitudes) ||
+            throw(DimensionMismatch("require matching boundary-vector lengths"))
+    end
+    weights = [prod((amplitude - nodes[other]) / (nodes[index] - nodes[other])
+                   for other in eachindex(nodes) if other != index)
+               for index in eachindex(nodes)]
+    frequency = sum(weight * entry.solution.frequency
+                    for (weight, entry) in zip(weights, selected))
+    horizon_amplitudes = sum(weight .* entry.solution.horizon_amplitudes
+                            for (weight, entry) in zip(weights, selected))
+    outer_amplitudes = sum(weight .* entry.solution.outer_amplitudes
+                          for (weight, entry) in zip(weights, selected))
+    outer_amplitudes[1] = amplitude
+    isfinite(frequency) && all(isfinite, horizon_amplitudes) &&
+        all(isfinite, outer_amplitudes) || return fallback
+    return (; frequency, horizon_amplitudes, outer_amplitudes)
+end

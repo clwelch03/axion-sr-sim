@@ -46,16 +46,16 @@ this handoff, the run README, and the saved artifacts.
 
 ## Data already available
 
-All paths below are relative to `runs/adiabatic/preliminary_20260922/`
+All paths below are relative to `runs/adiabatic/fig2_20260922/`
 unless stated otherwise.
 
 | Artifact | Contents |
 | --- | --- |
-| `branch/cosine_branch.csv` | Main preliminary cosine branch, 106 accepted points |
-| `branch/cosine_branch.jls` | Full solutions, boundary amplitudes, settings, and rows |
+| `results/cosine_branch.csv` | Main preliminary cosine branch, 106 accepted points |
+| `results/cosine_branch.jls` | Full solutions, boundary amplitudes, settings, and rows |
 | `seeds/seed_before_residual_check.jls` | Preserved copy of the 106-point branch used for diagnosis |
 | `diagnostics/high_amplitude/curved_prediction_diagnosis.jls` | Separate successful point at exactly `A0=10`; **not appended to the main branch** |
-| `branch/plot_branch.py` | Plots main cosine CSV only; does not include the separate A0=10 point |
+| `scripts/plot_branch.py` | Plots main cosine CSV only; does not include the separate A0=10 point |
 | `README.md` | Existing recipe, energy/flux conventions, earlier speed measurements |
 
 Main branch endpoint:
@@ -215,9 +215,9 @@ All these jobs, including the production job, were finished at handoff.
    Compare one modest jump against subdivided steps at a common endpoint,
    checking frequency, energy, flux, and boundary amplitudes for branch agreement.
    The A0=10 success alone has not validated subsequent large jumps.
-4. **Watch the restart rule:** `branch/continue_cosine.jl` currently forces its first
+4. **Watch the restart rule:** `scripts/continue_cosine.jl` currently forces its first
    increment into 10–25% of A0. At A0≈10 this jumps by at least 1, far beyond
-   the successful diagnostic step. Do not simply relaunch `branch/submit_long.sh`
+   the successful diagnostic step. Do not simply relaunch `scripts/submit_long.sh`
    and assume it uses the tested cubic predictor/small restart step.
 5. Once the next-step check passes, collect toward A0≈13 and through the
    upward flux zero crossing, checkpointing every accepted point. Keep failed
@@ -262,7 +262,7 @@ Give the following changes as incremental snippets, not automatic edits:
    cosine CSV or merely relabel a cosine solution.
 6. Start each new potential near the linear regime, using a small-amplitude
    solution as a **guess**, then re-solve with the selected potential before
-   accepting it. The old `runs/adiabatic/continuation.jls` and early cosine
+   accepting it. The old `runs/adiabatic/small_amplitude/results/continuation.jls` and early cosine
    checkpoints contain small-amplitude seeds; inspect their settings first.
 7. Collect the three branches independently. The polynomial source is cheaper
    to evaluate, but faster Newton convergence has not been established.
@@ -293,7 +293,7 @@ To inspect the successful separate point without re-running a solve:
 
 ```julia
 using Serialization
-result = deserialize("runs/adiabatic/preliminary_20260922/diagnostics/high_amplitude/curved_prediction_diagnosis.jls")
+result = deserialize("runs/adiabatic/fig2_20260922/diagnostics/high_amplitude/curved_prediction_diagnosis.jls")
 result.trial.target
 result.trial.solution
 result.trial.energy
@@ -302,7 +302,7 @@ result.trial.total_flux
 
 Some diagnostic scripts execute their experiment when included; inspect them
 or load their `.jls` results instead of casually including all scripts.
-The production `branch/continue_cosine.jl` guards its `main()`, but loads its seed
+The production `scripts/continue_cosine.jl` guards its `main()`, but loads its seed
 and global settings at include time. Set environment overrides before inclusion.
 
 To redraw the current main CSV:
@@ -310,9 +310,9 @@ To redraw the current main CSV:
 ```bash
 MPLCONFIGDIR=/tmp/axion_mpl_cache \
   /global/home/users/clwelch/.conda/envs/BHsuper/bin/python \
-  runs/adiabatic/preliminary_20260922/branch/plot_branch.py
+  runs/adiabatic/fig2_20260922/scripts/plot_branch.py
 ```
 
-The plotting script currently reads only `branch/cosine_branch.csv`; a separate
+The plotting script currently reads only `results/cosine_branch.csv`; a separate
 extended branch or polynomial branch requires an explicit plotting update.
 Save standalone PNG/PDF artifacts and retain the numerical tables.

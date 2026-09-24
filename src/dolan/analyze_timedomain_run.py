@@ -6,7 +6,7 @@ the frequency-filter growth rate Gamma (Dolan Eq. 49) against the runtime
 Leaver benchmark. Captures, as a rerunnable script, the Gamma table quoted in
 the README.
 
-    python analyze_timedomain_run.py runs/dolan_fig13_a099_alpha042_t100000.npz
+    python analyze_timedomain_run.py runs/dolan/fig13/peak/dolan_fig13_a099_alpha042_t100000.npz
 """
 
 import argparse

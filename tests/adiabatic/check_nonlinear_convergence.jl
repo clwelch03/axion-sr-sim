@@ -26,7 +26,7 @@ flush(stdout)
         (label="outer_farther_again", step=0.05, inner=-100.0, outer=200.0),
     )
     results = NamedTuple[]
-    output_path = joinpath(@__DIR__, "../../runs/adiabatic/nonlinear_convergence.csv")
+    output_path = joinpath(@__DIR__, "../../runs/adiabatic/small_amplitude/results/nonlinear_convergence.csv")
     mkpath(dirname(output_path))
     open(output_path, "w") do output
         println(output, "case,amplitude,spin,alpha,step,inner,outer,match,linear_real,linear_imag,nonlinear_real,nonlinear_imag,shift_real,shift_imag,scaled_residual,iterations")

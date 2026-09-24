@@ -8,7 +8,7 @@ t=10^6 M, then the frequency filter (Eq. 46/49) applied to the fixed-x probe
 series.  That path has no linear generator in it, so it is the one that carries
 over to the nonlinear problem.
 
-Each alpha is one ``measure_gamma.py`` run under ``runs/fig13/``; the array
+Each alpha is one ``measure_gamma.py`` run under ``runs/dolan/fig13/sweep/``; the array
 recipe is in ``runs/README.md``.  A run stores its own alpha and grid
 resolution in ``tower_parameters``, so runs are selected by reading the files,
 not by parsing their names.
@@ -33,7 +33,7 @@ from dolan.measure_gamma import measure_filtered_mode
 # Dolan Fig. 13 tracks the l=m=1 fundamental (n=0) and first overtone (n=1).
 # leaver.py's principal number is n_p = l + 1 + n_radial, so n=0 -> n_p=2.
 OVERTONES = [("n=0", 2), ("n=1", 3)]
-DEFAULT_RUN_DIRECTORY = "runs/fig13"
+DEFAULT_RUN_DIRECTORY = "runs/dolan/fig13/sweep"
 DEFAULT_SEARCH_HALF_WIDTH = 0.002
 
 

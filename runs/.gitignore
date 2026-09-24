@@ -1,6 +1,9 @@
-# Regenerable run artifacts (see README.md). SLURM job scripts (*.sh) and
-# README.md ARE tracked -- they define how the runs are reproduced.
+# Large generated outputs and logs; see README.md for preservation policy.
 *.npz
 *.out
 *.err
 *.png
+*.pdf
+*.tmp
+# New scratch experiments; existing CSV/JLS reference results remain tracked.
+work/

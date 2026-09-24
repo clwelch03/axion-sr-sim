@@ -1,11 +1,11 @@
 # Run with `julia --project=. src/adiabatic/continuation.jl` from the repository root.
 # Solve a small-amplitude seed, then continue through six increasing amplitudes.
-# Overwrite runs/adiabatic/continuation.jls with the seed and each completed step.
+# Overwrite runs/adiabatic/small_amplitude/results/continuation.jls with the seed and each completed step.
 using Serialization
 
 include(joinpath(@__DIR__, "load.jl"))
 
-output_path = joinpath(@__DIR__, "../../runs/adiabatic/continuation.jls")
+output_path = joinpath(@__DIR__, "../../runs/adiabatic/small_amplitude/results/continuation.jls")
 mkpath(dirname(output_path))
 
 # Build the angular grid and couplings from angular.jl and radial.jl

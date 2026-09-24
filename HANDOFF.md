@@ -41,7 +41,7 @@ brought over — judged stale. It stays in the fork.
    DROP: Lawrencium module loads, Chombo build config, the GRChombo directory layout, the upstream-merge
    section. Add: how to run the solver + tests, the `runs/` layout.
 4. **`runs/` data.** ~105 MB of `.npz` outputs were `cp`-ed into `runs/` and
-   `runs/fig13/` and are gitignored (regenerable). The SLURM `.sh` scripts and
+   `runs/dolan/fig13/sweep/` and are gitignored (regenerable). The SLURM `.sh` scripts and
    `README.md` ARE committed (commit c86c6b3) — they define reproduction.
 
 ## The design doc (docs/DESIGN.md)

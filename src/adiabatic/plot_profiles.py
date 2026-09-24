@@ -5,7 +5,7 @@ import numpy as np
 
 root = Path(__file__).resolve().parents[2]
 data = np.genfromtxt(
-    root / "runs/adiabatic/profiles.csv",
+    root / "runs/adiabatic/small_amplitude/results/profiles.csv",
     delimiter=",",
     names=True,
     dtype=None,

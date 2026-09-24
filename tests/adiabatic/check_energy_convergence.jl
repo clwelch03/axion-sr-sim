@@ -8,7 +8,7 @@ for filename in ("angular", "nonlinear", "tortoise", "radial",
 end
 
 saved = deserialize(
-    joinpath(@__DIR__, "../../runs/adiabatic/continuation.jls")
+    joinpath(@__DIR__, "../../runs/adiabatic/small_amplitude/results/continuation.jls")
 )
 entry = first(saved.continuation)
 

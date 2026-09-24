@@ -118,12 +118,12 @@ Drivers:
 
 ## runs/ layout
 
-`runs/` holds heavy time-domain evolutions and their outputs.
+`runs/` groups simulations by campaign: `dolan/fig13/`,
+`adiabatic/fig2_20260922/`, and `adiabatic/small_amplitude/`.
+See `runs/README.md` for the index, migration map, and preservation policy.
 
-- **Tracked:** `runs/README.md` (regeneration recipes) and the SLURM submit
-  scripts (`*.sh`).
-- **Gitignored (regenerable):** `*.npz` run outputs, `*.out`/`*.err` SLURM logs,
-  `*.png`. `runs/fig13/` holds the per-α array outputs.
-
-The `.sh` scripts plus `runs/README.md` are the definition of a reproduction —
-keep them current when a run recipe changes.
+Campaign `scripts/` directories contain recipes; `results/` (or Dolan's
+`peak/` and `sweep/`) contain numerical outputs; `seeds/` holds preserved inputs;
+`logs/` holds Slurm output. Existing CSV/JLS reference results remain tracked.
+Large NPZ files, logs, figures, temporary writes, and new `work/` scratch
+experiments are ignored. Keep campaign READMEs and recipes current.

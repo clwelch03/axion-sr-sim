@@ -4,7 +4,7 @@ using LinearAlgebra: norm
 include(joinpath(@__DIR__, "load.jl"))
 
 saved = deserialize(
-    joinpath(@__DIR__, "../../runs/adiabatic/continuation.jls")
+    joinpath(@__DIR__, "../../runs/adiabatic/small_amplitude/results/continuation.jls")
 )
 entry = last(saved.continuation)
 solution = entry.solution
@@ -62,7 +62,7 @@ println("Total E/Fa² = ", total_energy)
 println("E/(Fa² A0²) = ", total_energy / entry.amplitude^2)
 
 # Export branches for plotting
-output_path = joinpath(@__DIR__, "../../runs/adiabatic/profiles.csv")
+output_path = joinpath(@__DIR__, "../../runs/adiabatic/small_amplitude/results/profiles.csv")
 
 open(output_path, "w") do output
     println(output, "branch,rstar,l,m,R_real,R_imag,Q_real,Q_imag")

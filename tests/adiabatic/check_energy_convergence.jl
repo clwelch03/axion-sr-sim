@@ -1,11 +1,7 @@
 using Test
 using Serialization
 
-for filename in ("angular", "nonlinear", "tortoise", "radial",
-                 "boundary_series", "boundaries", "integration",
-                 "matching", "energy")
-    include(joinpath(@__DIR__, "../../src/adiabatic", filename * ".jl"))
-end
+include(joinpath(@__DIR__, "../../src/adiabatic/load.jl"))
 
 saved = deserialize(
     joinpath(@__DIR__, "../../runs/adiabatic/small_amplitude/results/continuation.jls")

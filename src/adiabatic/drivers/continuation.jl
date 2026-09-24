@@ -3,9 +3,9 @@
 # Overwrite runs/adiabatic/small_amplitude/results/continuation.jls with the seed and each completed step.
 using Serialization
 
-include(joinpath(@__DIR__, "load.jl"))
+include(joinpath(@__DIR__, "../load.jl"))
 
-output_path = joinpath(@__DIR__, "../../runs/adiabatic/small_amplitude/results/continuation.jls")
+output_path = joinpath(@__DIR__, "../../../runs/adiabatic/small_amplitude/results/continuation.jls")
 mkpath(dirname(output_path))
 
 # Build the angular grid and couplings from angular.jl and radial.jl

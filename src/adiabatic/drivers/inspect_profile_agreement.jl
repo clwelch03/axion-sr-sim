@@ -1,10 +1,10 @@
 using Serialization
 using LinearAlgebra: norm
 
-include(joinpath(@__DIR__, "load.jl"))
+include(joinpath(@__DIR__, "../load.jl"))
 
 saved = deserialize(
-    joinpath(@__DIR__, "../../runs/adiabatic/small_amplitude/results/continuation.jls")
+    joinpath(@__DIR__, "../../../runs/adiabatic/small_amplitude/results/continuation.jls")
 )
 entry = last(saved.continuation)
 solution = entry.solution

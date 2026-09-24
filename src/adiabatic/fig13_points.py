@@ -14,8 +14,9 @@ def growth_rate_points(alpha_values, references, spin, output_path, julia="julia
     uses its real frequencies as initial guesses, but solves for growth itself.
     The retained angular modes are l=[1,3,5], m=1 for both radial overtones.
     """
-    script = Path(__file__).with_suffix(".jl")
-    project_root = script.resolve().parents[2]
+    source_directory = Path(__file__).resolve().parent
+    script = source_directory / "drivers" / "fig13_points.jl"
+    project_root = source_directory.parents[1]
     output_path = Path(output_path).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     labels = ("n=0", "n=1")

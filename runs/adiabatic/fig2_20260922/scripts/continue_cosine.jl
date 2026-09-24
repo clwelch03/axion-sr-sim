@@ -3,12 +3,7 @@ using Serialization, LinearAlgebra
 
 # Load the solver.
 root = normpath(joinpath(@__DIR__, "../../../.."))
-for filename in (
-    "angular", "nonlinear", "tortoise", "radial", "boundary_series",
-    "boundaries", "integration", "matching", "continuation_predictor", "energy",
-)
-    include(joinpath(root, "src/adiabatic", filename * ".jl"))
-end
+include(joinpath(root, "src/adiabatic/load.jl"))
 
 # Resume this branch unless an explicit seed is supplied.
 const output = get(ENV, "AXION_OUTPUT_PREFIX", joinpath(@__DIR__, "../results/cosine_branch"))

@@ -1,9 +1,7 @@
 # Preliminary run recipe. Run from repository root with julia --project=.
 using Serialization, LinearAlgebra
 root = normpath(joinpath(@__DIR__, "../../../.."))
-for filename in ("angular", "nonlinear", "tortoise", "radial", "boundary_series", "boundaries", "integration", "matching", "continuation_predictor", "energy")
-    include(joinpath(root, "src/adiabatic", filename * ".jl"))
-end
+include(joinpath(root, "src/adiabatic/load.jl"))
 const potential_kind = Symbol(get(ENV, "AXION_POTENTIAL", "quartic"))
 potential_kind in (:quartic, :sextic) ||
     throw(ArgumentError("AXION_POTENTIAL must be quartic or sextic"))

@@ -1,6 +1,6 @@
 # Batch entry point for the Python figure driver. One Julia process handles
 # both radial overtones, so compilation is paid only once.
-include(joinpath(@__DIR__, "load.jl"))
+include(joinpath(@__DIR__, "../load.jl"))
 
 """
     write_growth_rate_points(seed_path, output_path;

@@ -4,10 +4,7 @@ flush(stdout)
 using Test
 using LinearAlgebra: norm
 
-for filename in ("angular", "nonlinear", "tortoise", "radial", "boundary_series",
-                 "boundaries", "integration", "matching")
-    include(joinpath(@__DIR__, "../../src/adiabatic", filename * ".jl"))
-end
+include(joinpath(@__DIR__, "../../src/adiabatic/load.jl"))
 println("Source files loaded; starting convergence check.")
 flush(stdout)
 

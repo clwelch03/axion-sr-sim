@@ -106,7 +106,7 @@ function newton_solve(
     residual,
     initial;
     tolerance=1e-10,
-    max_iterations::Int=15,
+    max_iterations=15,
     jacobian_backend=:finite,
     difference_step=1e-6,
     admissible=state -> true,
@@ -136,6 +136,8 @@ function newton_solve(
         ))
     end
 
+    stagnation_limit > 0 || throw(ArgumentError("stagnation_limit must be positive"))
+
     # Work on a floating-point copy, leaving the caller's initial guess unchanged.
     state = float.(initial)
 
@@ -159,6 +161,10 @@ function newton_solve(
 
         if !isfinite(mismatch_norm)
             error("nonfinite Newton residual")
+        end
+        
+        if !isnothing(progress_callback)
+            progress_callback(iteration, mismatch_norm)
         end
 
         if mismatch_norm <= tolerance

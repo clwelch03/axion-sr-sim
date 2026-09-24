@@ -1,15 +1,5 @@
 using Test
-
-include(joinpath(@__DIR__, "../../src/adiabatic/angular.jl"))
-include(joinpath(@__DIR__, "../../src/adiabatic/nonlinear.jl"))
-include(joinpath(@__DIR__, "../../src/adiabatic/tortoise.jl"))
-include(joinpath(@__DIR__, "../../src/adiabatic/radial.jl"))
-include(joinpath(@__DIR__, "../../src/adiabatic/boundary_series.jl"))
-include(joinpath(@__DIR__, "../../src/adiabatic/boundaries.jl"))
-include(joinpath(@__DIR__, "../../src/adiabatic/integration.jl"))
-include(joinpath(@__DIR__, "../../src/adiabatic/matching.jl"))
-include(joinpath(@__DIR__, "../../src/adiabatic/continuation_predictor.jl"))
-include(joinpath(@__DIR__, "../../src/adiabatic/energy.jl"))
+include(joinpath(@__DIR__, "../../src/adiabatic/load.jl"))
 
 @testset "Angular quadrature and polar orthonormality" begin
     grid = angular_grid(16, 31)

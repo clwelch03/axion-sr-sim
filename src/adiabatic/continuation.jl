@@ -3,14 +3,7 @@
 # Overwrite runs/adiabatic/continuation.jls with the seed and each completed step.
 using Serialization
 
-include("angular.jl")
-include("nonlinear.jl")
-include("tortoise.jl")
-include("radial.jl")
-include("boundary_series.jl")
-include("boundaries.jl")
-include("integration.jl")
-include("matching.jl")
+include(joinpath(@__DIR__, "load.jl"))
 
 output_path = joinpath(@__DIR__, "../../runs/adiabatic/continuation.jls")
 mkpath(dirname(output_path))

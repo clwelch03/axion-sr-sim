@@ -1,10 +1,7 @@
 using Serialization
 using LinearAlgebra: norm
 
-for filename in ("angular", "nonlinear", "tortoise", "radial",
-                 "boundary_series", "boundaries", "integration", "energy")
-    include(joinpath(@__DIR__, filename * ".jl"))
-end
+include(joinpath(@__DIR__, "load.jl"))
 
 saved = deserialize(
     joinpath(@__DIR__, "../../runs/adiabatic/continuation.jls")

@@ -52,7 +52,7 @@ function refine_branch()
                 couplings, polar, azimuthal, grid;
                 horizon_guess=horizon, outer_tail_guess=outer[2:end],
                 potential=potential_kind, tolerance=1e-9,
-                max_iterations=newton_max_iterations, difference_step,
+                max_iterations=newton_max_iterations, difference_step, jacobian_backend,
                 progress_callback=progress, options...)
         catch exception
             exception isa ErrorException || rethrow()
@@ -67,6 +67,7 @@ function refine_branch()
         serialize(refinement_output * ".jls.tmp", (; spin, alpha, modes, options,
             potential=String(potential_kind), n_polar=saved.n_polar,
             n_azimuth=saved.n_azimuth, tolerance=1e-9, difference_step,
+            jacobian_backend=String(jacobian_backend),
             newton_max_iterations, spacing, continuation, rows))
         mv(refinement_output * ".jls.tmp", refinement_output * ".jls"; force=true)
         open(refinement_output * ".csv.tmp", "w") do io

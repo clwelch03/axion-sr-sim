@@ -23,6 +23,8 @@ const couplings = build_cosine_squared_couplings(5, polar, grid)
 const options = saved.options
 const modes = saved.modes
 const spin, alpha = saved.spin, saved.alpha
+# Select the derivative method; difference_step applies only to finite differences.
+const jacobian_backend = Symbol(get(ENV, "AXION_JACOBIAN", "finite"))
 const difference_step = parse(Float64, get(ENV, "AXION_DIFFERENCE_STEP", "1e-8"))
 isfinite(difference_step) && difference_step > 0 ||
     throw(ArgumentError("AXION_DIFFERENCE_STEP must be positive and finite"))
@@ -69,6 +71,7 @@ function checkpoint(continuation, rows)
     serialize(output * ".jls.tmp", (; spin, alpha, modes, options, n_polar=saved.n_polar,
         n_azimuth=saved.n_azimuth, potential=String(potential_kind), tolerance=1e-9,
         predictor=String(predictor_kind), history_spacing,
+        jacobian_backend=String(jacobian_backend),
         newton_max_iterations, difference_step, continuation, rows))
     mv(output * ".jls.tmp", output * ".jls"; force=true)
     open(output * ".csv.tmp", "w") do io
@@ -89,6 +92,7 @@ function main()
     isfinite(target_amplitude) && target_amplitude > 0 ||
         throw(ArgumentError("AXION_TARGET_AMPLITUDE must be positive and finite"))
     println("Potential=", potential_kind, " restarting=", restarting, " output=", output)
+    println("Jacobian=", jacobian_backend, " predictor=", predictor_kind)
     flush(stdout)
     if restarting
         continuation = copy(saved.continuation)
@@ -104,7 +108,7 @@ function main()
             outer_tail_guess=seed_solution.outer_amplitudes[2:end],
             potential=potential_kind,
             tolerance=1e-9, max_iterations=newton_max_iterations,
-            difference_step, options...,
+            difference_step, jacobian_backend, options...,
         )
         continuation = [(amplitude=seed_entry.amplitude, solution)]
         rows = [diagnostics(seed_entry.amplitude, solution)]
@@ -146,7 +150,7 @@ function main()
                 outer_tail_guess=prediction.outer_amplitudes[2:end],
                 potential=potential_kind,
                 tolerance=1e-9, max_iterations=newton_max_iterations,
-                difference_step, progress_callback=progress, options...)
+                difference_step, jacobian_backend, progress_callback=progress, options...)
         catch exception
             exception isa ErrorException || rethrow()
             println("FAILED A0=$target: ", sprint(showerror, exception))

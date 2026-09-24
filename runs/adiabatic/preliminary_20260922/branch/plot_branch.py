@@ -18,8 +18,10 @@ potentials = (
 for potential, color, label in potentials:
     data = np.atleast_1d(np.genfromtxt(
         run_directory / f'{potential}_branch.csv', delimiter=',', names=True))
-    refinement_path = run_directory / f'{potential}_refined.csv'
-    if refinement_path.exists():
+    for suffix in ('refined', 'gap'):
+        refinement_path = run_directory / f'{potential}_{suffix}.csv'
+        if not refinement_path.exists():
+            continue
         refinement = np.atleast_1d(np.genfromtxt(
             refinement_path, delimiter=',', names=True))
         # Keep production values for shared amplitudes; add independently solved points.

@@ -19,6 +19,6 @@ else
     export AXION_POTENTIAL=sextic AXION_DIFFERENCE_STEP=1e-8
 fi
 export AXION_NEWTON_MAX_ITERATIONS=12
-export AXION_SAMPLE_SPACING=0.1
+export AXION_SAMPLE_SPACING="${AXION_SAMPLE_SPACING:-0.1}"
 export AXION_RUN_SECONDS=13800
 /global/home/users/clwelch/.juliaup/bin/julia --project=. runs/adiabatic/preliminary_20260922/branch/refine_polynomial.jl

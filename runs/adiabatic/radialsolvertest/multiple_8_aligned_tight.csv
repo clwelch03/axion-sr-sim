@@ -1,0 +1,2 @@
+method,amplitude,tolerance,rk_step,resolution,status,setup_seconds,solve_seconds,iterations,residual,replay_residual,energy,total_flux,omega_real,omega_imag,native_energy
+multiple_8_aligned_tight,10.33565530025236,1.0e-12,0.1,4.0,converged,15.745936155319214,18.455626010894775,3,1.2403950152018523e-15,1.5928015474918465e-13,1690.613853556393,-0.011994930665700596,0.3730672814109554,3.7905522200620253e-6,1690.613853556393

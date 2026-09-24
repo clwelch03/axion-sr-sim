@@ -1,0 +1,2 @@
+method,amplitude,tolerance,rk_step,resolution,status,setup_seconds,solve_seconds,iterations,residual,replay_residual,energy,total_flux,omega_real,omega_imag,native_energy
+shooting_ad_rk005,10.33565530025236,1.0e-9,0.05,0.0,converged,22.119204998016357,30.89367389678955,3,2.347157675778288e-11,2.3459291923458697e-11,1690.6135944730026,-0.01199525460924624,0.37306729693491514,3.7905563083327697e-6,1690.6135944730026

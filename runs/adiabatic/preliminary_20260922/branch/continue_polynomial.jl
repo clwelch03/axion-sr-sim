@@ -9,8 +9,8 @@ potential_kind in (:quartic, :sextic) ||
     throw(ArgumentError("AXION_POTENTIAL must be quartic or sextic"))
 const output = joinpath(@__DIR__, "$(potential_kind)_branch")
 const restarting = isfile(output * ".jls")
-const seed_path = restarting ? output * ".jls" :
-    joinpath(root, "runs/adiabatic/preliminary_cosine_20260922.jls")
+const seed_path = get(ENV, "AXION_SEED_PATH", restarting ? output * ".jls" :
+    joinpath(root, "runs/adiabatic/preliminary_cosine_20260922.jls"))
 const saved = deserialize(seed_path)
 if restarting
     Symbol(saved.potential) == potential_kind ||
@@ -26,6 +26,13 @@ const spin, alpha = saved.spin, saved.alpha
 const difference_step = parse(Float64, get(ENV, "AXION_DIFFERENCE_STEP", "1e-8"))
 isfinite(difference_step) && difference_step > 0 ||
     throw(ArgumentError("AXION_DIFFERENCE_STEP must be positive and finite"))
+const newton_max_iterations = parse(Int, get(ENV, "AXION_NEWTON_MAX_ITERATIONS", "12"))
+newton_max_iterations > 0 || throw(ArgumentError("require a positive correction limit"))
+const predictor_kind = Symbol(get(ENV, "AXION_PREDICTOR", "secant"))
+predictor_kind in (:secant, :cubic) || throw(ArgumentError("predictor must be secant or cubic"))
+const history_spacing = parse(Float64, get(ENV, "AXION_HISTORY_SPACING", "0.05"))
+isfinite(history_spacing) && history_spacing > 0 ||
+    throw(ArgumentError("require positive finite history spacing"))
 
 # Finite-radius outward current, with positive-m and conjugate normalization.
 function outward_flux(state, position, frequency)
@@ -61,8 +68,8 @@ end
 function checkpoint(continuation, rows)
     serialize(output * ".jls.tmp", (; spin, alpha, modes, options, n_polar=saved.n_polar,
         n_azimuth=saved.n_azimuth, potential=String(potential_kind), tolerance=1e-9,
-        predictor="secant in A0 of physical boundary amplitudes and frequency",
-        newton_max_iterations=nothing, difference_step, continuation, rows))
+        predictor=String(predictor_kind), history_spacing,
+        newton_max_iterations, difference_step, continuation, rows))
     mv(output * ".jls.tmp", output * ".jls"; force=true)
     open(output * ".csv.tmp", "w") do io
         println(io, join(string.(keys(first(rows))), ','))
@@ -96,7 +103,7 @@ function main()
             horizon_guess=seed_solution.horizon_amplitudes,
             outer_tail_guess=seed_solution.outer_amplitudes[2:end],
             potential=potential_kind,
-            tolerance=1e-9, max_iterations=nothing,
+            tolerance=1e-9, max_iterations=newton_max_iterations,
             difference_step, options...,
         )
         continuation = [(amplitude=seed_entry.amplitude, solution)]
@@ -105,14 +112,21 @@ function main()
         flush(stdout)
     end
     amplitude = last(continuation).amplitude
-    # Start at 10–25% of A0; failed corrections can reduce the increment.
+    # Respect the accepted spacing; do not force a large restart jump.
     amplitude_step = length(continuation) >= 2 ?
-        clamp(1.5 * (amplitude - continuation[end-1].amplitude), 0.1amplitude, 0.25amplitude) :
+        min(1.5 * (amplitude - continuation[end-1].amplitude), 0.1amplitude) :
         0.1amplitude
+    if haskey(ENV, "AXION_INITIAL_STEP")
+        amplitude_step = parse(Float64, ENV["AXION_INITIAL_STEP"])
+        isfinite(amplitude_step) && amplitude_step > 0 ||
+            throw(ArgumentError("AXION_INITIAL_STEP must be positive and finite"))
+    end
     checkpoint(continuation, rows)
     while time()-started < runtime_seconds && amplitude < target_amplitude
         target = min(target_amplitude, amplitude + amplitude_step)
-        prediction = predict_nonlinear_mode(continuation, target)
+        prediction = predictor_kind === :cubic ?
+            predict_nonlinear_mode_cubic(continuation, target; history_spacing) :
+            predict_nonlinear_mode(continuation, target)
         if !(isfinite(prediction.frequency) && 0 < real(prediction.frequency) < alpha &&
              all(isfinite, prediction.horizon_amplitudes) && all(isfinite, prediction.outer_amplitudes))
             amplitude_step /= 2
@@ -131,7 +145,7 @@ function main()
                 horizon_guess=prediction.horizon_amplitudes,
                 outer_tail_guess=prediction.outer_amplitudes[2:end],
                 potential=potential_kind,
-                tolerance=1e-9, max_iterations=nothing,
+                tolerance=1e-9, max_iterations=newton_max_iterations,
                 difference_step, progress_callback=progress, options...)
         catch exception
             exception isa ErrorException || rethrow()

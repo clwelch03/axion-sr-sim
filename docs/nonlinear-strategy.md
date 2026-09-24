@@ -1,5 +1,10 @@
 # Strategy checkpoint: separate fast oscillations from slow cloud evolution
 
+> Dated development record. Later sections may supersede earlier next steps.
+> For the implemented adiabatic approach and current work, see
+> [adiabatic status](adiabatic-repro.md); time-domain campaign commands are in
+> [Dolan Fig. 13](../runs/dolan/fig13/README.md).
+
 2026-09-16. Research and feasibility checkpoint; no replacement solver or
 orders-of-magnitude nonlinear speedup has been demonstrated.
 
@@ -11,7 +16,7 @@ optimization is not the recommended main route.
 
 ## Evidence from this repository
 
-A fresh single-thread run of `src/benchmark_nonlinear.py --repeats 3`, at
+A fresh single-thread run of `PYTHONPATH=src python -m dolan.benchmark_nonlinear --repeats 3`, at
 a=0.99, alpha=0.42, dx=M/6, 4,267 radial nodes and six channels, gave:
 
 | Operation | Median | Range |

@@ -1,5 +1,10 @@
 # Understanding the nonlinear runtime
 
+> Dated development record. Later sections may supersede earlier next steps.
+> For the implemented adiabatic approach and current work, see
+> [adiabatic status](adiabatic-repro.md); time-domain campaign commands are in
+> [Dolan Fig. 13](../runs/dolan/fig13/README.md).
+
 These notes explain the measurements one small step at a time. Timings are
 from the current machine on 2026-09-15, using the `BHsuper` environment
 (NumPy 2.3.5), with BLAS/OpenMP thread counts set to one. They are not a
@@ -190,7 +195,7 @@ Reproduce the comparison (no additional Julia packages required):
 ```bash
 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
   PYTHONPATH=src python -m dolan.benchmark_julia_remainder \
-  --julia /global/scratch/projects/pc_heptheory/clwelch/software/julia-1.13.0/bin/julia
+  --julia /global/home/users/clwelch/.juliaup/bin/julia
 ```
 
 The Python script creates identical float64 inputs for both languages via
@@ -239,7 +244,7 @@ substitutes the bridge for `sine_remainder` only inside the experiment:
 ```bash
 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=1 \
   PYTHONPATH=src python -m dolan.benchmark_julia_bridge --check-tests \
-  --julia /global/scratch/projects/pc_heptheory/clwelch/software/julia-1.13.0/bin/julia
+  --julia /global/home/users/clwelch/.juliaup/bin/julia
 ```
 
 All 23 existing tests passed with Julia handling the remainder. Additional

@@ -6,9 +6,11 @@ eigenvalue cross-check and a Leaver benchmark. Extracted from the GRChombo fork
 (`clwelch03/GRChombo-Axion-SR`, `Examples/AxionSuperradiance/radial1d/`); GRChombo
 is no longer part of this line of work.
 
-`docs/dolan-repro.md` is the living status doc for the reproduction — read it
-first for where the physics stands. `docs/DESIGN.md` is the design doc (the
-why). This file is about how to work in the repo.
+Start with `docs/README.md` for the documentation index and
+`docs/adiabatic-repro.md` for current nonlinear profile work.
+`docs/dolan-repro.md` contains Dolan entry points and dated validation history;
+`docs/DESIGN.md` is its unfinished design draft. This file is about how to work
+in the repo.
 
 ## Working style on this project
 
@@ -68,8 +70,8 @@ For adiabatic work, read `docs/adiabatic-design.md` for the numerical design and
   `PYTHONPATH=src python -m dolan.measure_gamma --output <run.npz> --time-final <T> --spin <a>
   --alpha <α> --m 1 --l-max 5 ...` — evolves Dolan's Gaussian initial data,
   saves the fixed-x complex probe series per channel. Checkpoints on an interval;
-  resume a killed run with the same command plus `--resume`. Full argument set
-  and the reference invocation are in `runs/README.md`.
+  resume a killed run with the same command plus `--resume`. Use `--help` for
+  the full argument set and `runs/dolan/fig13/README.md` for submission recipes.
 - **Analyse a finished time-domain run:**
   `PYTHONPATH=src python -m dolan.analyze_timedomain_run <run.npz>` — raw probe spectrum plus the
   frequency-filter Γ table against the runtime Leaver benchmark.
@@ -89,7 +91,7 @@ The validation checks described in `solver.py`
 identity, tower ℓ-leakage) were run ad hoc; a grid-convergence script
 (`convergence_test.py`) lives on the old fork branch
 `feat/eigenmode-seed-and-backreaction`. Turning those into a real `tests/`
-suite is a pending task (see `HANDOFF.md` / the repo-structure plan).
+suite remains a pending task.
 
 ## Module map
 
@@ -115,6 +117,16 @@ Drivers:
   eigenvalue points, and (via `fig13_timedomain_points`) the time-domain Γ
   points; `--grid-spacing-n 4 8` overlays several resolutions.
 - `analyze_timedomain_run.py` — spectrum + Γ table from a saved probe record.
+
+### Adiabatic modules
+
+Load `src/adiabatic/load.jl` for the library. `angular.jl` and `tortoise.jl`
+provide the shared basis and geometry. `stationary/` contains potentials,
+radial equations, boundaries, integration, matching, and continuation predictors;
+`observables/energy.jl` integrates energy. `drivers/` contains small-amplitude
+continuation, profile inspection, and the Julia Fig. 13 adapter. Finite-amplitude
+campaigns and their flux diagnostics live under `runs/adiabatic/`.
+See `docs/adiabatic-design.md` for the complete map and conventions.
 
 ## runs/ layout
 

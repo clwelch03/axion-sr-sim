@@ -1,3 +1,12 @@
+# Dolan time-domain design
+
+This is an unfinished design draft describing the linear `Tower` operator.
+The section numbering follows the original outline; sections 1 and 6 onward
+have not been written. See [the reproduction guide](dolan-repro.md) for
+commands and validation history, and [nonlinear progress](nonlinear-progress.md)
+for the coupled positive-m extension. The separate stationary solver is
+documented in [adiabatic design](adiabatic-design.md).
+
 # 2. Physics background
 After performing the reduction to $1+1D$ (the details of which we omit here), we are left with a wavefunction $$\Psi = \sum_{j = |m|}^\infty \psi_j(t,r) Y_{jm}(\theta).$$
 We define $\pi_j \equiv \dot{\psi}_j$, so we have two first-order-in-time equations that RK4 can accept as input. Dolan's equation (25) reads

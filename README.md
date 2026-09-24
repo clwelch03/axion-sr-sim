@@ -4,22 +4,53 @@ From-scratch reproduction of Dolan 1212.1477 Sec. III: the coupled-ℓ tower for
 massive scalar quasi-bound state on Kerr, evolved in the time domain, with an
 eigenvalue cross-check and a Leaver continued-fraction benchmark. A second
 reproduction, Omiya, Takahashi & Tanaka [2201.04382](https://arxiv.org/abs/2201.04382),
-is being built incrementally in `src/adiabatic/`.
+now includes stationary nonlinear profiles, continuation, energy, and flux
+calculations for cosine, quartic, and sextic potentials in `src/adiabatic/`.
+The saved Figure 2 branches are preliminary; slow amplitude evolution and
+high-amplitude radial/angular convergence remain open.
 
-- **`docs/dolan-repro.md`** — living status doc: where the reproduction stands,
-  what has been validated, what is next.
+Start with the [documentation index](docs/README.md) or the
+[Figure 2 campaign](runs/adiabatic/fig2_20260922/README.md).
+
+- **[Dolan reproduction](docs/dolan-repro.md)** — current entry points and
+  dated linear validation results.
 - **[`docs/adiabatic-design.md`](docs/adiabatic-design.md)** — adiabatic equations,
-  code structure, numerical choices, and nonlinear extension plan.
+  code structure, numerical choices, nonlinear matching, and observables.
 - **[`docs/adiabatic-repro.md`](docs/adiabatic-repro.md)** — adiabatic validation
   results, run commands, and remaining checkpoints.
-- **`docs/DESIGN.md`** — Dolan time-domain design.
-- **`CLAUDE.md`** — working conventions and how to run the solver, tests, and
+- **[Dolan design](docs/DESIGN.md)** — unfinished time-domain design draft.
+- **[CLAUDE.md](CLAUDE.md)** — working conventions and how to run the solver, tests, and
   `runs/`.
+
+## Setup
+
+Run commands from the repository root. Python requires version 3.9 or newer
+and NumPy, SciPy, mpmath, and Matplotlib. In an activated Python environment:
+
+```bash
+python -m pip install -e .
+```
+
+On Lawrencium the existing environment is `BHsuper`:
+
+```bash
+module load miniconda3/22.11.1-gcc-11.4.0
+conda activate BHsuper
+```
+
+Adiabatic solves also require Julia and the repository project dependencies
+(FastGaussQuadrature and ForwardDiff):
+
+```bash
+julia --project=. -e 'using Pkg; Pkg.instantiate()'
+```
+
+Use `--project=.` for Julia commands. The checked-in `Manifest.toml` records
+the dependency environment. Python-only Dolan calculations do not require Julia.
 
 ## Quickstart
 
-```
-conda activate BHsuper                      # numpy, scipy, mpmath, matplotlib
+```bash
 PYTHONPATH=src python -m dolan.fig13_growth_rates            # eigenvalue Fig. 13 (fast)
 PYTHONPATH=src python -m dolan.measure_gamma --help          # time-domain evolution driver
 ```
@@ -27,7 +58,7 @@ PYTHONPATH=src python -m dolan.measure_gamma --help          # time-domain evolu
 Packages live under `src/`:
 
 - `dolan/`: time-domain solver, nonlinear extensions, eigenmode solver and drivers.
-- `adiabatic/`: new reproduction of nonlinear profiles and slow cloud evolution.
+- `adiabatic/`: Julia stationary profiles and observables, plus Python plotting adapters.
 - `common/`: independent Leaver and hydrogenic benchmarks, plotting utilities.
 
 Run the commands above from the repository root. Alternatively, install with
@@ -64,6 +95,15 @@ branches and starting the imaginary frequency at zero. The figure remains
 are saved in `plots/fig13_adiabatic_points.csv`. Add `--skip-eigenvalue` to omit
 the ARPACK sweep, or combine with `--include-hydrogenic` for that comparison.
 Time-domain points default to `M/6`; use `--grid-spacing-n` to select another resolution.
+
+Redraw both preliminary Fig. 2 panels from the saved tables (no solve):
+
+```bash
+python runs/adiabatic/fig2_20260922/scripts/plot_branch.py
+```
+
+This writes `plots/preliminary_fig2_20260922.png` and `.pdf`. For continuation
+and restart recipes, see the campaign README linked above.
 
 Python checks: `PYTHONPATH=src python -m unittest discover -s tests/dolan`.
 

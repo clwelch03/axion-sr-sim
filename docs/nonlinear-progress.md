@@ -1,12 +1,17 @@
 # Nonlinear tower progress — 2026-09-15
 
+> Dated development record. Later sections may supersede earlier next steps.
+> For the implemented adiabatic approach and current work, see
+> [adiabatic status](adiabatic-repro.md); time-domain campaign commands are in
+> [Dolan Fig. 13](../runs/dolan/fig13/README.md).
+
 We have extended the validated linear Dolan solver with the machinery to evolve a real axion field on fixed Kerr, obeying $\Box_g\Phi-\mu^2\sin\Phi=0$, where $\Phi=\phi/f_a$. The new implementation combines positive odd-$m$ towers, reconstructs the negative-$m$ contributions through the reality condition, and evaluates the nonlinear remainder $\Phi-\sin\Phi$ on an angular grid at each radial node. After multiplication by the required geometric factors, the projected source is added to the existing tower equations before the Thomas solve. A synchronized RK4 step recomputes this source from all towers at every intermediate stage. The existing linear operators, PML prescription, and boundary freezing are retained; the new source is evaluated accurately even at very small field amplitudes.
 
 Incremental checks verified angular reconstruction/projection to roundoff, the analytic cubic source and generation of higher-$m$ components, and the source normalization against the existing mass terms (cancellation residual $3.4\times10^{-15}$ relative). Disabling nonlinearity reproduces the original linear steps exactly. Short nonlinear integrations show fourth-order timestep convergence, with a refinement ratio of 16.17, and recover linear evolution as the initial amplitude decreases: halving the initial peak $|\Phi|$ reduces the amplitude-normalized field discrepancy by approximately four, as expected from cubic forcing. These results validate the implementation and its small-amplitude limit on the tested grids; they do not yet establish accurate nonlinear cloud growth or saturation. Next are finite-amplitude angular and radial convergence checks, followed by physical energy, angular-momentum, and boundary-flux diagnostics. Long cloud evolutions and nonlinear growth-rate measurements remain to be done.
 
 ## Finite-amplitude angular sampling checkpoint
 
-`tests/test_finite_amplitude_quadrature.py` now checks polar and azimuthal
+`tests/dolan/test_finite_amplitude_quadrature.py` now checks polar and azimuthal
 quadrature refinement independently for a mixed six-channel field through
 $\ell=m=5$, at sampled peak $|\Phi|=1$ and 3. At amplitude 3, the relative
 source errors for 8, 16, 32 polar points (128 azimuthal points fixed) are

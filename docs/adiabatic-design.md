@@ -12,7 +12,7 @@ We build the implementation in stages:
 4. Add self-interactions and continue the solutions in amplitude.
 5. Calculate energy and fluxes, then evolve the amplitude.
 
-The current Julia implementation completes the linear matching problem and its comparison with Leaver’s continued-fraction method. Nonlinear continuation and energy-balance evolution remain to be implemented. The initial nonlinear target is $a/M=0.99$, $M\mu=0.42$, starting from the fundamental $l_0=m_0=1$ cloud on a fixed Kerr background.
+The current Julia implementation includes linear matching and its comparison with Leaver’s continued-fraction method, nonlinear continuation for three potentials, retained profiles, and energy/flux diagnostics. Slow amplitude evolution remains to be implemented. See [the reproduction status](adiabatic-repro.md) for validation limits and [the campaign README](../runs/adiabatic/fig2_20260922/README.md) for saved results. The initial nonlinear target is $a/M=0.99$, $M\mu=0.42$, starting from the fundamental $l_0=m_0=1$ cloud on a fixed Kerr background.
 
 ## 2. Field expansion and conventions
 
@@ -46,7 +46,7 @@ The code’s radial variable $R$ is the paper’s $\widetilde R$, with no additi
 
 $$ \widetilde R_{1l_0}(r;A_0) \sim A_0 e^{-qr} r^{-1+(2\omega_0^2-\mu^2)/q}, \qquad q=\sqrt{\mu^2-\omega_0^2},\quad \mathrm{Re}(q) >0. $$
 
-In the linear problem, the overall amplitude is arbitrary, so we fix this coefficient to one. In the nonlinear problem, $A_0$ will become the continuation parameter that determines the configuration.
+In the linear problem, the overall amplitude is arbitrary, so we fix this coefficient to one. In the nonlinear problem, $A_0$ is the continuation parameter that determines the configuration.
 
 
 ## 3. Projected radial equations
@@ -76,7 +76,7 @@ $$ C^{m_n}_{ll'} = \int_{-1}^{1} Y_{l m_n}(x)\,x^2\,Y_{l'm_n}(x)\,dx. $$
 
 Multiplication by $x^2=\cos^2\theta$ couples a mode to itself and to its $l\pm2$ neighbors. It preserves $m_n$, so different azimuthal blocks remain independent in the linear problem.
 
-The term $N_l$ denotes the projected nonlinear remainder after the mass term has been included in the linear operator. The present implementation sets $N_l=0$. Its definition and evaluation will be introduced with the nonlinear extension.
+The term $N_l$ denotes the projected nonlinear remainder after the mass term has been included in the linear operator. The linear solver sets $N_l=0$. The nonlinear solver reconstructs the real angular field and projects $\mu^2(r^2+a^2\cos^2\theta)[\phi-U'(\phi)]$ onto the retained modes. The same potential selector is used in the energy integral.
 
 ### Conversion to the tortoise coordinate
 
@@ -267,6 +267,61 @@ These give the update
 
 $$ \mathbf{u}_{j+1}=\mathbf{u}_j+\frac{h}{6}(\mathbf{k}_1+2\mathbf{k}_2+2\mathbf{k}_3+\mathbf{k}_4),\qquad r_{*,j+1}=r_{*,j}+h. $$
 
-Here $j$ counts radial steps, and the bold $\mathbf{k}_i$ are derivative vectors, distinct from the outer wave number $k_n$. Outward integration uses $h>0$; inward integration uses $h<0$. The implementation chooses a uniform spacing whose magnitude is no larger than the requested `step` and which lands exactly on the matching coordinate. It currently returns the final state at that coordinate.
+Here $j$ counts radial steps, and the bold $\mathbf{k}_i$ are derivative vectors, distinct from the outer wave number $k_n$. Outward integration uses $h>0$; inward integration uses $h<0$. The implementation chooses a uniform spacing whose magnitude is no larger than the requested `step` and which lands exactly on the matching coordinate. It returns the final state by default; `save_profile=true` also retains every position and state for observables and inspection.
 
 The standalone matching calculation defaults to $r_{*,\mathrm{inner}}=-100$, $r_{*,\mathrm{outer}}=100$, $r_{*,\mathrm{match}}=5$, and maximum spacing $0.05$, in units $M=1$. The Fig. 13 driver extends the outer domain for the more weakly bound clouds. These choices require convergence checks: the requested spacing is not an error tolerance. In a regime dominated by RK4 integration error, halving the spacing should reduce the accumulated error by approximately $2^4=16$. Boundary truncation and matching errors must be checked separately.
+
+
+## 5. Matching and amplitude continuation
+
+`solve_linear_mode` adjusts frequency and boundary amplitudes to match both
+`R` and `Q`. `solve_nonlinear_mode` fixes the first outer amplitude to the real
+value `A0`, packs the remaining complex unknowns into real coordinates, and
+solves the mismatch scaled by `A0`. Real coordinates are necessary because
+reconstructing a real field introduces complex conjugation.
+
+The Newton solver supports centered finite differences (`:finite`) and
+ForwardDiff (`:forwarddiff`), with descent and stagnation checks and a correction
+limit. These are solve controls, separate from radial discretization. Campaigns
+can use secant or spaced-history cubic prediction, then correct each proposed
+amplitude with Newton. Failed trials are not accepted branch points. See the
+campaign README for current defaults; saved runs may use older settings.
+
+The available dimensionless potentials and remainders are:
+
+| Selector | U(phi) | phi − U′(phi) |
+|---|---|---|
+| `:cosine` | `1 - cos(phi)` | `phi - sin(phi)` |
+| `:quartic` | `phi^2/2 - phi^4/24` | `phi^3/6` |
+| `:sextic` | `phi^2/2 - phi^4/24 + phi^6/720` | `phi^3/6 - phi^5/120` |
+
+The code evaluates the cosine potential and remainder with small-field
+cancellation safeguards. Source and energy functions supply the mass factor
+`alpha^2` separately.
+
+## 6. Observables and code structure
+
+After accepting a solution, reconstruct profiles and integrate energy on both
+radial branches with composite Simpson quadrature. The campaign drivers also
+evaluate finite-radius boundary currents. Their signed total flux enters the
+planned slow evolution equation `E′(A0) dA0/dt = -F_tot`. That time evolution
+is not implemented by radial RK4 or by amplitude continuation.
+
+Load the library with `include("src/adiabatic/load.jl")` from the repository root.
+Paths below are relative to `src/adiabatic/`:
+
+| Location | Responsibility |
+|---|---|
+| `angular.jl`, `tortoise.jl` | Angular basis/quadrature and Kerr geometry |
+| `stationary/nonlinear.jl`, `stationary/radial.jl` | Potential projection and radial equations |
+| `stationary/boundary_series.jl`, `stationary/boundaries.jl` | Finite-radius boundary states |
+| `stationary/integration.jl`, `stationary/matching.jl` | Radial RK4, residuals, and Newton solves |
+| `stationary/continuation_predictor.jl` | Predictions from accepted branch history |
+| `observables/energy.jl` | Energy density and branch quadrature |
+| `drivers/` | Small-amplitude continuation, profile inspection, and Fig. 13 points |
+| `fig13_points.py`, `plot_profiles.py` | Python adapter and profile plotting |
+
+Finite-amplitude production, flux diagnostics, restarts, and plotting recipes
+live in `runs/adiabatic/fig2_20260922/scripts/`. Tests live in
+`tests/adiabatic/`. This separation keeps campaign policy out of the stationary
+library.

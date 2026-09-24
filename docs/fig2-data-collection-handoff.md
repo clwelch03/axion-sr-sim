@@ -1,5 +1,12 @@
 # Figure 2 data collection — Astra handoff
 
+> Historical snapshot from 2026-09-23, superseded on 2026-09-24. Polynomial
+> potentials are now wired into both source and energy, all three branches
+> have saved results, and the solver supports bounded corrections and
+> ForwardDiff. The next-step instructions and defaults below are historical.
+> Use the [current campaign README](../runs/adiabatic/fig2_20260922/README.md)
+> and [adiabatic status](adiabatic-repro.md) for ongoing work.
+
 Status checked on 2026-09-23. Repository:
 `/global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim`.
 

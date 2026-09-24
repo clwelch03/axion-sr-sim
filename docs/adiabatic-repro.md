@@ -3,52 +3,62 @@
 Reference: Omiya, Takahashi & Tanaka,
 [2201.04382v3 (PDF)](https://arxiv.org/pdf/2201.04382v3).
 See [adiabatic-design.md](adiabatic-design.md) for equations, conventions,
-module responsibilities, and the planned nonlinear extension.
+module responsibilities, nonlinear matching, and observables.
 
-## Status
+## Status — 2026-09-24
 
-2026-09-21: the Julia solver includes linear matching, cosine nonlinear source
-projection, nonlinear matching with a real Jacobian, and a small-amplitude
-continuation driver. The local saved continuation contains seven solutions
-from A0=1e-4 to 0.0011390625. Radial profiles can now be retained for inspection.
-Energy/flux integrals, the other two potentials in Fig. 2, continuation into
-the strongly nonlinear regime, and slow amplitude evolution remain unfinished.
+The Julia implementation includes linear and nonlinear matching, cosine,
+quartic, and sextic source/energy potentials, continuation predictors, retained
+radial profiles, and energy integration. Campaign drivers calculate signed
+finite-radius horizon and outer fluxes. Newton corrections support centered
+finite differences and ForwardDiff Jacobians on the real-packed residual.
 
-## Fig. 2: current ingredient — retaining radial profiles
+All three preliminary Fig. 2 branches have saved data at spin=0.99, alpha=0.42.
+The [campaign README](../runs/adiabatic/fig2_20260922/README.md) records table
+sizes, current defaults, restart recipes, and plotting commands. Its
+[history](../runs/adiabatic/fig2_20260922/HISTORY.md) records the numerical
+experiments. The earlier seven-point
+[small-amplitude branch](../runs/adiabatic/small_amplitude/README.md) remains a
+separate reference.
 
-The target is both panels at spin=0.99, alpha=0.42, with quartic, sextic,
-and cosine potentials. We are working through the ingredients incrementally.
-The saved small-amplitude branch is not yet a reproduction of these curves.
+These are stationary families, not yet a slow-time evolution. Full
+high-amplitude radial, boundary, quadrature, and harmonic-truncation convergence
+has not been established. Predictor and Jacobian comparisons establish local
+solve behavior, not discretization accuracy.
 
-`integrate_radial(...; save_profile=true)` now returns `positions` and `states`.
-Each column of `states` contains `[R; Q]`, where Q=dR/dr_*. The default still
-returns only the final state, avoiding profile storage during Newton solves.
-Calling `nonlinear_matching_residual(...; save_profile=true)` with an already
-solved frequency and boundary amplitudes returns `from_horizon`, `from_outer`,
-and `residual`. Both branches run from their boundary to the matching point;
-the outer branch is therefore in decreasing coordinate order. Both matching
-states are retained without averaging. Request this after solving, not as an
-option to `solve_nonlinear_mode`, which requires a residual vector.
+## Figure 2 observables and data
 
-At the existing settings (step=0.05, inner=-100, outer=100, match=5), replaying
-the first and last locally saved solutions reproduces their residuals exactly:
+`integrate_radial(...; save_profile=true)` returns `positions` and `states`,
+with one `[R; Q]` column per position and `Q=dR/dr_*`. After a solve,
+`nonlinear_matching_residual(...; save_profile=true)` reconstructs both branches
+and their mismatch. The horizon branch runs outward and the outer branch runs
+inward; both matching states are retained without averaging. Ordinary Newton
+residual evaluations do not retain profiles.
 
-| A0 | norm of R mismatch / A0 | norm of Q mismatch / A0 |
-|---|---:|---:|
-| 0.0001 | 2.31e-12 | 1.80e-12 |
-| 0.0011390625 | 1.17e-14 | 1.56e-14 |
+`integrate_energy_branch` reverses descending profiles and uses composite
+Simpson quadrature, requiring uniform spacing and an even interval count.
+Sum the integrals of both branches for the cloud energy. Pass the same
+`potential` selection to source evaluation, profile reconstruction, and energy.
 
-Analytic integration tests check every retained sample in both directions.
-This validates profile retention and matching continuity at these settings;
-it does not establish accuracy of energy or flux integrals.
+The campaign flux convention is `total_flux = horizon_flux + outer_flux`.
+The horizon contribution is minus the outward current at the inner endpoint;
+a negative total flux corresponds to cloud energy gain. The stored
+`balance_ratio = -total_flux / (2imag(omega) * energy)` is a small-amplitude
+check, not an identity to impose on nonlinear solutions.
 
-Next, derive and implement the energy and signed boundary fluxes with the
-paper's angular normalization. The decisive small-amplitude check is
-F_tot approximately -2 Im(omega) E, with E proportional to A0 squared.
-Then introduce the quartic and sextic potentials consistently in both the
-source and energy, extend continuation, and check radial/angular truncation
-and endpoints before comparing full curves. Plot F_tot versus E in amplitude
-order so the quartic branch's turning point is preserved.
+CSV columns include amplitude, energy, `normalized_energy=energy/A0^2`, real
+and imaginary frequency, horizon/outer/total flux, balance ratio, sampled peak
+field, scaled matching residual, and Newton iterations. Plot `energy`, not
+`normalized_energy`, for Fig. 2. Connect flux-versus-energy points in amplitude
+order to preserve the quartic energy turning point. The plotting recipe merges
+production, refined, and gap tables, retaining production values at shared
+amplitudes.
+
+```bash
+python runs/adiabatic/fig2_20260922/scripts/plot_branch.py
+```
+
+Outputs: `plots/preliminary_fig2_20260922.png` and `.pdf`.
 
 ## Completed checkpoint: the linear radial problem
 
@@ -72,7 +82,8 @@ The single-l=1 version was independently checked against `common.leaver` with
 its matching leading angular correction; that reference is not an exact
 target for the full l=[1,3,5] block.
 
-The last numerical test run passed 208 Julia assertions. Run from the repo root:
+The suite covers angular/radial operators, boundaries, integration, matching,
+nonlinear sources, predictors, energy, and polynomial potentials. Run from the repo root:
 
 ```bash
 julia --project=. tests/adiabatic/runtests.jl
@@ -93,18 +104,20 @@ PYTHONPATH=src python -m dolan.fig13_growth_rates --include-adiabatic --grid-spa
 
 Pass `--julia /path/to/julia` if needed. The plot uses open diamonds for
 adiabatic results and the M/6 time-domain runs; M/6 is now the plotting default.
-[The PNG](../plots/fig13_growth_rates.png) is included as a repository artifact.
+The generated PNG is `plots/fig13_growth_rates.png`.
 Generated frequencies and diagnostics are written to
 `plots/fig13_adiabatic_points.csv`. Add `--skip-eigenvalue` to omit the ARPACK
 comparison when redrawing.
 
-## Following checkpoints
+## Remaining checkpoints
 
-1. Compute cloud energy and horizon/outer fluxes, then evolve the amplitude
-   using E'(A0) dA0/dt = -F_tot (PDF equation 24). Check the small-amplitude limit.
-2. Add the quartic and sextic potentials and extend amplitude continuation.
-3. Reproduce the energy/flux curves and evolution at the initial parameter
-   point, then study parameter and harmonic-truncation dependence.
+1. Check high-amplitude radial spacing, finite boundaries, angular quadrature,
+   and retained-mode dependence. Extend or refine branches where needed for
+   the intended Figure 2 comparison.
+2. Implement slow amplitude evolution using `E′(A0) dA0/dt = -F_tot`, checking
+   the small-amplitude limit and behavior near energy turning points.
+3. Compare converged curves and evolution with the target figure before
+   claiming a completed reproduction; then vary physical parameters.
 
 ## Code boundaries
 
@@ -114,5 +127,5 @@ with its time-domain operator. Share nonlinear angular routines only after
 checking coordinate, radial-field, and harmonic normalization conversions;
 the current Dolan source is not assumed to be directly interchangeable.
 
-The existing `runs/` data stays in place. Future adiabatic run recipes and
-outputs should use `runs/adiabatic/`.
+Run recipes and outputs are grouped under `runs/adiabatic/`; see the
+[campaign index](../runs/README.md) for the layout and preservation policy.

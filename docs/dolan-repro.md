@@ -1,9 +1,28 @@
 # Reproducing Dolan 1212.1477 Sec. III from scratch
 
-Branch: `repro/dolan-coupled-tower`. Living status doc — kept current so this
-can be picked up cold at any point. See `../CLAUDE.md` ("Building from-scratch
-reproductions") for the working rule this branch follows:
-small pieces, built and checked together, not autonomous whole-module drops.
+## Current entry points — 2026-09-24
+
+The solver is packaged under `src/dolan/`, with independent benchmarks in
+`src/common/`. The original reproduction branch and extraction tasks below
+are historical. Working conventions are in [CLAUDE.md](../CLAUDE.md).
+
+- [Dolan Fig. 13 campaign](../runs/dolan/fig13/README.md): peak runs and
+  alpha/resolution sweeps, including the `t=10^6 M` array recipe.
+- `PYTHONPATH=src python -m dolan.fig13_growth_rates`: Leaver/eigenvalue plot
+  with available time-domain points (default resolution `M/6`).
+- `PYTHONPATH=src python -m dolan.analyze_timedomain_run <run.npz>`:
+  frequency-filter analysis of a saved record.
+- [Nonlinear progress](nonlinear-progress.md) and
+  [performance experiments](nonlinear-performance.md): positive odd-m source
+  and synchronized RK4 checks, including the optional Julia benchmark bridge.
+- [Adiabatic status](adiabatic-repro.md): the subsequent stationary-profile
+  approach to slow cloud evolution.
+
+## Original linear reproduction record
+
+The following design notes and dated measurements preserve the original
+validation history. The September 8 next-step list is not the current project
+backlog; use the campaign recipes above for current paths and run settings.
 
 ## Why this branch exists
 
@@ -16,9 +35,9 @@ Decision: start over, reproduce Dolan's Sec. III (equations, discretization,
 PML, boundaries) exactly, validate against his own numbers, and only then
 revisit backreaction/detuning/multilevel on top of the faithful version.
 
-Old code is deleted from this branch (`git rm -r radial1d/`, not yet
-committed) but still lives on `feat/eigenmode-seed-and-backreaction` and in
-history if anything needs to be checked against it.
+The predecessor lived on `feat/eigenmode-seed-and-backreaction` in the
+GRChombo fork. This repository was subsequently extracted as a standalone
+project; it does not require GRChombo.
 
 ## What we have from the paper so far
 
@@ -74,9 +93,10 @@ through `−χ'−imΩχ`. RK4 steps `(ψ,π,χ)` forward at once; we read `ψ`,
 **Two design decisions that make this clean:**
 - **The PML does NOT enter the Thomas solve.** The channel coupling *is* a `~Δ`
   term (`A` off-diagonals `= a²Δ c_{l,l±2}`; `b` coupling `= a²μ²Δ c_{l,l±2}`),
-  and the PML lives exactly where `~Δ` terms are dropped. So `A` is diagonal in
-  the PML strip — no tridiagonal system there. Thomas (interior) and PML
-  (near-horizon strip) never overlap in space.
+  and the PML is placed where these terms are negligible. The implementation
+  still applies the Thomas solve everywhere; the off-diagonal terms approach
+  zero near the horizon.
+  The PML is then added to that result, without an explicit domain split.
 - **No two-region solver / no seam matching.** As `Δ→0` the interior `π̇ = b/A`
   limits *exactly* onto Eq. (44) with `γ=χ=0` (since `A→(r²+a²)²`, the `ψ''`
   coeff `→1`, `2iam(r²+a²)/A→2imΩ`, `V_l→0`). So we run the full Eq. (25)

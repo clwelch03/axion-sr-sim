@@ -18,6 +18,13 @@ const spin, alpha = saved.spin, saved.alpha
 const difference_step = parse(Float64, get(ENV, "AXION_DIFFERENCE_STEP", "1e-8"))
 isfinite(difference_step) && difference_step > 0 ||
     throw(ArgumentError("AXION_DIFFERENCE_STEP must be positive and finite"))
+const newton_max_iterations = parse(Int, get(ENV, "AXION_NEWTON_MAX_ITERATIONS", "12"))
+newton_max_iterations > 0 || throw(ArgumentError("require a positive correction limit"))
+const predictor_kind = Symbol(get(ENV, "AXION_PREDICTOR", "secant"))
+predictor_kind in (:secant, :cubic) || throw(ArgumentError("predictor must be secant or cubic"))
+const history_spacing = parse(Float64, get(ENV, "AXION_HISTORY_SPACING", "0.025"))
+isfinite(history_spacing) && history_spacing > 0 ||
+    throw(ArgumentError("require positive finite history spacing"))
 
 # Finite-radius outward current, with positive-m and conjugate normalization.
 function outward_flux(state, position, frequency)
@@ -53,8 +60,8 @@ end
 function checkpoint(continuation, rows)
     serialize(output * ".jls.tmp", (; spin, alpha, modes, options, n_polar=saved.n_polar,
         n_azimuth=saved.n_azimuth, potential="cosine", tolerance=1e-9,
-        predictor="secant in A0 of physical boundary amplitudes and frequency",
-        newton_max_iterations=nothing, difference_step, continuation, rows))
+        predictor=String(predictor_kind), history_spacing,
+        newton_max_iterations, difference_step, continuation, rows))
     mv(output * ".jls.tmp", output * ".jls"; force=true)
     open(output * ".csv.tmp", "w") do io
         println(io, join(string.(keys(first(rows))), ','))
@@ -75,15 +82,21 @@ function main()
         throw(ArgumentError("AXION_TARGET_AMPLITUDE must be positive and finite"))
     continuation, rows = copy(saved.continuation), copy(saved.rows)
     amplitude = last(continuation).amplitude
-    # A saved-branch check validates a 25% jump with the finer Jacobian differences.
-    # Start at least at 10%, then let successful corrections grow the spacing.
+    # Preserve the small accepted spacing when restarting a difficult branch.
     amplitude_step = length(continuation) >= 2 ?
-        clamp(1.5 * (amplitude - continuation[end-1].amplitude), 0.1amplitude, 0.25amplitude) :
+        min(1.5 * (amplitude - continuation[end-1].amplitude), 0.1amplitude) :
         0.1amplitude
+    if haskey(ENV, "AXION_INITIAL_STEP")
+        amplitude_step = parse(Float64, ENV["AXION_INITIAL_STEP"])
+        isfinite(amplitude_step) && amplitude_step > 0 ||
+            throw(ArgumentError("require positive finite initial step"))
+    end
     checkpoint(continuation, rows)
     while time()-started < runtime_seconds && amplitude < target_amplitude
         target = min(target_amplitude, amplitude + amplitude_step)
-        prediction = predict_nonlinear_mode(continuation, target)
+        prediction = predictor_kind === :cubic ?
+            predict_nonlinear_mode_cubic(continuation, target; history_spacing) :
+            predict_nonlinear_mode(continuation, target)
         if !(isfinite(prediction.frequency) && 0 < real(prediction.frequency) < alpha &&
              all(isfinite, prediction.horizon_amplitudes) && all(isfinite, prediction.outer_amplitudes))
             amplitude_step /= 2
@@ -101,7 +114,7 @@ function main()
                 spin, alpha, modes, couplings, polar, azimuthal, grid;
                 horizon_guess=prediction.horizon_amplitudes,
                 outer_tail_guess=prediction.outer_amplitudes[2:end],
-                tolerance=1e-9, max_iterations=nothing,
+                tolerance=1e-9, max_iterations=newton_max_iterations,
                 difference_step, progress_callback=progress, options...)
         catch exception
             exception isa ErrorException || rethrow()

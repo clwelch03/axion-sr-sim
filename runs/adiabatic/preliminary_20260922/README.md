@@ -296,6 +296,36 @@ radial/angular discretization.
 
 ## Flux convention and checks
 
+Cosine predictor comparison job **26307889** uses
+`diagnostics/high_amplitude/submit_cosine_predictors.sh` and the frozen
+`seeds/cosine_before_predictor_comparison.jls`. It screens secant and cubic
+history spacings 0.01, 0.025, 0.05, and 0.1 at amplitude increments 0.05 and
+0.1. The secant and two best cubic guesses at increment 0.1 receive bounded
+12-correction solves with fixed Jacobian difference scale 1e-8. If any solve
+succeeds, the fastest is checked against two half steps using energy,
+frequency, flux, and boundary-amplitude agreement. Results are saved to
+`diagnostics/high_amplitude/cosine_predictor_comparison.jls`. Failed solves
+are recorded; submission or successful screening alone does not validate a
+method. This experiment does not write production checkpoints.
+
+Branch extension status on 2026-09-23: quartic job **26305515** continues
+toward A0=6 and sextic job **26305114** toward A0=10. Cosine was restarted
+from A0=9.9490175217 in job **26307661**, targeting A0=13 with four hours
+allocated. Its driver now preserves the last accepted spacing on restart
+and limits each correction attempt to 12 iterations before halving the
+amplitude step. It retains the secant predictor and difference scale 1e-8.
+The cosine submission script redraws all three branches on normal completion.
+Targets are requested endpoints, not guarantees of completion within one job.
+
+At the user's request, cosine job 26307661 was cancelled and replaced by
+**26307933**, dependent on the old job ending to prevent concurrent checkpoint
+writes. This trial uses `AXION_PREDICTOR=cubic`, history spacing 0.025, initial
+step 0.1, and the unchanged difference scale 1e-8 and residual tolerance 1e-9.
+Each attempt permits 12 corrections, with failed attempts halving the step.
+It targets A0=13 with four hours allocated. The independent predictor
+comparison 26307889 continues; its validation was not yet complete when this
+production trial was launched. Predictor choice and spacing are checkpointed.
+
 For m0=1, the outward flux at a finite radius is evaluated as
 
     F_out/Fa² = 4π (r²+a²) sum_lm Re[i m omega R_lm conj(Q_lm)].

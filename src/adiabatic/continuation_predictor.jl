@@ -58,8 +58,10 @@ Predict frequency and physical boundary amplitudes by cubic extrapolation.
 
 Select four accepted points near equally spaced offsets behind the latest
 amplitude, using their actual unequal spacing in the interpolation weights.
-Fall back to [`predict_nonlinear_mode`](@ref) when history is insufficient
-or the selected nodes are too close. Fix the fundamental outer amplitude
+If this repeats a point or selects nodes too close together, select each
+earlier point at least `history_spacing` behind the previous selection.
+Fall back to [`predict_nonlinear_mode`](@ref) when history is insufficient.
+Fix the fundamental outer amplitude
 exactly to `amplitude`. Leave accepted solutions unchanged.
 
 # Arguments
@@ -78,9 +80,20 @@ function predict_nonlinear_mode_cubic(continuation, amplitude; history_spacing=0
     indices = [findlast(value -> value <= last(nodes) - offset * history_spacing,
                        nodes) for offset in 3:-1:0]
     any(isnothing, indices) && return fallback
-    selected = continuation[Int.(indices)]
+    selected_indices = Int.(indices)
+    if !all(diff(nodes[selected_indices]) .>= history_spacing / 2)
+        # Unequal accepted steps can map adjacent target offsets to one node.
+        # Walk backward from each chosen node to retain four distinct inputs.
+        selected_indices = [lastindex(nodes)]
+        for _ in 1:3
+            previous_index = findlast(value -> value <=
+                nodes[first(selected_indices)] - history_spacing, nodes)
+            (isnothing(previous_index) || previous_index >= first(selected_indices)) && return fallback
+            pushfirst!(selected_indices, previous_index)
+        end
+    end
+    selected = continuation[selected_indices]
     nodes = [entry.amplitude for entry in selected]
-    all(diff(nodes) .>= history_spacing / 2) || return fallback
     for entry in selected
         length(entry.solution.horizon_amplitudes) == length(fallback.horizon_amplitudes) &&
             length(entry.solution.outer_amplitudes) == length(fallback.outer_amplitudes) ||

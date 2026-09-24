@@ -25,3 +25,29 @@
     @test_throws ArgumentError predict_nonlinear_mode(continuation, Inf)
     @test_throws ArgumentError predict_nonlinear_mode([], 0.2)
 end
+
+@testset "Cubic continuation prediction and short-history fallback" begin
+    exact(amplitude) = (
+        frequency=0.4 - 0.01amplitude^2 + 1e-7im * (1 + amplitude^3),
+        horizon_amplitudes=ComplexF64[1 + im*amplitude^3, amplitude^2 - 2im*amplitude],
+        outer_amplitudes=ComplexF64[amplitude, (1+im)*amplitude^3 - amplitude^2],
+    )
+    continuation = [(; amplitude, solution=exact(amplitude)) for amplitude in (0.1, 0.2, 0.31, 0.45)]
+    unchanged = deepcopy(continuation)
+    prediction = predict_nonlinear_mode_cubic(continuation, 0.5; history_spacing=0.1)
+    @test prediction.frequency ≈ exact(0.5).frequency
+    @test prediction.horizon_amplitudes ≈ exact(0.5).horizon_amplitudes
+    @test prediction.outer_amplitudes ≈ exact(0.5).outer_amplitudes
+    @test prediction.outer_amplitudes[1] == 0.5
+    @test continuation == unchanged
+    @test predict_nonlinear_mode_cubic(continuation[1:2], 0.3) ==
+        predict_nonlinear_mode(continuation[1:2], 0.3)
+    # Fixed target offsets select 0.26 twice despite sufficient earlier history.
+    uneven = [(; amplitude, solution=exact(amplitude)) for amplitude in (0.1, 0.2, 0.26, 0.35, 0.36)]
+    prediction = predict_nonlinear_mode_cubic(uneven, 0.4; history_spacing=0.05)
+    @test prediction.frequency ≈ exact(0.4).frequency
+    @test prediction.horizon_amplitudes ≈ exact(0.4).horizon_amplitudes
+    @test prediction.outer_amplitudes ≈ exact(0.4).outer_amplitudes
+    @test prediction != predict_nonlinear_mode(uneven, 0.4)
+    @test_throws ArgumentError predict_nonlinear_mode_cubic(continuation, 0.5; history_spacing=0)
+end

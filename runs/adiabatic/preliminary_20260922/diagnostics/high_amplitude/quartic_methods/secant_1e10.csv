@@ -1,0 +1,2 @@
+label,amplitude,target_amplitude,amplitude_gain,elapsed,gain_per_minute,accepted,rejected,total_corrections,energy,omega_real,omega_imag,total_flux,residual,status
+secant_1e10,5.630179788730739,5.7,0.04641960889501373,755.102707862854,0.0036884737727714296,4,2,54,1247.061891116813,0.3807162733309954,1.6210777015868523e-6,-0.0038195268996921456,7.464555619744235e-12,budget_reached

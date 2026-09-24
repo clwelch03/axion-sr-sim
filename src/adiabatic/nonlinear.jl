@@ -86,7 +86,16 @@ See also [`project_field`](@ref).
 """
 function reconstruct_field(radial_values, polar_values, azimuthal_values, grid)
     # Rows are polar nodes; columns are azimuthal nodes.
-    field = zeros(length(grid.cosine_theta_nodes), length(grid.azimuth_nodes))
+    # Need to promote_type because radial_values may be in ForwardDiff.Dual format
+    field_type = promote_type(
+    Float64,
+    (typeof(real(amplitude)) for amplitude in values(radial_values))...,
+    )
+    field = zeros(
+        field_type,
+        length(grid.cosine_theta_nodes),
+        length(grid.azimuth_nodes),
+    )
 
     for ((l, m), amplitude) in radial_values
         0 < m <= l || throw(ArgumentError("require positive m <= l"))

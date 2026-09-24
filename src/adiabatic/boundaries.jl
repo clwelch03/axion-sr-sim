@@ -158,7 +158,8 @@ function boundary_state(
     length(amplitudes) == count ||
         throw(DimensionMismatch("require one amplitude per mode"))
 
-    state = zeros(ComplexF64, 2count)
+    state_type = promote_type(typeof(complex(frequency)), eltype(amplitudes))
+    state = zeros(state_type, 2count)
 
     for m in unique([m for (l, m) in modes])
         m > 0 && m % fundamental_m == 0 ||

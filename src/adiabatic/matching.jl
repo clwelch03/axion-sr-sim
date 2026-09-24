@@ -1,5 +1,78 @@
 using LinearAlgebra: norm
+using ForwardDiff
 
+"""
+    residual_jacobian(residual, state; backend=:finite,
+                      difference_step=1e-6, admissible=state -> true)
+
+Compute the Jacobian of `residual` at `state`.
+
+Select centered differences with `:finite` or automatic differentiation with
+`:forwarddiff`. ForwardDiff requires a real state vector.
+
+See also [`centered_difference_jacobian`](@ref), [`newton_solve`](@ref).
+"""
+function residual_jacobian(
+    residual,
+    state;
+    backend=:finite,
+    difference_step=1e-6,
+    admissible=state -> true,
+)
+    if backend === :forwarddiff
+        return ForwardDiff.jacobian(residual, state)
+    elseif backend === :finite
+        return centered_difference_jacobian(
+            residual, state;
+            difference_step,
+            admissible,
+        )
+    end
+
+    throw(ArgumentError("unknown Jacobian backend: $backend"))
+end
+
+
+"""
+    centered_difference_jacobian(residual, state; difference_step=1e-6,
+                                 admissible=state -> true)
+
+Approximate each Jacobian column by centered differences.
+
+Perturb component `j` by `difference_step * max(1, abs(state[j]))`.
+Require both perturbed states to satisfy `admissible`. Leave `state` unchanged.
+
+See also [`residual_jacobian`](@ref).
+"""
+function centered_difference_jacobian(
+    residual,
+    state;
+    difference_step=1e-6,
+    admissible=state -> true,
+)
+    columns = map(eachindex(state)) do index
+        displacement = difference_step * max(1, abs(state[index]))
+
+        forward_state = copy(state)
+        backward_state = copy(state)
+        forward_state[index] += displacement
+        backward_state[index] -= displacement
+
+        if !admissible(forward_state) || !admissible(backward_state)
+            error(
+                "Jacobian difference crosses the domain boundary; " *
+                "reduce difference_step"
+            )
+        end
+
+        forward_residual = residual(forward_state)
+        backward_residual = residual(backward_state)
+
+        return (forward_residual - backward_residual) / (2 * displacement)
+    end
+
+    return hcat(columns...)
+end
 
 """
     newton_solve(residual, initial; <keyword arguments>)
@@ -29,56 +102,134 @@ unless a correction fails or the residual stagnates.
 
 See also [`real_newton`](@ref), [`complex_newton`](@ref).
 """
-function newton_solve(residual, initial; tolerance=1e-10, max_iterations=15,
-                        difference_step=1e-6, admissible=state -> true,
-                        progress_callback=nothing, stagnation_limit=8,
-                        minimum_progress=1e-3)
-    isfinite(tolerance) && tolerance > 0 && isfinite(difference_step) && difference_step > 0 &&
-        (isnothing(max_iterations) || (max_iterations isa Integer && max_iterations >= 0)) ||
-        throw(ArgumentError("require positive tolerances and nonnegative iteration limit"))
-    stagnation_limit isa Integer && stagnation_limit > 0 &&
-        isfinite(minimum_progress) && 0 < minimum_progress < 1 ||
-        throw(ArgumentError("require positive stagnation limit and 0 < minimum_progress < 1"))
-    state = float.(initial)
-    admissible(state) || throw(ArgumentError("initial guess is outside the allowed domain"))
-    mismatch = residual(state)
-    iteration, stagnant_steps = 0, 0
-    while true
-        mismatch_norm = norm(mismatch)
-        isfinite(mismatch_norm) || error("nonfinite Newton residual")
-        isnothing(progress_callback) || progress_callback(iteration, mismatch_norm)
-        mismatch_norm <= tolerance && return (; state, residual=mismatch, iterations=iteration)
-        iteration == max_iterations && error("Newton iteration limit reached; residual=$mismatch_norm")
-        stagnant_steps >= stagnation_limit &&
-            error("Newton residual stagnated after $iteration corrections; residual=$mismatch_norm")
+function newton_solve(
+    residual,
+    initial;
+    tolerance=1e-10,
+    max_iterations::Int=15,
+    jacobian_backend=:finite,
+    difference_step=1e-6,
+    admissible=state -> true,
+    progress_callback=nothing,
+    stagnation_limit::Int=8,
+    minimum_progress=1e-3,
+)
+    # Validate solver settings before evaluating the residual.
+    if !isfinite(tolerance) || tolerance <= 0
+        throw(ArgumentError("tolerance must be positive and finite"))
+    end
 
-        # J[i,j] measures how matching condition i changes with unknown j.
-        jacobian = Matrix{eltype(state)}(undef, length(mismatch), length(state))
-        for column in eachindex(state)
-            displacement = difference_step * max(1, abs(state[column]))
-            plus, minus = copy(state), copy(state)
-            plus[column] += displacement
-            minus[column] -= displacement
-            admissible(plus) && admissible(minus) ||
-                error("Jacobian difference crosses the domain boundary; reduce difference_step")
-            jacobian[:, column] = (residual(plus) - residual(minus)) / (2displacement)
+    if !isnothing(max_iterations)
+        if !(max_iterations isa Integer) || max_iterations < 0
+            throw(ArgumentError(
+                "max_iterations must be a nonnegative integer or nothing"
+            ))
         end
-        # F(z+dz) ~ F(z)+J*dz: solve for the correction, without inverting J.
+    end
+    if !isfinite(minimum_progress) || !(0 < minimum_progress < 1)
+        throw(ArgumentError("minimum_progress must lie strictly between 0 and 1"))
+    end
+
+    if !(jacobian_backend in (:finite, :forwarddiff))
+        throw(ArgumentError(
+            "jacobian_backend must be :finite or :forwarddiff"
+        ))
+    end
+
+    # Work on a floating-point copy, leaving the caller's initial guess unchanged.
+    state = float.(initial)
+
+    if jacobian_backend === :forwarddiff && !(eltype(state) <: Real)
+        throw(ArgumentError(
+            "ForwardDiff requires the real-packed Newton system; use real_newton"
+        ))
+    end
+
+    if !admissible(state)
+        throw(ArgumentError("initial guess is outside the allowed domain"))
+    end
+
+    mismatch = residual(state)
+    iteration = 0
+    stagnant_steps = 0
+
+    while true
+        # 1. Check the current iterate before attempting another correction.
+        mismatch_norm = norm(mismatch)
+
+        if !isfinite(mismatch_norm)
+            error("nonfinite Newton residual")
+        end
+
+        if mismatch_norm <= tolerance
+            return (
+                state=state,
+                residual=mismatch,
+                iterations=iteration,
+            )
+        end
+
+        if iteration == max_iterations
+            error("Newton iteration limit reached; residual=$mismatch_norm")
+        end
+
+        if stagnant_steps >= stagnation_limit
+            error(
+                "Newton residual stagnated after $iteration corrections; " *
+                "residual=$mismatch_norm"
+            )
+        end
+
+        # 2. Linearize the residual around the current state.
+        # J[i, j] measures how residual component i changes with unknown j.
+        jacobian = residual_jacobian(
+            residual, state;
+            backend=jacobian_backend,
+            difference_step,
+            admissible,
+        )
+
+        # 3. Solve J * correction = -mismatch.
+        # Backslash solves the linear system without explicitly inverting J.
         correction = -(jacobian \ mismatch)
+
+        # 4. Try the full Newton correction first.
+        # If it leaves the allowed domain or fails to improve the residual,
+        # repeatedly halve it. Only an accepted trial replaces the current state.
         accepted = false
+
         for reduction in 0:20
-            trial = state + 2.0^(-reduction) * correction
-            admissible(trial) || continue
-            trial_mismatch = residual(trial)
+            damping = 2.0^(-reduction)
+            trial_state = state + damping * correction
+
+            if !admissible(trial_state)
+                continue
+            end
+
+            trial_mismatch = residual(trial_state)
+
             if norm(trial_mismatch) < mismatch_norm
-                state, mismatch = trial, trial_mismatch
+                state = trial_state
+                mismatch = trial_mismatch
                 accepted = true
                 break
             end
         end
-        accepted || error("Newton step could not reduce the residual ($mismatch_norm)")
-        stagnant_steps = norm(mismatch) > (1 - minimum_progress) * mismatch_norm ?
-            stagnant_steps + 1 : 0
+
+        if !accepted
+            error("Newton step could not reduce the residual ($mismatch_norm)")
+        end
+
+        # 5. Track corrections that improve the residual only marginally.
+        # A sufficiently large improvement resets the stagnation counter.
+        required_residual = (1 - minimum_progress) * mismatch_norm
+
+        if norm(mismatch) > required_residual
+            stagnant_steps += 1
+        else
+            stagnant_steps = 0
+        end
+
         iteration += 1
     end
 end
@@ -220,8 +371,15 @@ function solve_linear_mode(frequency_guess, spin, alpha, l_values, m, couplings;
 end
 
 """
-    solve_nonlinear_mode(frequency_guess, amplitude, spin, alpha, modes, couplings,
-                         polar_values, azimuthal_values, grid; <keyword arguments>)
+    solve_nonlinear_mode(
+    frequency_guess, amplitude, spin, alpha, modes, couplings,
+    polar_values, azimuthal_values, grid;
+    horizon_guess, outer_tail_guess,
+    fundamental_m=1, tolerance=1e-10,
+    max_iterations=15, difference_step=1e-6,
+    progress_callback=nothing, stagnation_limit=8, minimum_progress=1e-3,
+    jacobian_backend=:finite, integration_options...,
+)
 
 Solve nonlinear matching at the fixed positive outer amplitude `amplitude = A0`.
 
@@ -247,6 +405,8 @@ series-order, and angular convergence separately from the matching tolerance.
   the reported norm is scaled by `A0`.
 - `stagnation_limit=8`, `minimum_progress=1e-3`: stagnation controls forwarded
   to [`newton_solve`](@ref).
+- `jacobian_backend=:finite`: select centered differences or `:forwarddiff`
+  automatic differentiation for the real-packed matching system.
 - `integration_options...`: keywords for [`nonlinear_matching_residual`](@ref):
   `step=0.05`, `inner=-100.0`, `outer=100.0`, `match=5.0`, `horizon_order=3`,
   and `outer_order=7`.
@@ -260,7 +420,7 @@ function solve_nonlinear_mode(
     fundamental_m=1, tolerance=1e-10,
     max_iterations=15, difference_step=1e-6,
     progress_callback=nothing, stagnation_limit=8, minimum_progress=1e-3,
-    integration_options...,
+    jacobian_backend=:finite, integration_options...,
 )
     amplitude isa Real && isfinite(amplitude) && amplitude > 0 ||
         throw(ArgumentError("require positive finite A0"))
@@ -297,8 +457,8 @@ function solve_nonlinear_mode(
     # Reconstruction involves conjugates, so use the real Jacobian.
     solution = real_newton(
         residual, initial;
-        tolerance, max_iterations, difference_step, admissible,
-        progress_callback, stagnation_limit, minimum_progress,
+        tolerance, max_iterations, difference_step, jacobian_backend,
+        admissible, progress_callback, stagnation_limit, minimum_progress,
     )
 
     physical_residual = amplitude .* solution.residual

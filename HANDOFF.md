@@ -2,12 +2,28 @@
 
 Updated 2026-09-24 against the working tree and saved campaign tables.
 
-The active adiabatic work is the preliminary three-potential Figure 2
-reproduction. Linear matching, nonlinear continuation, polynomial potentials,
-energy integrals, and finite-radius flux diagnostics are implemented. Slow
-amplitude evolution and high-amplitude radial/angular convergence remain open.
+The active adiabatic work is preparing amplitude evolution from stationary
+energy and flux tables. Implicit energy derivatives are saved at all 178 cosine
+branch points, and a single-point finite-difference check supports the derivative
+calculation on the current spatial grid. Time integration remains unimplemented.
+The preliminary three-potential Figure 2 data remain available separately.
 The Dolan time-domain solver remains available for linear validation and
 nonlinear transients; gravitational backreaction is not implemented.
+
+At the September 24 closeout, all 12 independent interpolation reference points
+have completed. Cubic Hermite energy derivatives meet the 0.1% target at 8/12
+points; amplitude rates using linear flux interpolation meet that threshold at
+4/12. Maximum discrepancies are 0.157% and 1.635%, respectively. These sampled
+checks do not establish accuracy throughout the branch or spatial convergence.
+All jobs for this check have finished, and no further run is needed tonight.
+
+Suggested next step: use the saved state derivatives to compute flux amplitude
+derivatives, then compare Hermite flux interpolation against the same 12 saved
+references. Guide the user through this incrementally. Energy interpolation
+also needs attention in sparse intervals; changing flux interpolation alone
+will not resolve that error. See the
+[amplitude evolution campaign](runs/adiabatic/amplitude_evolution/README.md)
+and its [comparison table](runs/adiabatic/amplitude_evolution/results/interpolation_checks.csv).
 
 Start with:
 

@@ -1,5 +1,7 @@
 using Test
 include(joinpath(@__DIR__, "../../src/adiabatic/load.jl"))
+include("test_branch_sensitivity.jl")
+include("test_amplitude_interpolation.jl")
 
 @testset "Angular quadrature and polar orthonormality" begin
     grid = angular_grid(16, 31)

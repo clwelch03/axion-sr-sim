@@ -9,6 +9,8 @@ for filename in (
     "stationary/matching",
     "stationary/continuation_predictor",
     "observables/energy",
+    "amplitude_evolution/branch_sensitivity",
+    "amplitude_evolution/interpolation",
 )
     include(joinpath(@__DIR__, filename * ".jl"))
 end

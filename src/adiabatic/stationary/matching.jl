@@ -377,6 +377,40 @@ function solve_linear_mode(frequency_guess, spin, alpha, l_values, m, couplings;
 end
 
 """
+    scaled_nonlinear_matching_residual(
+        state, amplitude, spin, alpha, modes, couplings,
+        polar_values, azimuthal_values, grid; kwargs...,
+    )
+
+Evaluate the nonlinear matching residual divided by `amplitude = A0`.
+
+Supply the complex solver state containing the fundamental frequency,
+the horizon amplitudes divided by A0, and the free outer amplitudes
+divided by A0, in that order. The fundamental outer amplitude is fixed
+to A0 and is not an independent state entry.
+
+Return the complex scaled matching residual. Forward `kwargs...` to
+[`nonlinear_matching_residual`](@ref); use `save_profile=false`.
+
+See also [`solve_nonlinear_mode`](@ref).
+"""
+function scaled_nonlinear_matching_residual(
+    state, amplitude, spin, alpha, modes, couplings,
+    polar_values, azimuthal_values, grid; kwargs...,
+)
+    mode_count = length(modes)
+
+    return nonlinear_matching_residual(
+        state[1],
+        amplitude .* state[2:mode_count+1],
+        amplitude .* vcat(one(state[1]), state[mode_count+2:end]),
+        spin, alpha, modes, couplings,
+        polar_values, azimuthal_values, grid;
+        kwargs...,
+    ) ./ amplitude
+end
+
+"""
     solve_nonlinear_mode(
     frequency_guess, amplitude, spin, alpha, modes, couplings,
     polar_values, azimuthal_values, grid;
@@ -446,14 +480,11 @@ function solve_nonlinear_mode(
         complex.(outer_tail_guess ./ amplitude),
     )
 
-    residual = state -> nonlinear_matching_residual(
-        state[1],
-        amplitude .* state[2:count+1],
-        amplitude .* vcat(one(state[1]), state[count+2:end]),
-        spin, alpha, modes, couplings,
+    residual = state -> scaled_nonlinear_matching_residual(
+        state, amplitude, spin, alpha, modes, couplings,
         polar_values, azimuthal_values, grid;
         fundamental_m, integration_options...,
-    ) ./ amplitude
+    )
 
     # The fundamental remains bound. Higher harmonics use their own
     # boundary branches, as selected by boundary_state.

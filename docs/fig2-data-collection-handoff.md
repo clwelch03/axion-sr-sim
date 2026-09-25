@@ -222,7 +222,7 @@ All these jobs, including the production job, were finished at handoff.
    Compare one modest jump against subdivided steps at a common endpoint,
    checking frequency, energy, flux, and boundary amplitudes for branch agreement.
    The A0=10 success alone has not validated subsequent large jumps.
-4. **Watch the restart rule:** `scripts/continue_cosine.jl` currently forces its first
+4. **Watch the restart rule:** `src/adiabatic/drivers/continue_cosine.jl` currently forces its first
    increment into 10–25% of A0. At A0≈10 this jumps by at least 1, far beyond
    the successful diagnostic step. Do not simply relaunch `scripts/submit_long.sh`
    and assume it uses the tested cubic predictor/small restart step.
@@ -309,7 +309,7 @@ result.trial.total_flux
 
 Some diagnostic scripts execute their experiment when included; inspect them
 or load their `.jls` results instead of casually including all scripts.
-The production `scripts/continue_cosine.jl` guards its `main()`, but loads its seed
+The production `src/adiabatic/drivers/continue_cosine.jl` guards its `main()`, but loads its seed
 and global settings at include time. Set environment overrides before inclusion.
 
 To redraw the current main CSV:

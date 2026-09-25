@@ -7,7 +7,9 @@ those entries describe settings at the time, not necessarily today's defaults.
 
 ## Files
 
-- `scripts/`: continuation, refinement, targeted quartic solves, and plotting.
+- `scripts/`: submit scripts, refinement, targeted quartic solves, and plotting.
+  The continuation drivers moved to `src/adiabatic/drivers/continue_{cosine,polynomial}.jl`
+  on 2026-09-25; their default seed and output paths still point here.
 - `results/`: accepted `*_branch.*`, additional `*_refined.*`, and quartic gap points.
 - `seeds/`: initial cosine checkpoint and frozen diagnostic inputs.
 - `diagnostics/`: extrapolation, speed, and high-amplitude comparisons.

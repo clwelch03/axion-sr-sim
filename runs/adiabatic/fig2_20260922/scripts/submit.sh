@@ -11,4 +11,4 @@
 set -euo pipefail
 export OPENBLAS_NUM_THREADS=1
 export JULIA_NUM_THREADS=1
-/global/home/users/clwelch/.juliaup/bin/julia --project=. runs/adiabatic/fig2_20260922/scripts/continue_cosine.jl
+/global/home/users/clwelch/.juliaup/bin/julia --project=. src/adiabatic/drivers/continue_cosine.jl

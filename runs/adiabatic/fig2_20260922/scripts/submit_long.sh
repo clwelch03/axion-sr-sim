@@ -14,5 +14,5 @@ export OPENBLAS_NUM_THREADS=1
 export JULIA_NUM_THREADS=1
 export AXION_RUN_SECONDS=13800
 export MPLCONFIGDIR="${TMPDIR:-/tmp}/axion_mpl_${SLURM_JOB_ID}"
-/global/home/users/clwelch/.juliaup/bin/julia --project=. runs/adiabatic/fig2_20260922/scripts/continue_cosine.jl
+/global/home/users/clwelch/.juliaup/bin/julia --project=. src/adiabatic/drivers/continue_cosine.jl
 /global/home/users/clwelch/.conda/envs/BHsuper/bin/python runs/adiabatic/fig2_20260922/scripts/plot_branch.py

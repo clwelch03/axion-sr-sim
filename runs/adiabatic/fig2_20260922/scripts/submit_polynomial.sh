@@ -13,4 +13,4 @@ export OPENBLAS_NUM_THREADS=1
 export JULIA_NUM_THREADS=1
 export AXION_TARGET_AMPLITUDE="${AXION_TARGET_AMPLITUDE:-0.1}"
 export AXION_RUN_SECONDS="${AXION_RUN_SECONDS:-1000}"
-/global/home/users/clwelch/.juliaup/bin/julia --project=. runs/adiabatic/fig2_20260922/scripts/continue_polynomial.jl
+/global/home/users/clwelch/.juliaup/bin/julia --project=. src/adiabatic/drivers/continue_polynomial.jl

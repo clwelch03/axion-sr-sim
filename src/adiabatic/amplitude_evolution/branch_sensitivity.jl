@@ -57,10 +57,45 @@ See also [`implicit_branch_derivative`](@ref).
 function implicit_energy_derivative(
     residual, energy, state::AbstractVector{<:Real}, amplitude::Real,
 )
-    state_derivative = implicit_branch_derivative(residual, state, amplitude)
-    energy_derivative = ForwardDiff.derivative(
-        offset -> energy(state .+ offset .* state_derivative, amplitude + offset),
-        zero(amplitude),
+    result = implicit_observable_derivatives(
+        residual,
+        (trial_state, trial_amplitude) -> [energy(trial_state, trial_amplitude)],
+        state,
+        amplitude,
     )
-    return (; state_derivative, energy_derivative)
+
+    return (;
+        state_derivative=result.state_derivative,
+        energy_derivative=only(result.observable_derivatives),
+    )
+end
+
+"""
+    implicit_observable_derivatives(residual, observables, state, amplitude)
+
+Compute total amplitude derivatives along a stationary solution branch.
+
+`observables(state, amplitude)` must return a real vector and support
+ForwardDiff, for example `[energy, horizon_flux, outer_flux]`.
+
+Require a converged state and a nonsingular residual Jacobian. Keep
+physical parameters and spatial settings fixed while differentiating.
+
+Return the state derivative and observable derivatives in the supplied
+order. This does not estimate spatial discretization error.
+"""
+function implicit_observable_derivatives(
+    residual, observables, state::AbstractVector{<:Real}, amplitude::Real,
+)
+    state_derivative = implicit_branch_derivative(residual, state, amplitude)
+
+    observable_derivatives = ForwardDiff.jacobian(
+        offsets -> observables(
+            state .+ offsets[1] .* state_derivative,
+            amplitude + offsets[1],
+        ),
+        [zero(amplitude)],
+    )[:, 1]
+
+    return (; state_derivative, observable_derivatives)
 end

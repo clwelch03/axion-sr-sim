@@ -7,6 +7,8 @@ settings below are retained from the original notes.
 ## Directory layout
 
 - `scripts/`: cosine and polynomial drivers, submit scripts, and plotting.
+  (2026-09-25: the two drivers moved to `src/adiabatic/drivers/`; references
+  to `scripts/continue_*.jl` below describe the layout at the time.)
 - `results/`: accepted branch CSVs and checkpoints. Figures are still written to the repository's `plots/`.
 - `seeds/`: preserved checkpoints used as inputs to diagnostic experiments.
 - `diagnostics/extrapolation/`: early rescaled-versus-secant comparison.

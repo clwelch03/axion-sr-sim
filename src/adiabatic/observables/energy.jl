@@ -184,3 +184,77 @@ function integrate_energy_branch(
 
     return (spacing / 3) * weighted_density
 end
+
+"""
+    energy_and_fluxes(packed_state, amplitude, spin, alpha,
+                           modes, couplings, polar_values,
+                           azimuthal_values, grid; kwargs...)
+
+Return [energy, horizon_flux, outer_flux] for a normalized matching state.
+
+`packed_state` is the real-packed form of:
+    [frequency; horizon_amplitudes / amplitude;
+                outer_amplitudes[2:end] / amplitude]
+
+The first outer coefficient is fixed to `amplitude`.
+Positive flux means energy lost by the cloud.
+
+Use the same physical parameters, potential, and integration settings
+as the stationary solve. Supports ForwardDiff differentiation.
+"""
+function energy_and_fluxes(
+    packed_state::AbstractVector{<:Real}, amplitude::Real,
+    spin, alpha, modes, couplings,
+    polar_values, azimuthal_values, grid;
+    fundamental_m=1, potential=:cosine, integration_options...,
+)
+    complex_state = unpack_complex(packed_state)
+    mode_count = length(modes)
+
+    length(complex_state) == 2mode_count ||
+        throw(DimensionMismatch("unexpected matching-state length"))
+
+    frequency = complex_state[1]
+    horizon_amplitudes = amplitude .* complex_state[2:mode_count+1]
+    outer_amplitudes = amplitude .* vcat(
+        one(frequency), complex_state[mode_count+2:end],
+    )
+
+    profiles = nonlinear_matching_residual(
+        frequency, horizon_amplitudes, outer_amplitudes,
+        spin, alpha, modes, couplings,
+        polar_values, azimuthal_values, grid;
+        fundamental_m, potential,
+        integration_options..., save_profile=true,
+    )
+
+    energy = sum(
+        integrate_energy_branch(
+            branch, frequency, spin, alpha, modes,
+            polar_values, azimuthal_values, grid;
+            fundamental_m, potential,
+        )
+        for branch in (profiles.from_horizon, profiles.from_outer)
+    )
+
+    # The first column is the starting boundary of each radial branch.
+    function outward_boundary_flux(branch)
+        boundary_state = view(branch.states, :, 1)
+        position = first(branch.positions)
+        geometry = tortoise_geometry(position, spin)
+
+        return 4π * geometry.radial_factor * sum(
+            real(
+                im * (m / fundamental_m) * frequency *
+                boundary_state[index] *
+                conj(boundary_state[mode_count + index])
+            )
+            for (index, (_, m)) in enumerate(modes)
+        )
+    end
+
+    horizon_flux = -outward_boundary_flux(profiles.from_horizon)
+    outer_flux = outward_boundary_flux(profiles.from_outer)
+
+    return [energy, horizon_flux, outer_flux]
+end

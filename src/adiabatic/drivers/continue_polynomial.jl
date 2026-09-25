@@ -1,11 +1,11 @@
 # Preliminary run recipe. Run from repository root with julia --project=.
 using Serialization, LinearAlgebra
-root = normpath(joinpath(@__DIR__, "../../../.."))
+root = normpath(joinpath(@__DIR__, "../../.."))
 include(joinpath(root, "src/adiabatic/load.jl"))
 const potential_kind = Symbol(get(ENV, "AXION_POTENTIAL", "quartic"))
 potential_kind in (:quartic, :sextic) ||
     throw(ArgumentError("AXION_POTENTIAL must be quartic or sextic"))
-const output = joinpath(@__DIR__, "../results/$(potential_kind)_branch")
+const output = joinpath(root, "runs/adiabatic/fig2_20260922/results/$(potential_kind)_branch")
 const restarting = isfile(output * ".jls")
 const seed_path = get(ENV, "AXION_SEED_PATH", restarting ? output * ".jls" :
     joinpath(root, "runs/adiabatic/fig2_20260922/seeds/preliminary_cosine_20260922.jls"))

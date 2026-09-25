@@ -27,3 +27,42 @@ end
         @test result.energy_derivative ≈ 3sqrt(amplitude) / 2 + 3amplitude^2
     end
 end
+
+@testset "Multiple observables include all amplitude dependence" begin
+    residual = (state, amplitude) -> [
+        state[1]^2 - amplitude,
+        state[2] - amplitude * state[1],
+    ]
+
+    # Along this branch: u₁ = sqrt(A), u₂ = A^(3/2).
+    observables = (state, amplitude) -> [
+        amplitude * state[1] + state[2]^2, # A^(3/2) + A^3
+        -state[1] * state[2],             # -A^2
+        amplitude^2,                      # A^2
+        state[2] - amplitude * state[1],  # zero
+    ]
+
+    for amplitude in (1.0, 4.0, 9.0)
+        state = [sqrt(amplitude), amplitude * sqrt(amplitude)]
+        result = implicit_observable_derivatives(
+            residual, observables, state, amplitude,
+        )
+
+        @test result.state_derivative ≈ [
+            1 / (2sqrt(amplitude)),
+            3sqrt(amplitude) / 2,
+        ]
+
+        expected = [
+            3sqrt(amplitude) / 2 + 3amplitude^2,
+            -2amplitude,
+            2amplitude,
+            0.0,
+        ]
+
+        @test length(result.observable_derivatives) == length(expected)
+        for (computed, reference) in zip(result.observable_derivatives, expected)
+            @test computed ≈ reference atol=1e-12
+        end
+    end
+end

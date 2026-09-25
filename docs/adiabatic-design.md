@@ -318,10 +318,10 @@ Paths below are relative to `src/adiabatic/`:
 | `stationary/integration.jl`, `stationary/matching.jl` | Radial RK4, residuals, and Newton solves |
 | `stationary/continuation_predictor.jl` | Predictions from accepted branch history |
 | `observables/energy.jl` | Energy density and branch quadrature |
-| `drivers/` | Small-amplitude continuation, profile inspection, and Fig. 13 points |
+| `drivers/` | Small- and finite-amplitude continuation, branch derivatives, profile inspection, and Fig. 13 points |
 | `fig13_points.py`, `plot_profiles.py` | Python adapter and profile plotting |
 
-Finite-amplitude production, flux diagnostics, restarts, and plotting recipes
-live in `runs/adiabatic/fig2_20260922/scripts/`. Tests live in
-`tests/adiabatic/`. This separation keeps campaign policy out of the stationary
-library.
+The finite-amplitude continuation drivers are `drivers/continue_cosine.jl` and
+`drivers/continue_polynomial.jl`. Campaign submit scripts, seeds, results, and
+diagnostics live under `runs/adiabatic/<campaign>/`. Tests live in
+`tests/adiabatic/`.

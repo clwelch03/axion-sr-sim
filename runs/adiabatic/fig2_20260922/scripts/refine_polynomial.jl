@@ -1,5 +1,5 @@
 # Fill amplitude gaps using bracketed guesses and independent nonlinear solves.
-include(joinpath(@__DIR__, "continue_polynomial.jl"))
+include(joinpath(@__DIR__, "../../../../src/adiabatic/drivers/continue_polynomial.jl"))
 
 function refine_branch()
     spacing = parse(Float64, get(ENV, "AXION_SAMPLE_SPACING", "0.1"))

@@ -2,11 +2,12 @@
 using Serialization, LinearAlgebra
 
 # Load the solver.
-root = normpath(joinpath(@__DIR__, "../../../.."))
+root = normpath(joinpath(@__DIR__, "../../.."))
 include(joinpath(root, "src/adiabatic/load.jl"))
 
 # Resume this branch unless an explicit seed is supplied.
-const output = get(ENV, "AXION_OUTPUT_PREFIX", joinpath(@__DIR__, "../results/cosine_branch"))
+const output = get(ENV, "AXION_OUTPUT_PREFIX",
+    joinpath(root, "runs/adiabatic/fig2_20260922/results/cosine_branch"))
 const default_seed = isfile(output * ".jls") ? output * ".jls" :
     joinpath(root, "runs/adiabatic/fig2_20260922/seeds/preliminary_cosine_20260922.jls")
 const seed_path = get(ENV, "AXION_SEED_PATH", default_seed)
@@ -29,6 +30,10 @@ const jacobian_backend = Symbol(get(ENV, "AXION_JACOBIAN", "forwarddiff"))
 const difference_step = parse(Float64, get(ENV, "AXION_DIFFERENCE_STEP", "1e-8"))
 const newton_max_iterations = parse(Int, get(ENV, "AXION_NEWTON_MAX_ITERATIONS", "12"))
 
+# Sampling caps: ΔA0 <= min(h_max, eta * A0), even after easy Newton solves.
+const maximum_amplitude_step = parse(Float64, get(ENV, "AXION_MAX_AMPLITUDE_STEP", "0.25"))
+const maximum_fractional_step = parse(Float64, get(ENV, "AXION_MAX_FRACTIONAL_STEP", "0.05"))
+
 predictor_kind in (:secant, :cubic) ||
     throw(ArgumentError("predictor must be secant or cubic"))
 isfinite(history_spacing) && history_spacing > 0 ||
@@ -37,6 +42,10 @@ isfinite(difference_step) && difference_step > 0 ||
     throw(ArgumentError("difference_step must be positive and finite"))
 newton_max_iterations > 0 ||
     throw(ArgumentError("require a positive correction limit"))
+isfinite(maximum_amplitude_step) && maximum_amplitude_step > 0 ||
+    throw(ArgumentError("require a positive finite maximum amplitude step"))
+isfinite(maximum_fractional_step) && maximum_fractional_step > 0 ||
+    throw(ArgumentError("require a positive finite maximum fractional step"))
 
 
 # Finite-radius outward current, including the conjugate-mode normalization.
@@ -105,6 +114,7 @@ function checkpoint(continuation, rows)
         potential="cosine", tolerance=1e-9,
         predictor=String(predictor_kind), history_spacing,
         jacobian_backend=String(jacobian_backend),
+        maximum_amplitude_step, maximum_fractional_step,
         newton_max_iterations, difference_step, continuation, rows,
     )
 
@@ -152,6 +162,9 @@ function main()
     checkpoint(continuation, rows)
 
     while time() - started < runtime_seconds && amplitude < target_amplitude
+        # Enforce both caps for initial, restarted, grown, and retried steps.
+        amplitude_step = min(amplitude_step, maximum_amplitude_step,
+                             maximum_fractional_step * amplitude)
         # Predict the next point without advancing beyond the requested target.
         target = min(target_amplitude, amplitude + amplitude_step)
         prediction = if predictor_kind === :cubic
@@ -225,7 +238,7 @@ function main()
             0.75
         end
 
-        amplitude_step = min(growth * accepted_step, 0.25 * amplitude)
+        amplitude_step = growth * accepted_step
     end
 
     println("Finished at A0=", amplitude, " with ", length(rows), " saved points.")

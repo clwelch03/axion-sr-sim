@@ -22,6 +22,7 @@ benchmark timings, job states, and proposed next steps are not current defaults.
 - [Nonlinear performance](nonlinear-performance.md): NumPy optimizations and Julia bridge experiments.
 - [Nonlinear strategy](nonlinear-strategy.md): motivation for the adiabatic approach.
 - [Gravitational backreaction review](gravitational-backreaction-review.md): research proposals, not implemented gravity.
+- [Adiabatic self-gravity review](adiabatic-self-gravity-review.md): literature and proposed metric response of the nonlinear stationary branch.
 - [Figure 2 history](../runs/adiabatic/fig2_20260922/HISTORY.md): continuation experiments and numerical diagnostics.
 - [Figure 2 handoff, September 23](fig2-data-collection-handoff.md): earlier diagnostic state, superseded by the campaign README.
 - [Setup handoff, September 9](setup-handoff-20260909.md): original repository extraction notes.

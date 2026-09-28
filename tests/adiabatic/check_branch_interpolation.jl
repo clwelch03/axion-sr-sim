@@ -82,25 +82,12 @@ function prepare_interpolation_retry()
     source_parts = [deserialize(joinpath(interpolation_campaign,
         "results/cosine_derivatives_part$(index).jls")) for index in 0:3]
     entries = Dict(entry.amplitude => entry for part in source_parts for entry in part.solutions)
-    normalized_state(entry) = vcat(entry.solution.frequency,
-        entry.solution.horizon_amplitudes ./ entry.amplitude,
-        entry.solution.outer_amplitudes[2:end] ./ entry.amplitude)
     continuation = NamedTuple[]
     for index in missing
         query = seed.validation_cases[index]
         left, right = entries[query.left_amplitude], entries[query.right_amplitude]
-        fraction = query.fraction
-        spacing = right.amplitude - left.amplitude
-        # Hermite interpolation of the normalized solver state is only a
-        # Newton predictor. Energy/flux predictions under test are unchanged.
-        prediction = (2fraction^3 - 3fraction^2 + 1) .* normalized_state(left) .+
-            (fraction^3 - 2fraction^2 + fraction) * spacing .* unpack_complex(left.state_derivative) .+
-            (-2fraction^3 + 3fraction^2) .* normalized_state(right) .+
-            (fraction^3 - fraction^2) * spacing .* unpack_complex(right.state_derivative)
-        mode_count = length(seed.modes)
-        solution = (; frequency=prediction[1],
-            horizon_amplitudes=query.amplitude .* prediction[2:mode_count+1],
-            outer_amplitudes=query.amplitude .* vcat(one(prediction[1]), prediction[mode_count+2:end]))
+        # Only the Newton guess changes; observable predictions remain frozen.
+        solution = interpolate_branch_state(query.amplitude, left, right)
         push!(continuation, (; amplitude=query.amplitude, solution))
     end
     serialize(interpolation_retry_seed, merge(seed, (; continuation,

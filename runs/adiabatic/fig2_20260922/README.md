@@ -1,68 +1,97 @@
 # Adiabatic Figure 2 campaign — 2026-09-22
 
 Preliminary cosine, quartic, and sextic branches at spin=0.99 and alpha=0.42.
-These saved branches do not establish radial/angular discretization convergence.
-See [HISTORY.md](HISTORY.md) for experiments, validation, and past job IDs;
-those entries describe settings at the time, not necessarily today's defaults.
+These branches have not been checked for radial/angular convergence.
+See [HISTORY.md](HISTORY.md) and [the September 28 work record](../../../docs/adiabatic-branch-work-2026-09-28.md)
+for dated experiments and validation.
 
-## Files
+## Files and current results
 
-- `scripts/`: submit scripts, refinement, targeted quartic solves, and plotting.
-  The continuation drivers moved to `src/adiabatic/drivers/continue_{cosine,polynomial}.jl`
-  on 2026-09-25; their default seed and output paths still point here.
-- `results/`: accepted `*_branch.*`, additional `*_refined.*`, and quartic gap points.
+- `scripts/`: submission recipes, polynomial gap refinement, and plotting.
+- `results/`: accepted `*_branch.*`, `*_refined.*`, and quartic gap points.
 - `seeds/`: initial cosine checkpoint and frozen diagnostic inputs.
-- `diagnostics/`: extrapolation, speed, and high-amplitude comparisons.
+- `diagnostics/`: historical experiments; see the freeze point below.
 - `logs/`: Slurm output. Figures go to `plots/preliminary_fig2_20260922.{png,pdf}`.
 
-Snapshot at the layout migration (2026-09-24); CSVs remain authoritative:
+Saved tables on September 28 (CSVs remain authoritative):
 
 | Result table | Saved points | Maximum amplitude |
 |---|---:|---:|
-| `cosine_branch.csv` | 178 | 11.9851915 |
+| `cosine_branch.csv` | 232 | 13 |
 | `quartic_branch.csv` | 126 | 6 |
 | `quartic_gap.csv` | 11 | 5.4 |
 | `quartic_refined.csv` | 235 | 6 |
 | `sextic_branch.csv` | 87 | 10 |
 | `sextic_refined.csv` | 154 | 9.10906286 |
 
+Cosine job **26434700** added 54 points beyond A0=11.9851915. Energy remains
+monotonic, and the signed net loss changes from negative to positive between
+A0=12.959108 and 12.962707. The linear zero estimate is A0=12.96268 on this
+spatial grid. Its physical interpretation requires spatial convergence checks.
+Energy and flux derivatives live in the separate
+[amplitude evolution campaign](../amplitude_evolution/README.md).
+
 ## Reproduce or resume
 
-From the repository root, create the logs directory before submitting:
+The unified driver is `src/adiabatic/drivers/continue_branch.jl`:
+
+```bash
+AXION_TARGET_AMPLITUDE=13 julia --project=. src/adiabatic/drivers/continue_branch.jl \
+    cosine runs/adiabatic/fig2_20260922/seeds/preliminary_cosine_20260922.jls \
+    runs/adiabatic/fig2_20260922/results/cosine_branch
+```
+
+The three positional arguments are potential (`cosine`, `quartic`, or `sextic`),
+seed checkpoint, and output prefix. The target environment variable is required.
+An existing output always resumes; the seed is used only for a fresh output.
+A seed for another potential supplies its first point, which is re-solved.
+Use a new output prefix to start over. Physical/grid settings come from the
+selected checkpoint. Never run two writers against the same output prefix.
+
+From the repository root:
 
 ```bash
 mkdir -p runs/adiabatic/fig2_20260922/logs
 sbatch runs/adiabatic/fig2_20260922/scripts/submit.sh
-# Alternatively, a four-hour cosine continuation followed by plotting:
+# Alternative: four-hour cosine continuation followed by plotting.
 sbatch runs/adiabatic/fig2_20260922/scripts/submit_long.sh
-# Independent polynomial branch (choose quartic or sextic):
-sbatch --export=ALL,AXION_POTENTIAL=quartic runs/adiabatic/fig2_20260922/scripts/submit_polynomial.sh
-# Refine the two polynomial branches after their writers finish:
+# Independent polynomial branch; target should be chosen explicitly.
+sbatch --export=ALL,AXION_POTENTIAL=quartic,AXION_TARGET_AMPLITUDE=6 runs/adiabatic/fig2_20260922/scripts/submit_polynomial.sh
+# Fill polynomial gaps after production writers finish.
 sbatch runs/adiabatic/fig2_20260922/scripts/submit_refinement.sh
 ```
 
-The two cosine commands are alternatives. Never run two writers against the
-same output prefix. Refinement should read completed production checkpoints.
-Both continuation drivers resume their `results/*_branch.jls` when present;
-otherwise they use `seeds/preliminary_cosine_20260922.jls`. Polynomial startup
-re-solves the first seed point for the selected potential. `AXION_SEED_PATH`
-can select an explicit seed. Cosine also accepts `AXION_OUTPUT_PREFIX`.
-
-Current driver defaults: cosine uses ForwardDiff Jacobians, polynomial uses
-finite differences; both use the secant predictor and a 12-correction limit.
+The unified driver defaults to ForwardDiff, a secant predictor, 12 Newton
+corrections, tolerance 1e-9, and a 1000-second runtime. Every continuation
+attempt obeys `delta A0 <= min(0.25, 0.05 A0)`, including resumed attempts.
+`AXION_MAX_AMPLITUDE_STEP` and `AXION_MAX_FRACTIONAL_STEP` override these limits.
 `AXION_JACOBIAN`, `AXION_PREDICTOR`, `AXION_HISTORY_SPACING`,
-`AXION_DIFFERENCE_STEP`, and `AXION_NEWTON_MAX_ITERATIONS` select alternatives.
-`AXION_TARGET_AMPLITUDE` and `AXION_RUN_SECONDS` set continuation bounds;
-submission scripts may set their own defaults. Existing serialized solutions
-retain their saved physical/grid settings. Check the selected script and record
-environment overrides before launching a new calculation.
+`AXION_DIFFERENCE_STEP`, `AXION_NEWTON_MAX_ITERATIONS`, `AXION_INITIAL_STEP`,
+and `AXION_RUN_SECONDS` set the corresponding solver/continuation controls.
 
-Plot the existing data without running a solver:
+Recipes retain their own defaults: short cosine targets 13; long cosine uses
+cubic prediction with history spacing 0.025 and 13800 seconds; polynomial
+uses finite differences, history spacing 0.05, and target 0.1 unless overridden.
+The short cosine and polynomial recipes accept `AXION_SEED_PATH` and
+`AXION_OUTPUT_PREFIX`. The long recipe uses the production paths above.
+Polynomial refinement uses `load_branch_setup` and `branch_diagnostics` from
+the unified driver but retains its independent midpoint gap-filling algorithm.
+It writes `*_refined.*`, with `AXION_SAMPLE_SPACING=0.1` by default.
+
+Plot without running a solver (BHsuper Python environment):
 
 ```bash
 python runs/adiabatic/fig2_20260922/scripts/plot_branch.py
 ```
 
-The plot merges branch, refined, and gap CSVs, keeping production values at
-shared amplitudes. Use the BHsuper Python environment. Julia recipes use the
-repository `Project.toml` and `Manifest.toml` (`julia --project=.`).
+The plot merges branch, refined, and gap CSVs, retaining production values at
+shared amplitudes. Julia recipes use `julia --project=.`.
+
+## Historical driver freeze
+
+The old cosine and polynomial drivers were replaced by `continue_branch.jl`.
+Commit **aa17cb5** is the last revision at which all seven scripts under
+`diagnostics/`, plus `scripts/solve_quartic_target.jl` and
+`scripts/fill_quartic_gap.jl`, run unchanged. Reproduce those finished experiments
+from a separate checkout of that revision; their old-driver references are
+historical and are not current entry points.

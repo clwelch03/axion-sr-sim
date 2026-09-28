@@ -124,7 +124,7 @@ Load `src/adiabatic/load.jl` for the library. `angular.jl` and `tortoise.jl`
 provide the shared basis and geometry. `stationary/` contains potentials,
 radial equations, boundaries, integration, matching, and continuation predictors;
 `observables/energy.jl` integrates energy. `drivers/` contains small- and
-finite-amplitude continuation (`continue_cosine.jl`, `continue_polynomial.jl`),
+finite-amplitude continuation (`continue_branch.jl` for all three potentials),
 branch energy derivatives, profile inspection, and the Julia Fig. 13 adapter.
 Campaign submit scripts, results, and flux diagnostics live under `runs/adiabatic/`.
 See `docs/adiabatic-design.md` for the complete map and conventions.

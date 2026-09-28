@@ -321,7 +321,33 @@ Paths below are relative to `src/adiabatic/`:
 | `drivers/` | Small- and finite-amplitude continuation, branch derivatives, profile inspection, and Fig. 13 points |
 | `fig13_points.py`, `plot_profiles.py` | Python adapter and profile plotting |
 
-The finite-amplitude continuation drivers are `drivers/continue_cosine.jl` and
-`drivers/continue_polynomial.jl`. Campaign submit scripts, seeds, results, and
+The finite-amplitude continuation driver is `drivers/continue_branch.jl`,
+shared by cosine, quartic, and sextic potentials. It takes explicit potential,
+seed, and output arguments and requires `AXION_TARGET_AMPLITUDE`. Existing
+outputs resume; fresh outputs use the seed. Every attempted amplitude step
+obeys `min(0.25, 0.05 A0)` by default. Campaign submit scripts, seeds, results, and
 diagnostics live under `runs/adiabatic/<campaign>/`. Tests live in
 `tests/adiabatic/`.
+
+
+### Amplitude derivatives and interpolation
+
+`amplitude_evolution/branch_sensitivity.jl` differentiates the normalized
+stationary matching problem implicitly, then propagates the state tangent to
+energy and signed boundary fluxes. `drivers/branch_energy_derivatives.jl`
+corrects each input point to residual <=1e-10 and saves those derivatives,
+corrected states, and seed hashes in resumable shards.
+
+`amplitude_evolution/interpolation.jl` contains cubic Hermite energy
+interpolation and a shared normalized-state Hermite predictor. The latter is
+only a Newton guess. The current `amplitude_rate` library function still uses
+linear flux interpolation; the campaign assessment scripts explicitly use
+Hermite flux slopes. Production time evolution must resolve that difference.
+
+The dense cosine derivative table has 372 points through A0=11.9851915.
+All 370 interior leave-one-out checks meet 0.1% on the saved grid, with worst
+energy-derivative error 0.0036%. This tests interpolation at wider spacing,
+not spatial convergence. A separate 54-point derivative extension through
+A0=13 is prepared, covering the preliminary flux zero near A0=12.96. See the
+[amplitude campaign](../runs/adiabatic/amplitude_evolution/README.md) for its status.
+Historical Figure 2 diagnostics use the old drivers at commit `aa17cb5`.

@@ -1,12 +1,24 @@
 # Fill amplitude gaps using bracketed guesses and independent nonlinear solves.
-include(joinpath(@__DIR__, "../../../../src/adiabatic/drivers/continue_polynomial.jl"))
+include(joinpath(@__DIR__, "../../../../src/adiabatic/drivers/continue_branch.jl"))
 
-function refine_branch()
+function refine_branch(;
+    potential_kind=Symbol(get(ENV, "AXION_POTENTIAL", "quartic")),
+    seed_path=joinpath(@__DIR__, "../results/$(potential_kind)_branch.jls"),
+    refinement_output=joinpath(@__DIR__, "../results/$(potential_kind)_refined"),
+)
+    potential_kind in (:quartic, :sextic) || error("require quartic or sextic")
+    setup = load_branch_setup(seed_path; potential=potential_kind)
+    (; saved, spin, alpha, modes, couplings, polar, azimuthal, grid, options) = setup
+    Symbol(saved.potential) == potential_kind || error("seed potential differs")
+    jacobian_backend = Symbol(get(ENV, "AXION_JACOBIAN", "finite"))
+    difference_step = parse(Float64, get(ENV, "AXION_DIFFERENCE_STEP", "1e-8"))
+    newton_max_iterations = parse(Int, get(ENV, "AXION_NEWTON_MAX_ITERATIONS", "12"))
+    isfinite(difference_step) && difference_step > 0 || error("require positive finite difference step")
+    newton_max_iterations > 0 || error("require positive correction limit")
     spacing = parse(Float64, get(ENV, "AXION_SAMPLE_SPACING", "0.1"))
     runtime = parse(Float64, get(ENV, "AXION_RUN_SECONDS", "13800"))
     isfinite(spacing) && spacing > 0 || error("Require positive finite spacing")
     isfinite(runtime) && runtime > 0 || error("Require positive finite runtime")
-    refinement_output = joinpath(@__DIR__, "../results/$(potential_kind)_refined")
     continuation = copy(saved.continuation)
     rows = copy(saved.rows)
     if isfile(refinement_output * ".jls")
@@ -26,6 +38,7 @@ function refine_branch()
     continuation, rows = continuation[ordering], rows[ordering]
     failed_targets = Set{Float64}()
     started = time()
+    mkpath(dirname(refinement_output))
     while time() - started < runtime
         gaps = diff([entry.amplitude for entry in continuation])
         candidates = filter(eachindex(gaps)) do index
@@ -60,7 +73,7 @@ function refine_branch()
             push!(failed_targets, target)
             continue
         end
-        row = diagnostics(target, solution)
+        row = branch_diagnostics(setup, target, solution)
         isfinite(row.residual) && row.residual <= 1e-9 || error("Unconverged refinement")
         insert!(continuation, index+1, (; amplitude=target, solution))
         insert!(rows, index+1, row)
@@ -82,6 +95,7 @@ function refine_branch()
     end
     println("Finished: points=$(length(rows)), failed_targets=$(collect(failed_targets)), ",
         "largest_gap=$(maximum(diff([entry.amplitude for entry in continuation])))")
+    return (; continuation, rows)
 end
 
 if abspath(PROGRAM_FILE) == abspath(@__FILE__)

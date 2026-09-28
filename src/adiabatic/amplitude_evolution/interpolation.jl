@@ -138,3 +138,38 @@ function amplitude_rate(amplitude, branch)
         branch.samples[interval.right_index],
     )
 end
+
+"""
+    interpolate_branch_state(amplitude, left, right)
+
+Construct a Newton guess by cubic Hermite interpolation of the normalized
+stationary state. Endpoints contain `amplitude`, `solution`, and a packed-real
+`state_derivative` of (frequency, horizon/A0, outer_tail/A0). Return physical
+frequency and boundary amplitudes, fixing the first outer amplitude to A0.
+The guess must be corrected by the stationary solver before use as a solution.
+"""
+function interpolate_branch_state(amplitude, left, right)
+    0 < left.amplitude < right.amplitude ||
+        throw(ArgumentError("require positive increasing endpoint amplitudes"))
+    left.amplitude <= amplitude <= right.amplitude ||
+        throw(DomainError(amplitude, "amplitude lies outside the interval"))
+    mode_count = length(left.solution.horizon_amplitudes)
+    for entry in (left, right)
+        length(entry.solution.horizon_amplitudes) == mode_count &&
+            length(entry.solution.outer_amplitudes) == mode_count &&
+            length(entry.state_derivative) == 4mode_count ||
+            throw(DimensionMismatch("endpoint states and tangents must use the same modes"))
+    end
+    normalized_state(entry) = vcat(entry.solution.frequency,
+        entry.solution.horizon_amplitudes ./ entry.amplitude,
+        entry.solution.outer_amplitudes[2:end] ./ entry.amplitude)
+    spacing = right.amplitude - left.amplitude
+    fraction = (amplitude - left.amplitude) / spacing
+    state = (2fraction^3 - 3fraction^2 + 1) .* normalized_state(left) .+
+        (fraction^3 - 2fraction^2 + fraction) * spacing .* unpack_complex(left.state_derivative) .+
+        (-2fraction^3 + 3fraction^2) .* normalized_state(right) .+
+        (fraction^3 - fraction^2) * spacing .* unpack_complex(right.state_derivative)
+    return (; frequency=state[1],
+        horizon_amplitudes=amplitude .* state[2:mode_count+1],
+        outer_amplitudes=amplitude .* vcat(one(state[1]), state[mode_count+2:end]))
+end

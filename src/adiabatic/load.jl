@@ -11,6 +11,7 @@ for filename in (
     "observables/energy",
     "amplitude_evolution/branch_sensitivity",
     "amplitude_evolution/interpolation",
+    "amplitude_evolution/time_integration",
 )
     include(joinpath(@__DIR__, filename * ".jl"))
 end

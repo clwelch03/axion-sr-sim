@@ -77,6 +77,23 @@ function branch_interval(amplitude, amplitudes)
 end
 
 """
+    interpolate_branch_flux(amplitude, left, right, value_field, derivative_field)
+
+Interpolate a signed flux using its endpoint values and amplitude derivatives.
+The field symbols select the flux and derivative from each branch sample.
+Reuse the energy Hermite polynomial with flux values in its energy fields.
+"""
+function interpolate_branch_flux(amplitude, left, right, value_field, derivative_field)
+    left_flux = (; amplitude=left.amplitude,
+        energy=getproperty(left, value_field),
+        energy_derivative=getproperty(left, derivative_field))
+    right_flux = (; amplitude=right.amplitude,
+        energy=getproperty(right, value_field),
+        energy_derivative=getproperty(right, derivative_field))
+    return interpolate_branch_energy(amplitude, left_flux, right_flux).energy
+end
+
+"""
     amplitude_rate_on_interval(amplitude, left, right)
 
 Evaluate dA0/d(t/M) = -total_flux / energy_derivative.
@@ -95,18 +112,10 @@ function amplitude_rate_on_interval(amplitude, left, right)
     iszero(derivative) &&
         throw(DomainError(amplitude, "energy derivative is zero"))
 
-    function interpolate_flux(value_field, derivative_field)
-        left_flux = (; amplitude=left.amplitude,
-            energy=getproperty(left, value_field),
-            energy_derivative=getproperty(left, derivative_field))
-        right_flux = (; amplitude=right.amplitude,
-            energy=getproperty(right, value_field),
-            energy_derivative=getproperty(right, derivative_field))
-        return interpolate_branch_energy(amplitude, left_flux, right_flux).energy
-    end
-
-    horizon_flux = interpolate_flux(:horizon_flux, :horizon_flux_derivative)
-    outer_flux = interpolate_flux(:outer_flux, :outer_flux_derivative)
+    horizon_flux = interpolate_branch_flux(
+        amplitude, left, right, :horizon_flux, :horizon_flux_derivative)
+    outer_flux = interpolate_branch_flux(
+        amplitude, left, right, :outer_flux, :outer_flux_derivative)
     return -(horizon_flux + outer_flux) / derivative
 end
 
@@ -139,6 +148,18 @@ function amplitude_rate(amplitude, branch)
 end
 
 """
+    normalized_branch_state(entry)
+
+Return frequency and boundary amplitudes normalized by A0, omitting the fixed
+first outer amplitude. This is the complex state used by the Hermite predictor.
+"""
+function normalized_branch_state(entry)
+    return vcat(entry.solution.frequency,
+        entry.solution.horizon_amplitudes ./ entry.amplitude,
+        entry.solution.outer_amplitudes[2:end] ./ entry.amplitude)
+end
+
+"""
     interpolate_branch_state(amplitude, left, right)
 
 Construct a Newton guess by cubic Hermite interpolation of the normalized
@@ -159,14 +180,11 @@ function interpolate_branch_state(amplitude, left, right)
             length(entry.state_derivative) == 4mode_count ||
             throw(DimensionMismatch("endpoint states and tangents must use the same modes"))
     end
-    normalized_state(entry) = vcat(entry.solution.frequency,
-        entry.solution.horizon_amplitudes ./ entry.amplitude,
-        entry.solution.outer_amplitudes[2:end] ./ entry.amplitude)
     spacing = right.amplitude - left.amplitude
     fraction = (amplitude - left.amplitude) / spacing
-    state = (2fraction^3 - 3fraction^2 + 1) .* normalized_state(left) .+
+    state = (2fraction^3 - 3fraction^2 + 1) .* normalized_branch_state(left) .+
         (fraction^3 - 2fraction^2 + fraction) * spacing .* unpack_complex(left.state_derivative) .+
-        (-2fraction^3 + 3fraction^2) .* normalized_state(right) .+
+        (-2fraction^3 + 3fraction^2) .* normalized_branch_state(right) .+
         (fraction^3 - fraction^2) * spacing .* unpack_complex(right.state_derivative)
     return (; frequency=state[1],
         horizon_amplitudes=amplitude .* state[2:mode_count+1],

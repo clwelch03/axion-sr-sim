@@ -79,35 +79,34 @@ end
 """
     amplitude_rate_on_interval(amplitude, left, right)
 
-Evaluate the energy-balance amplitude rate between two branch samples.
+Evaluate dA0/d(t/M) = -total_flux / energy_derivative.
 
-Supply endpoints with `amplitude`, `energy`, `energy_derivative`,
-`horizon_flux`, and `outer_flux`. Energy and flux must share a consistent
-normalization. Positive flux denotes energy lost by the cloud.
+Endpoints must contain amplitude, energy, energy_derivative, horizon_flux,
+outer_flux, horizon_flux_derivative, and outer_flux_derivative. All derivatives
+are with respect to amplitude. Energy and flux share a consistent normalization;
+positive flux denotes energy lost by the cloud.
 
-Use cubic Hermite interpolation for energy and linear interpolation for
-each signed flux. Return `dA0/d(t/M)` in code units M=1.
-
-Reject an exactly zero energy derivative. Near-zero derivatives require
-separate accuracy and branch-validity checks before time integration.
-
-See also [`interpolate_branch_energy`](@ref).
+Use cubic Hermite interpolation for energy and each signed flux.
+Reject an exactly zero energy derivative.
 """
 function amplitude_rate_on_interval(amplitude, left, right)
     interpolated = interpolate_branch_energy(amplitude, left, right)
-
-    fraction = (amplitude - left.amplitude) /
-               (right.amplitude - left.amplitude)
-
-    horizon_flux = (1 - fraction) * left.horizon_flux +
-                  fraction * right.horizon_flux
-    outer_flux = (1 - fraction) * left.outer_flux +
-                 fraction * right.outer_flux
-
     derivative = interpolated.energy_derivative
     iszero(derivative) &&
         throw(DomainError(amplitude, "energy derivative is zero"))
 
+    function interpolate_flux(value_field, derivative_field)
+        left_flux = (; amplitude=left.amplitude,
+            energy=getproperty(left, value_field),
+            energy_derivative=getproperty(left, derivative_field))
+        right_flux = (; amplitude=right.amplitude,
+            energy=getproperty(right, value_field),
+            energy_derivative=getproperty(right, derivative_field))
+        return interpolate_branch_energy(amplitude, left_flux, right_flux).energy
+    end
+
+    horizon_flux = interpolate_flux(:horizon_flux, :horizon_flux_derivative)
+    outer_flux = interpolate_flux(:outer_flux, :outer_flux_derivative)
     return -(horizon_flux + outer_flux) / derivative
 end
 

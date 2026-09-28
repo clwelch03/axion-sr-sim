@@ -53,7 +53,8 @@ function prepare_interpolation_checks()
                 left_amplitude=left.amplitude, right_amplitude=right.amplitude,
                 energy=interpolated.energy, energy_derivative=interpolated.energy_derivative,
                 horizon_flux, outer_flux, total_flux=horizon_flux+outer_flux,
-                amplitude_rate=amplitude_rate(amplitude, branch)))
+                amplitude_rate=-(horizon_flux + outer_flux) /
+                               interpolated.energy_derivative))
         end
     end
     # Guesses are corrected by the production derivative driver. They are not

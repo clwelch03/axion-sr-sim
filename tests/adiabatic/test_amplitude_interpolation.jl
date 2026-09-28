@@ -10,9 +10,11 @@ end
 
 @testset "Tabulated amplitude rate and interval boundaries" begin
     left = (amplitude=1.0, energy=1.0, energy_derivative=2.0,
-            horizon_flux=-3.0, outer_flux=1.0)
+            horizon_flux=-3.0, outer_flux=1.0,
+            horizon_flux_derivative=0.0, outer_flux_derivative=0.0)
     right = (amplitude=2.0, energy=4.0, energy_derivative=4.0,
-             horizon_flux=-3.0, outer_flux=1.0)
+             horizon_flux=-3.0, outer_flux=1.0,
+             horizon_flux_derivative=0.0, outer_flux_derivative=0.0)
     branch = (; amplitudes=[1.0, 2.0], samples=[left, right])
     for amplitude in (1.0, 1.5, 2.0)
         @test amplitude_rate(amplitude, branch) ≈ 1 / amplitude
@@ -48,4 +50,29 @@ end
     @test_throws ArgumentError interpolate_branch_state(1.5, right, left)
     @test_throws DimensionMismatch interpolate_branch_state(1.5, left,
         merge(right, (; state_derivative=zeros(2))))
+end
+
+@testset "Hermite fluxes reproduce cubic growth and decay" begin
+    sample(amplitude) = (; amplitude,
+        energy=amplitude^2, energy_derivative=2amplitude,
+        horizon_flux=-1.5amplitude^2,
+        horizon_flux_derivative=-3amplitude,
+        outer_flux=amplitude^3,
+        outer_flux_derivative=3amplitude^2)
+
+    left, right = sample(1.0), sample(2.0)
+    branch = (; amplitudes=[1.0, 2.0], samples=[left, right])
+
+    for amplitude in (1.0, 1.25, 1.5, 1.75, 2.0)
+        expected = (1.5amplitude^2 - amplitude^3) / (2amplitude)
+        @test isapprox(amplitude_rate(amplitude, branch), expected;
+            atol=1e-14, rtol=1e-12)
+    end
+    @test amplitude_rate(1.25, branch) > 0
+    @test amplitude_rate(1.75, branch) < 0
+
+    flat_left = merge(left, (; energy=1.0, energy_derivative=0.0))
+    flat_right = merge(right, (; energy=1.0, energy_derivative=0.0))
+    @test_throws DomainError amplitude_rate_on_interval(
+        1.5, flat_left, flat_right)
 end

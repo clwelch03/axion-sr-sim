@@ -43,7 +43,7 @@ end
 function merge_derivatives(; dense_only=false)
     dense = read_derivative_shards(joinpath(derivative_campaign, "seeds/cosine_dense_20260925.jls"),
         joinpath(derivative_campaign, "results/cosine_dense_derivatives"))
-    inputs = [dense]
+    inputs = NamedTuple[dense]
     if !dense_only
         extension = read_derivative_shards(joinpath(derivative_campaign, "seeds/cosine_extension_20260928.jls"),
             joinpath(derivative_campaign, "results/cosine_extension_derivatives"))

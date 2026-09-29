@@ -9,6 +9,7 @@ Current entry points, reviewed 2026-09-24:
 | [Project handoff](../HANDOFF.md) | Where to resume work |
 | [Adiabatic design](adiabatic-design.md) | Equations, conventions, and implementation structure |
 | [Adiabatic reproduction](adiabatic-repro.md) | Validated checkpoints and remaining work |
+| [Multimode adiabatic design](multimode-adiabatic-design.md) | Proposed Section III reproduction, mode-transfer equations, and first checkpoint |
 | [Dolan reproduction](dolan-repro.md) | Current entry points and dated linear validation record |
 | [Dolan design](DESIGN.md) | Time-domain operator and state; unfinished design draft |
 | [Campaign index](../runs/README.md) | Submission recipes, saved data, and preservation policy |
@@ -23,6 +24,7 @@ benchmark timings, job states, and proposed next steps are not current defaults.
 - [Nonlinear strategy](nonlinear-strategy.md): motivation for the adiabatic approach.
 - [Gravitational backreaction review](gravitational-backreaction-review.md): research proposals, not implemented gravity.
 - [Adiabatic self-gravity review](adiabatic-self-gravity-review.md): literature and proposed metric response of the nonlinear stationary branch.
+- [Multimode literature review, September 28](multimode-literature-review-2026-09-28.md): existing results, recent papers, and candidate gaps in nonlinear multimode evolution.
 - [Figure 2 history](../runs/adiabatic/fig2_20260922/HISTORY.md): continuation experiments and numerical diagnostics.
 - [Figure 2 handoff, September 23](fig2-data-collection-handoff.md): earlier diagnostic state, superseded by the campaign README.
 - [Setup handoff, September 9](setup-handoff-20260909.md): original repository extraction notes.

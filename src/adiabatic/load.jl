@@ -1,6 +1,8 @@
 for filename in (
     "angular",
     "stationary/nonlinear",
+    "multimode/background",
+    "multimode/secondary_mode",
     "tortoise",
     "stationary/radial",
     "stationary/boundary_series",

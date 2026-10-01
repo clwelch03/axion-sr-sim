@@ -6,11 +6,23 @@ eigenvalue cross-check and a Leaver benchmark. Extracted from the GRChombo fork
 (`clwelch03/GRChombo-Axion-SR`, `Examples/AxionSuperradiance/radial1d/`); GRChombo
 is no longer part of this line of work.
 
-Start with `docs/README.md` for the documentation index and
-`docs/adiabatic-repro.md` for current nonlinear profile work.
-`docs/dolan-repro.md` contains Dolan entry points and dated validation history;
-`docs/DESIGN.md` is its unfinished design draft. This file is about how to work
-in the repo.
+The repo now has two lines of work: the Dolan time-domain tower (Python,
+`src/dolan/`) and the adiabatic nonlinear-cloud method of Omiya, Takahashi &
+Tanaka (Julia, `src/adiabatic/`), which is the active one. The multimode
+extension (Omiya et al. 2211.01949, Sec. III) is at the design stage.
+
+Start with `docs/README.md` for the documentation index and `HANDOFF.md` for
+where to resume (check its date; it can lag the docs). Current adiabatic state:
+`docs/adiabatic-repro.md` (checkpoints) and `docs/adiabatic-branch-work-2026-09-28.md`
+(latest session: dense derivatives, cosine flux zero, open items).
+`docs/multimode-adiabatic-design.md` is a proposal only; no multimode solver
+exists. `docs/dolan-repro.md` contains Dolan entry points and dated validation
+history; `docs/DESIGN.md` is its unfinished design draft. Dated docs and reviews
+(`*-review*.md`, `nonlinear-*.md`) are records, not current defaults. This file
+is about how to work in the repo.
+
+Reference PDFs are in `docs/papers/`. Cite equation numbers from those PDFs,
+not from arXiv HTML (the numbers can differ).
 
 ## Working style on this project
 
@@ -22,10 +34,28 @@ in the repo.
   boring cause. Example already in the history: the "~1% short of Leaver" was not
   a missing tower contribution — it was benchmarking against flat `Λ=l(l+1)`
   instead of spheroidal Leaver. One runtime comparison settled it.
+- **Check against saved data, and say how far a check reaches.** State what a
+  check does and does not establish (interpolation accuracy on a fixed grid is
+  not radial/angular convergence; a local solve check is not discretization
+  accuracy). Label preliminary results as such.
 - **`evolve_metric=0 ⇒ time-independent flux`** is the canonical falsification
   principle carried over from the fork: if a knob that should not affect an
   observable does affect it, the observable is contaminated (this is how the
   PML-contaminated time-domain slope fit was caught — it drifted with PML width).
+
+## Explain notation
+
+If you introduce notation the paper or the repo does not already use (a symbol,
+a combined phase, an abbreviation, a label for a quantity), define it the first
+time it appears: say that it is your notation, give the definition, and say what
+each piece means, including which of two similar symbols (for example the
+Boyer–Lindquist azimuth versus the field φ₁) is meant. Do not assume the user
+will recognize it. Example of what to avoid: writing "φ₁ depends on t and φ only
+through ψ₁" with ψ₁ undefined. Write instead: "define ψ₁ ≡ ω₁t − m₁φ (my
+notation, not the paper's), the combination in the exponent of the primary
+ansatz (53), where φ is the Boyer–Lindquist azimuth." When a paper's notation
+and the code's names differ (e.g. paper `m_n` versus code `m` / `fundamental_m`),
+say which is which.
 
 ## Naming style
 
@@ -80,12 +110,39 @@ For adiabatic work, read `docs/adiabatic-design.md` for the numerical design and
 
 Heavy runs go through SLURM — see `runs/README.md` for the submit scripts.
 
+### Julia (adiabatic)
+
+Run from the repo root with `julia --project=. <script>`. Library code loads
+through `src/adiabatic/load.jl`. Heavy runs go through Slurm, with Newton
+residual tolerance and spatial settings recorded in checkpoints. Only one writer
+per checkpoint prefix; an existing output is always resumed.
+
+- **Continue a stationary branch (all potentials):**
+  `AXION_TARGET_AMPLITUDE=13 julia --project=. src/adiabatic/drivers/continue_branch.jl cosine|quartic|sextic seed.jls output_prefix`.
+  `AXION_TARGET_AMPLITUDE` is required. `continue_cosine.jl` and
+  `continue_polynomial.jl` are superseded and pending removal; do not use them
+  for new work.
+- **Energy derivatives along a branch:** `src/adiabatic/drivers/branch_energy_derivatives.jl`
+  (sharded by Slurm array; merge with `runs/adiabatic/amplitude_evolution/scripts/merge_derivatives.jl`).
+- **Amplitude evolution:** `src/adiabatic/amplitude_evolution/` (`interpolation.jl`
+  Hermite interpolation of the branch table, `time_integration.jl`,
+  `branch_fitting.jl`, `branch_sensitivity.jl`); recipe
+  `runs/adiabatic/amplitude_evolution/scripts/evolve_cosine.jl`.
+
+Open caveats as of 2026-09-28: radial, outer-radius, mode-truncation, and angular
+convergence at large amplitude are unchecked, so the cosine flux zero near
+A0 ≈ 12.96 is not yet interpreted physically. Energy derivatives above
+A0 = 11.985 needed a follow-up extension run. The seven `fig2_20260922/diagnostics/`
+scripts run unchanged only at commit `aa17cb5`.
+
 ### Tests
 
 `tests/dolan/test_hydrogenic.py` contains analytic normalization, overtone, threshold,
 broadcasting, and input checks for the small-alpha benchmark. Run with
 `PYTHONPATH=src python -m unittest discover -s tests/dolan` (also pytest-compatible).
-Julia adiabatic checks: `julia --project=. tests/adiabatic/runtests.jl`.
+Julia adiabatic checks: `julia --project=. tests/adiabatic/runtests.jl`
+(`test_*.jl` are unit tests; `check_*.jl` are longer physical checks, some
+needing Slurm).
 The validation checks described in `solver.py`
 (4th-order stencil convergence, Thomas vs dense solve, single-channel `rhs`
 identity, tower ℓ-leakage) were run ad hoc; a grid-convergence script
@@ -123,7 +180,8 @@ Drivers:
 Load `src/adiabatic/load.jl` for the library. `angular.jl` and `tortoise.jl`
 provide the shared basis and geometry. `stationary/` contains potentials,
 radial equations, boundaries, integration, matching, and continuation predictors;
-`observables/energy.jl` integrates energy. `drivers/` contains small- and
+`observables/energy.jl` integrates energy. `amplitude_evolution/` interpolates the
+saved branch table and integrates the slow amplitude A0(t). `drivers/` contains small- and
 finite-amplitude continuation (`continue_branch.jl` for all three potentials),
 branch energy derivatives, profile inspection, and the Julia Fig. 13 adapter.
 Campaign submit scripts, results, and flux diagnostics live under `runs/adiabatic/`.
@@ -132,7 +190,8 @@ See `docs/adiabatic-design.md` for the complete map and conventions.
 ## runs/ layout
 
 `runs/` groups simulations by campaign: `dolan/fig13/`,
-`adiabatic/fig2_20260922/`, and `adiabatic/small_amplitude/`.
+`adiabatic/fig2_20260922/`, `adiabatic/small_amplitude/`, and
+`adiabatic/amplitude_evolution/` (dense derivative tables, seeds, evolution).
 See `runs/README.md` for the index, migration map, and preservation policy.
 
 Campaign `scripts/` directories contain recipes; `results/` (or Dolan's

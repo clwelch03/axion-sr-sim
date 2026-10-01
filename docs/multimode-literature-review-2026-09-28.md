@@ -155,3 +155,22 @@ radial/angular/Fourier convergence. Selected time-domain comparisons would
 help distinguish an approximation failure from a genuine instability.
 Self-gravity, binary tides, and waveform forecasts are additional projects;
 none is required for the first fixed-Kerr result.
+
+# Scratch work - ignore
+
+$$\phi_1 = \sum_{k}\sum_{l} e^{-ik\psi_1},\tilde R^1_{kl}(r;A_1),Y_{l,km_1}(x) + \text{c.c.}$$
+
+$$\int_0^{2\pi}\frac{d\varphi}{2\pi}\int_{-1}^{1}dx;Y_{lm_2},e^{im_2\varphi},(r^2+a^2x^2),(1-\cos\phi_1),\phi_2 .$$
+
+$$1-\cos\phi_1 = \sum_j c_j(r,x),e^{-ij\psi_1},\qquad c_j(r,x)=\int_0^{2\pi}\frac{d\psi_1}{2\pi},e^{ij\psi_1},(1-\cos\phi_1).$$
+
+From (61), in the convention of our radial equation (*), the secondary's equation for each l is
+
+$$\Delta R_l'' + \Delta' R_l' + B_l R_l + a^2(\omega_2^2-\mu^2)\sum_{l'}C^{m_2}{ll'}R{l'} + N_l = 0,$$
+
+with the "nonlinear" slot now filled by a term linear in R:
+
+$$N_l = \alpha^2\sum_{l'} V_{ll'}(r),R_{l'},\qquad V_{ll'}(r) \equiv \int_{-1}^{1}dx;Y_{l2}(x),Y_{l'2}(x),(r^2+a^2x^2),c_0(r,x).$$
+
+V_ll′ is my notation for the background coupling matrix. In the code, alpha is Mμ, and m₂ = 2 is the secondary's azimuthal number.
+

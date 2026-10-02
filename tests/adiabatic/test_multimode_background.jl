@@ -44,7 +44,7 @@ end
         for (l, _) in secondary_modes, (other_l, _) in secondary_modes
     ]
     @test isapprox(coupling_matrix, expected; atol=1e-12, rtol=0)
-    @test coupling_matrix ≈ transpose(coupling_matrix)
+    @test isapprox(coupling_matrix, transpose(coupling_matrix))
 end
 
 @testset "Fixed-time background term: direct part equals the period average" begin
@@ -134,3 +134,42 @@ end
 
     @test isapprox(secondary, linear; atol=1e-12, rtol=0)
 end
+
+@testset "Averaged background term: complex-linear and equal to the fixed-time direct part" begin
+    grid = angular_grid(16, 31)
+    polar = build_polar_values(6, grid.cosine_theta_nodes)
+    azimuthal = build_azimuthal_values(6, grid.azimuth_nodes)
+    radius, spin, alpha = 7.3, 0.99, 0.42
+
+    # Order-one primary field, so the fixed-time conjugate part is not small.
+    primary_values = Dict(
+        (1, 1) => 0.8 + 0.5im, (3, 1) => -0.1 + 0.2im, (5, 1) => 0.02im,
+        (3, 3) => 0.15 - 0.1im, (5, 3) => 0.03 + 0.0im, (5, 5) => -0.02 + 0.01im,
+    )
+    secondary_modes = [(2, 2), (4, 2), (6, 2)]
+    secondary_values = Dict((2, 2) => 0.3 - 0.1im, (4, 2) => 0.05 + 0.02im, (6, 2) => -0.01im)
+    rotated_values = Dict(mode => im * value for (mode, value) in secondary_values)
+    source(values; reading) = secondary_background_source(primary_values, values,
+        radius, spin, alpha, secondary_modes, polar, azimuthal, grid; reading)
+
+    averaged = source(secondary_values; reading=:averaged)
+    averaged_rotated = source(rotated_values; reading=:averaged)
+    fixed_time = source(secondary_values; reading=:fixed_time)
+    fixed_time_rotated = source(rotated_values; reading=:fixed_time)
+
+    for mode in secondary_modes
+        # No conj(R): multiplying R by i multiplies the term by i.
+        @test isapprox(averaged_rotated[mode], im * averaged[mode]; atol=1e-14, rtol=1e-12)
+        # The fixed-time term's part proportional to R.
+        direct_part = (fixed_time[mode] - im * fixed_time_rotated[mode]) / 2
+        @test isapprox(averaged[mode], direct_part; atol=1e-12, rtol=1e-10)
+    end
+end
+
+@testset "Uniform quadrature integrates cubics exactly, odd or even intervals" begin
+    for sample_count in (8, 9)   # 7 and 8 intervals
+        positions = range(0.0, 2.0; length=sample_count)
+        @test isapprox(integrate_uniform(positions .^ 3, step(positions)), 4.0; atol=1e-13)
+    end
+end
+

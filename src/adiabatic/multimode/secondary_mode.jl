@@ -1,36 +1,68 @@
 """
     secondary_background_source(primary_values, secondary_values, radius, spin, alpha,
-                                secondary_modes, polar_values, azimuthal_values, grid)
+                                secondary_modes, polar_values, azimuthal_values, grid;
+                                reading=:averaged)
 
 Return the background term of Omiya et al. 2211.01949 Eq. (61) for each
 secondary mode at one radius, as a dictionary keyed by mode.
 
-Reconstruct the primary ϕ₁ and the secondary ϕ₂ on the angular grid at t = 0,
-form `alpha^2 * (r^2 + a^2 cos^2θ) * (1 - cos ϕ₁) * ϕ₂`, and project onto
-`secondary_modes` with [`project_field`](@ref). This is the literal
-fixed-time projection, not a period average. It enters the secondary's
-radial equation in the slot of the nonlinear source `N`, including the
-factor mu^2 missing from the printed Eq. (61).
+With `reading=:averaged` (the default), replace `1 - cos ϕ₁` by its average over
+one period of the primary, [`averaged_mass_deficit`](@ref), and project
+`alpha^2 * (r^2 + a^2 cos^2θ) * <1 - cos ϕ₁> * ϕ₂` onto `secondary_modes`.
+This keeps only the part of the product at the secondary's own (ω₂, m₂),
+as the paper's (ω, m) classification (Sec. II B) requires.
+
+With `reading=:fixed_time`, reconstruct ϕ₁ and ϕ₂ at t = 0 and project their
+product directly. That version also picks up a term at (4ω₁ - ω₂, m₂)
+proportional to conj(R), which makes ω₂ depend on the secondary's
+normalization phase; it is kept only to reproduce that check.
+
+The term enters the secondary's radial equation in the slot of the nonlinear
+source `N`, including the factor mu^2 missing from the printed Eq. (61).
 """
 function secondary_background_source(primary_values, secondary_values, radius, spin, alpha,
-                                     secondary_modes, polar_values, azimuthal_values, grid)
-    primary_field = reconstruct_field(primary_values, polar_values, azimuthal_values, grid)
-    secondary_field = reconstruct_field(secondary_values, polar_values, azimuthal_values, grid)
-
-    # rho^2 = r^2 + a^2 cos^2θ at each polar node; broadcasts across azimuthal columns.
+                                     secondary_modes, polar_values, azimuthal_values, grid;
+                                     reading=:averaged)
+    # rho^2 = r^2 + a^2 cos^2θ at each polar node.
     rho_squared = radius^2 .+ spin^2 .* grid.cosine_theta_nodes .^ 2
 
-    # 2 sin²(ϕ₁/2) equals 1 - cos ϕ₁ without cancellation when ϕ₁ is small.
-    background_term =
-        alpha^2 .* rho_squared .* 2 .* sin.(primary_field ./ 2) .^ 2 .* secondary_field
+    if reading === :averaged
+        secondary_m = last(first(secondary_modes))
+        all(mode -> last(mode) == secondary_m, secondary_modes) ||
+            throw(ArgumentError("all secondary modes must share one azimuthal number"))
 
-    return project_field(background_term, secondary_modes, polar_values, azimuthal_values, grid)
+        mass_deficit_average = averaged_mass_deficit(
+            primary_values, polar_values, azimuthal_values, grid,
+        )
+        # The secondary's polar profile sum_l R_l Y_l(x) at each polar node.
+        secondary_profile = sum(
+            value .* polar_values[mode] for (mode, value) in secondary_values
+        )
+        weighted_term = alpha^2 .* grid.polar_weights .* rho_squared .*
+                        mass_deficit_average .* secondary_profile
+
+        return Dict(mode => sum(weighted_term .* polar_values[mode])
+                    for mode in secondary_modes)
+
+    elseif reading === :fixed_time
+        primary_field = reconstruct_field(primary_values, polar_values, azimuthal_values, grid)
+        secondary_field = reconstruct_field(secondary_values, polar_values, azimuthal_values, grid)
+
+        # 2 sin²(ϕ₁/2) equals 1 - cos ϕ₁ without cancellation when ϕ₁ is small.
+        background_term =
+            alpha^2 .* rho_squared .* 2 .* sin.(primary_field ./ 2) .^ 2 .* secondary_field
+
+        return project_field(background_term, secondary_modes, polar_values, azimuthal_values, grid)
+    end
+
+    throw(ArgumentError("reading must be :averaged or :fixed_time"))
 end
+
 
 """
     secondary_tortoise_rhs!(derivative, state, tortoise_radius, primary_values,
                             spin, alpha, frequency, secondary_modes, couplings,
-                            polar_values, azimuthal_values, grid)
+                            polar_values, azimuthal_values, grid; reading=:averaged)
 
 Write the radial derivative of the secondary's Eq. (61) into `derivative` and return it.
 
@@ -43,7 +75,7 @@ scaling, as [`nonlinear_tortoise_rhs!`](@ref) does for the primary.
 """
 function secondary_tortoise_rhs!(derivative, state, tortoise_radius, primary_values,
                                  spin, alpha, frequency, secondary_modes, couplings,
-                                 polar_values, azimuthal_values, grid)
+                                 polar_values, azimuthal_values, grid; reading=:averaged)
     # With fundamental_m = m2, every secondary mode has n = 1 and frequency omega2.
     secondary_m = last(first(secondary_modes))
     linear_tortoise_rhs!(
@@ -60,7 +92,7 @@ function secondary_tortoise_rhs!(derivative, state, tortoise_radius, primary_val
     )
     source = secondary_background_source(
         primary_values, secondary_values, geometry.radius, spin, alpha,
-        secondary_modes, polar_values, azimuthal_values, grid,
+        secondary_modes, polar_values, azimuthal_values, grid; reading,
     )
 
     # Convert from the r-coordinate equation to dQ/dr_*, as for the primary.
@@ -100,7 +132,7 @@ end
                                 primary_profiles, primary_modes, spin, alpha,
                                 secondary_modes, couplings, polar_values,
                                 azimuthal_values, grid;
-                                horizon_order=3, outer_order=7, save_profile=false)
+                                horizon_order=3, outer_order=7, save_profile=false, reading=:averaged)
 
 Return the mismatch `[R_horizon - R_outer; Q_horizon - Q_outer]` of the
 secondary's Eq. (61) at the primary's matching point.
@@ -116,7 +148,7 @@ Boundary states follow Eqs. (58)-(59) with `(omega1, m1)` replaced by
 function secondary_matching_residual(
     frequency, horizon_amplitudes, outer_amplitudes, primary_profiles, primary_modes,
     spin, alpha, secondary_modes, couplings, polar_values, azimuthal_values, grid;
-    horizon_order=3, outer_order=7, save_profile=false,
+    horizon_order=3, outer_order=7, save_profile=false, reading=:averaged
 )
     primary_from_horizon = primary_profiles.from_horizon
     primary_from_outer = primary_profiles.from_outer
@@ -191,7 +223,8 @@ function solve_secondary_mode(
     frequency_guess, primary_profiles, primary_modes, spin, alpha,
     secondary_modes, couplings, polar_values, azimuthal_values, grid;
     horizon_guess, outer_tail_guess, tolerance=1e-8, max_iterations=15,
-    difference_step=1e-6, jacobian_backend=:finite, series_options...,
+    difference_step=1e-6, jacobian_backend=:finite, reading=:averaged,
+    series_options...,
 )
     count = length(secondary_modes)
     length(horizon_guess) == count && length(outer_tail_guess) == count - 1 ||
@@ -204,7 +237,7 @@ function solve_secondary_mode(
     residual = state -> secondary_matching_residual(
         state[1], state[2:count+1], vcat(one(state[1]), state[count+2:end]),
         primary_profiles, primary_modes, spin, alpha, secondary_modes, couplings,
-        polar_values, azimuthal_values, grid; series_options...,
+        polar_values, azimuthal_values, grid; reading, series_options...,
     )
 
     # Keep the secondary on the positive-frequency bound branch.

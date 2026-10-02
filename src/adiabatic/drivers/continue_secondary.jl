@@ -44,14 +44,14 @@ end
 secondary_unknowns(solution) =
     vcat(solution.frequency, solution.horizon_amplitudes, solution.outer_amplitudes[2:end])
 
-function solve_secondary_point(setup, profiles, guess; tolerance, jacobian_backend)
+function solve_secondary_point(setup, profiles, guess; tolerance, jacobian_backend, reading)
     (; primary, secondary_modes, grid, polar, azimuthal, couplings) = setup
     count = length(secondary_modes)
     return solve_secondary_mode(
         guess[1], profiles, primary.modes, primary.spin, primary.alpha,
         secondary_modes, couplings, polar, azimuthal, grid;
         horizon_guess=guess[2:count+1], outer_tail_guess=guess[count+2:end],
-        tolerance, jacobian_backend,
+        tolerance, jacobian_backend, reading,
     )
 end
 
@@ -88,23 +88,31 @@ end
 
 """
     continue_secondary(primary_path, output_prefix; tolerance=1e-8,
-                       jacobian_backend=:forwarddiff, maximum_points=nothing)
+                       jacobian_backend=:forwarddiff, reading=:averaged,
+                       maximum_points=nothing)
 
 Solve the secondary at each primary point in amplitude order. Predict each
 guess by secant extrapolation in A1 from the two previous solutions, with the
 linear secondary as the A1 = 0 point. Save after every point; resume an
 existing output. Stop with an error at the first failed solve.
+
+`reading` selects the background term of [`secondary_background_source`](@ref).
+Use the default `:averaged`; `:fixed_time` makes omega2 depend on the
+secondary's normalization phase (see the campaign README).
 """
 function continue_secondary(primary_path, output_prefix; tolerance=1e-8,
-                            jacobian_backend=:forwarddiff, maximum_points=nothing)
+                            jacobian_backend=:forwarddiff, reading=:averaged,
+                            maximum_points=nothing)
     setup = load_secondary_setup(primary_path)
     (; primary, secondary_modes, couplings) = setup
-    settings = (; tolerance, jacobian_backend=String(jacobian_backend))
+    settings = (; tolerance, jacobian_backend=String(jacobian_backend),
+                  reading=String(reading))
 
     if isfile(output_prefix * ".jls")
         previous = deserialize(output_prefix * ".jls")
-        previous.primary_path == primary_path && previous.tolerance == tolerance ||
-            error("existing output has a different primary or tolerance")
+        previous.primary_path == primary_path && previous.tolerance == tolerance &&
+            get(previous, :reading, "fixed_time") == String(reading) ||
+            error("existing output has a different primary, tolerance, or reading")
         linear, rows = previous.linear, previous.rows
         println("resuming after ", length(rows), " points")
     else
@@ -144,7 +152,7 @@ function continue_secondary(primary_path, output_prefix; tolerance=1e-8,
 
         (; profiles, residual_change) = primary_profiles_at(setup, index)
         elapsed = @elapsed solution = solve_secondary_point(
-            setup, profiles, guess; tolerance, jacobian_backend,
+            setup, profiles, guess; tolerance, jacobian_backend, reading,
         )
 
         push!(rows, (; primary_index=index, amplitude,

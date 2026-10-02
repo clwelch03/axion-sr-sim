@@ -3,6 +3,7 @@ for filename in (
     "stationary/nonlinear",
     "multimode/background",
     "multimode/secondary_mode",
+    "multimode/secondary_energy",
     "tortoise",
     "stationary/radial",
     "stationary/boundary_series",

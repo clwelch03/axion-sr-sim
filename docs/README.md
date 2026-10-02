@@ -1,6 +1,6 @@
 # Documentation guide
 
-Current entry points, reviewed 2026-09-24:
+Current entry points, reviewed 2026-10-02:
 
 | Document | Purpose |
 |---|---|
@@ -9,7 +9,8 @@ Current entry points, reviewed 2026-09-24:
 | [Project handoff](../HANDOFF.md) | Where to resume work |
 | [Adiabatic design](adiabatic-design.md) | Equations, conventions, and implementation structure |
 | [Adiabatic reproduction](adiabatic-repro.md) | Validated checkpoints and remaining work |
-| [Multimode adiabatic design](multimode-adiabatic-design.md) | Proposed Section III reproduction, mode-transfer equations, and first checkpoint |
+| [Multimode adiabatic design](multimode-adiabatic-design.md) | Sec. III reproduction (2211.01949): decisions, piece plan and status, extension ideas |
+| [Secondary campaign](../runs/adiabatic/multimode_secondary/README.md) | Secondary-cloud runs, results, and checks |
 | [Dolan reproduction](dolan-repro.md) | Current entry points and dated linear validation record |
 | [Dolan design](DESIGN.md) | Time-domain operator and state; unfinished design draft |
 | [Campaign index](../runs/README.md) | Submission recipes, saved data, and preservation policy |

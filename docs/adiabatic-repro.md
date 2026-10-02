@@ -113,7 +113,13 @@ comparison when redrawing.
 
 1. Check high-amplitude radial spacing, finite boundaries, angular quadrature,
    and retained-mode dependence. Extend or refine branches where needed for
-   the intended Figure 2 comparison.
+   the intended Figure 2 comparison. Radial spacing is now known to fail at
+   high amplitude (2026-10-02): the saved cosine solutions (step 0.1),
+   re-evaluated at steps 0.05 and 0.025, have scaled matching residual ≈ 8e-8
+   at A0 = 2.05, 3e-7 at 6.26, 4e-5 at 9.14, 6e-4 at 10.2, 2e-2 at 12.4, and
+   4e-2 at 13, and a Newton re-solve at step 0.05 from the saved A0 = 13
+   solution stagnates. The flux zero near A0 ≈ 12.96 lies in this region. See
+   the [secondary campaign README](../runs/adiabatic/multimode_secondary/README.md).
 2. Implement slow amplitude evolution using `E′(A0) dA0/dt = -F_tot`, checking
    the small-amplitude limit and behavior near energy turning points.
 3. Compare converged curves and evolution with the target figure before

@@ -88,8 +88,8 @@ end
 
 """
     continue_secondary(primary_path, output_prefix; tolerance=1e-8,
-                       jacobian_backend=:forwarddiff, reading=:averaged,
-                       maximum_points=nothing)
+                       ulp_tolerance_factor=nothing, jacobian_backend=:forwarddiff,
+                       reading=:averaged, maximum_points=nothing)
 
 Solve the secondary at each primary point in amplitude order. Predict each
 guess by secant extrapolation in A1 from the two previous solutions, with the
@@ -99,18 +99,27 @@ existing output. Stop with an error at the first failed solve.
 `reading` selects the background term of [`secondary_background_source`](@ref).
 Use the default `:averaged`; `:fixed_time` makes omega2 depend on the
 secondary's normalization phase (see the campaign README).
+
+With `ulp_tolerance_factor`, each point after the first uses
+`max(tolerance, factor * |res(ω + ulp) - res(ω)|)`, the residual's change from one
+unit in the last place of Re ω₂, measured at the previous solution. No
+representable ω₂ gives a smaller residual. This sensitivity grows as the
+secondary contracts away from its fixed outer amplitude, so a fixed absolute
+`tolerance` (used otherwise, and always for the linear A1 = 0 solve) eventually
+falls below the floor.
 """
 function continue_secondary(primary_path, output_prefix; tolerance=1e-8,
-                            jacobian_backend=:forwarddiff, reading=:averaged,
-                            maximum_points=nothing)
+                            ulp_tolerance_factor=nothing, jacobian_backend=:forwarddiff,
+                            reading=:averaged, maximum_points=nothing)
     setup = load_secondary_setup(primary_path)
     (; primary, secondary_modes, couplings) = setup
-    settings = (; tolerance, jacobian_backend=String(jacobian_backend),
+    settings = (; tolerance, ulp_tolerance_factor, jacobian_backend=String(jacobian_backend),
                   reading=String(reading))
 
     if isfile(output_prefix * ".jls")
         previous = deserialize(output_prefix * ".jls")
         previous.primary_path == primary_path && previous.tolerance == tolerance &&
+            get(previous, :ulp_tolerance_factor, nothing) == ulp_tolerance_factor &&
             get(previous, :reading, "fixed_time") == String(reading) ||
             error("existing output has a different primary, tolerance, or reading")
         linear, rows = previous.linear, previous.rows
@@ -151,13 +160,29 @@ function continue_secondary(primary_path, output_prefix; tolerance=1e-8,
         end
 
         (; profiles, residual_change) = primary_profiles_at(setup, index)
+        # The residual cannot fall below its change from one ulp of Re omega2;
+        # measure that at the previous solution on this primary.
+        point_tolerance = tolerance
+        if ulp_tolerance_factor !== nothing && !isempty(rows)
+            previous = last(rows).solution
+            residual_at(frequency) = secondary_matching_residual(
+                frequency, previous.horizon_amplitudes, previous.outer_amplitudes,
+                profiles, primary.modes, primary.spin, primary.alpha, secondary_modes,
+                couplings, setup.polar, setup.azimuthal, setup.grid; reading,
+            )
+            ulp_sensitivity = norm(
+                residual_at(previous.frequency + eps(real(previous.frequency))) -
+                residual_at(previous.frequency))
+            point_tolerance = max(tolerance, ulp_tolerance_factor * ulp_sensitivity)
+        end
         elapsed = @elapsed solution = solve_secondary_point(
-            setup, profiles, guess; tolerance, jacobian_backend, reading,
+            setup, profiles, guess; tolerance=point_tolerance, jacobian_backend, reading,
         )
 
         push!(rows, (; primary_index=index, amplitude,
                        omega1=primary.continuation[index].solution.frequency,
-                       solution, primary_residual_change=residual_change))
+                       solution, primary_residual_change=residual_change,
+                       tolerance=point_tolerance))
         save_secondary_branch(output_prefix, setup, settings, linear, rows)
 
         @printf("%3d A1=%-9.5g omega2=%.12f %+.6ei it=%d res=%.1e t=%.1fs\n",
@@ -172,5 +197,9 @@ if abspath(PROGRAM_FILE) == abspath(@__FILE__)
     length(ARGS) == 2 || error("require primary_branch.jls output_prefix")
     maximum_points = haskey(ENV, "AXION_MAX_POINTS") ?
         parse(Int, ENV["AXION_MAX_POINTS"]) : nothing
-    continue_secondary(ARGS[1], ARGS[2]; maximum_points)
+    # Mμ = 0.3 (outer r* = 300) needs AXION_SECONDARY_ULP_TOLERANCE_FACTOR=2.
+    tolerance = parse(Float64, get(ENV, "AXION_SECONDARY_TOLERANCE", "1e-8"))
+    ulp_tolerance_factor = haskey(ENV, "AXION_SECONDARY_ULP_TOLERANCE_FACTOR") ?
+        parse(Float64, ENV["AXION_SECONDARY_ULP_TOLERANCE_FACTOR"]) : nothing
+    continue_secondary(ARGS[1], ARGS[2]; tolerance, ulp_tolerance_factor, maximum_points)
 end

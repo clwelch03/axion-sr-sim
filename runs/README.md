@@ -9,6 +9,8 @@ figures remain in `plots/`.
 | [Dolan Fig. 13](dolan/fig13/README.md) | Single-point time-domain runs and the alpha/resolution sweep |
 | [Adiabatic Fig. 2, 2026-09-22](adiabatic/fig2_20260922/README.md) | Cosine, quartic, and sextic continuation, refinement, and diagnostics |
 | [Small-amplitude checks](adiabatic/small_amplitude/README.md) | Initial continuation, profiles, and nonlinear convergence results |
+| [Amplitude evolution](adiabatic/amplitude_evolution/README.md) | Dense branch derivatives, interpolation checks, and A0(t) |
+| [Multimode secondary](adiabatic/multimode_secondary/README.md) | 2211.01949 Sec. III: secondary cloud on the primary at Mμ = 0.42 and 0.3, energies, Fig. 7 reproduction |
 
 ## Conventions
 

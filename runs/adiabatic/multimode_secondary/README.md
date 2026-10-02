@@ -72,6 +72,42 @@ includes the interaction term (μ²/2)⟨cos ϕ₁⟩ϕ₂². The balance
 the secondary contracts, not a physical energy change. About 0.15% of the
 linear secondary's energy lies beyond r* = 150 (outer flux at small A₁).
 
+### Mμ = 0.3: the paper's Fig. 7
+
+Same settings as Mμ = 0.42 except outer r* = 300 (both linear frequencies are
+unchanged for outer r* from 200 to 400 and match spheroidal Leaver: primary to
+all printed digits, secondary Γ₂ to 8e-6).
+
+```bash
+julia --project=. runs/adiabatic/multimode_secondary/scripts/prepare_alpha030_seed.jl
+sbatch runs/adiabatic/multimode_secondary/scripts/submit_alpha030_primary.sh   # job 26640571
+AXION_SECONDARY_ULP_TOLERANCE_FACTOR=2 julia --project=. src/adiabatic/drivers/continue_secondary.jl \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_branch.jls \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary
+julia --project=. src/adiabatic/drivers/secondary_energies.jl \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_branch.jls \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary.jls \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary_energy.csv
+julia --project=. runs/adiabatic/multimode_secondary/scripts/export_profiles.jl alpha030 660
+PYTHONPATH=src python runs/adiabatic/multimode_secondary/scripts/plot_fig7_analogue.py alpha030 660
+```
+
+The primary has 83 points to A₁ = 0.06 (E₁ = 651 at A₁ = 0.0364, the nearest
+to 660). The secondary needs `AXION_SECONDARY_ULP_TOLERANCE_FACTOR=2`: its
+residual floor is the residual's change from one ulp of Re ω₂ (5.9e-8 at
+A₁ = 0.0014, 1.2e-6 at 0.016), which grows along the branch, so a fixed
+tolerance fails partway. Energy balance is 1.0000046 at all 83 points.
+
+Fig. 7 comparison (`plots/multimode_alpha030_fig7_analogue.png`), peaks of |R|:
+
+| | l=m=1 linear | l=m=1 nonlinear | l=m=2 linear | l=m=2 nonlinear |
+|---|---|---|---|---|
+| paper, read from figure (E ≈ 660) | 0.116, r* ≈ 22 | 0.126, r* ≈ 22 | 0.030, r* ≈ 72 | 0.034, r* ≈ 62 |
+| ours, E = 651 | 0.1152, r* = 24.4 | 0.1244, r* = 24.0 | 0.0301, r* = 71.8 | 0.0338, r* = 64.0 |
+| ours × √(660/651) | 0.116 | 0.125 | 0.030 | 0.034 |
+
+The near-horizon plateau (|R₁₁| ≈ 0.006) and the tails also agree by eye.
+
 ## Checks so far
 
 - Linear limit (A₁ = 0): ω₂ = 0.4156284036 + 6.3703e-11 i, matching spheroidal

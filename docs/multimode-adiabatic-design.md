@@ -83,12 +83,12 @@ to boundary fluxes, so 2Γ₂E₂ = −(F_H + F_out) exactly; the code satisfies
 | 2 | Secondary eigenproblem (61) along the primary branch | done at Mμ = 0.42; Leaver linear limit, A₁² scaling, step convergence at A₁ = 2.05 |
 | 3 | Ê₂(A₁), fluxes, energy balance | done at Mμ = 0.42 |
 | 3b | Pieces 1–3 at Mμ = 0.3 for Fig. 7 | done; Fig. 7 peaks reproduced to reading precision |
-| 4 | Driven m = 0 field at 2ω₁ − ω₂, horizon flux | next |
-| 5 | Driven m = 3 field at 2ω₂ − ω₁, flux to infinity | 2ω₂ − ω₁ ≈ 0.423 vs μ = 0.42: radial wavelength ~120M, outer-boundary care needed |
+| 4 | Driven $m = 0$ field at $2\omega_1 - \omega_2$, horizon flux | done at $M\mu = 0.42$ and $0.3$; power identity, $F_H \propto A_1^4$, step and $l$ convergence ([piece 4 guide](multimode-piece4-guide.md)) |
+| 5 | Driven m = 3 field at 2ω₂ − ω₁, flux to infinity | next; 2ω₂ − ω₁ ≈ 0.423 vs μ = 0.42: radial wavelength ~120M, outer-boundary care needed |
 | 6 | J, Eqs. (62)–(63), Fig. 6 | J₂ = m₂E₂/Re ω₂ for the single-frequency secondary; J₁ from δE₁/ω₁ = δJ₁/m₁ (Eq. 72) |
 
 Planned checks for pieces 4–5: field amplitude ∝ A₂ (m = 0) and ∝ A₂² (m = 3);
-small-A₁ powers against the perturbative F₀, F₃ (Eqs. 41–42); F_J = (m/Ω)F_E
+small-A₁ powers against the perturbative F₀, F₃ (Eqs. 38–39, (A11), (A14)); F_J = (m/Ω)F_E
 per channel.
 
 ## Code identities to keep separate
@@ -103,8 +103,11 @@ block with `fundamental_m = m₂`. Keep three identities distinct:
   Ω_q = **q**·**ω** and m_q = **q**·**m**;
 - the angular index l within each component.
 
-The m = 0 channel needs a zero-m block, which the existing boundary routines
-reject (they require m > 0).
+The $m = 0$ channel is a zero-$m$ block, which `linear_tortoise_rhs!` and
+`boundary_state` reject (they require $m > 0$). `multimode/dissipative_mode.jl`
+therefore assembles it directly from `tortoise_operator_coefficients` and the
+series helpers `horizon_boundary_data` / `outer_boundary_data`, which accept
+$m = 0$.
 
 ## Beyond Sec. III
 

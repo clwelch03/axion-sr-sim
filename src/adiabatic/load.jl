@@ -4,6 +4,7 @@ for filename in (
     "multimode/background",
     "multimode/secondary_mode",
     "multimode/secondary_energy",
+    "multimode/dissipative_mode",
     "tortoise",
     "stationary/radial",
     "stationary/boundary_series",

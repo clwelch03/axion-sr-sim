@@ -108,7 +108,84 @@ Fig. 7 comparison (`plots/multimode_alpha030_fig7_analogue.png`), peaks of |R|:
 
 The near-horizon plateau (|R₁₁| ≈ 0.006) and the tails also agree by eye.
 
-## Checks so far
+### Piece 4: the driven $m = 0$ field
+
+The $m = 0$ field at $\omega_0 = 2\,\mathrm{Re}\,\omega_1 - \mathrm{Re}\,\omega_2$
+(Eqs. (51)–(52)), driven by the $e^{-2i\psi_1}$ harmonic of $1 - \cos\phi_1$
+times the conjugate secondary, with modes $(l, m) = (0,0), (2,0), (4,0)$. It
+carries energy into the horizon: this is the dissipation of the perturbative
+$F_0$ (Eq. (38), (A11)). Method, notation, and every check are explained in
+[docs/multimode-piece4-guide.md](../../../docs/multimode-piece4-guide.md).
+Library code: `src/adiabatic/multimode/dissipative_mode.jl`
+(and `mass_deficit_harmonic` in `background.jl`).
+
+```bash
+julia --project=. src/adiabatic/drivers/dissipative_fluxes.jl \
+    runs/adiabatic/fig2_20260922/results/cosine_branch.jls \
+    runs/adiabatic/multimode_secondary/results/cosine_secondary.jls \
+    runs/adiabatic/multimode_secondary/results/cosine_secondary_energy.csv \
+    runs/adiabatic/multimode_secondary/results/cosine_dissipative_m0.csv
+julia --project=. src/adiabatic/drivers/dissipative_fluxes.jl \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_branch.jls \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary.jls \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary_energy.csv \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_dissipative_m0.csv
+```
+
+About 3 s per point locally (12 min for $M\mu = 0.42$, 7 min for $0.3$). The
+key column is `horizon_flux_per_energy` $= F_H/\hat E_2$: energy into the
+horizon per unit time, per unit secondary energy, independent of the
+secondary's normalization.
+
+Results (2026-10-02), `results/cosine_dissipative_m0.csv` (232 points) and
+`results/alpha030_cosine_dissipative_m0.csv` (83 points):
+
+| | $M\mu = 0.42$ | $M\mu = 0.3$ |
+|---|---|---|
+| $\omega_0$ along the branch | 0.4020 → 0.3406 | 0.2942 → 0.2933 |
+| $F_H/\hat E_2$ (monotonic) | $6.0\times10^{-14}$ → $0.040$ | $1.0\times10^{-11}$ → $1.8\times10^{-5}$ |
+| power ratio $(F_H+F_\text{out})/\text{source work}$ | within $10^{-6}$ of 1 | within $8\times10^{-8}$ of 1 |
+| residual after solve / before | $\le 8\times10^{-15}$ | $\le 3.5\times10^{-15}$ |
+| $\lvert F_\text{out}/F_H\rvert$ | $\le 10^{-26}$ | $\le 5\times10^{-26}$ |
+| share of $F_H$ in $l = 2$, $l = 4$ | $\le 3.4\times10^{-5}$, $\le 4\times10^{-10}$ | $\le 4\times10^{-8}$, $\le 10^{-16}$ |
+| scaled condition number of the matching matrix | 4–227 | 12 → 4100 |
+
+Checks (scripts in `tests/adiabatic/`, logs in `logs/`):
+
+- `check_mass_deficit_harmonic.jl`, `check_dissipative_current.jl`,
+  `check_dissipative_boundary.jl`, `check_dissipative_solve.jl`: steps 4a–4d,
+  results in the guide, Section 8.
+- **Small $A_1$:** $d\ln(F_H/\hat E_2)/d\ln A_1 = 3.9997, 3.9990, 3.9960$ as
+  $A_1$ doubles from 0.0011 ($M\mu = 0.42$), and 3.997 at $M\mu = 0.3$. This is
+  the $E_1^2$ law of the perturbative $F_0 E_1^2 E_2$. It bends below 4 as the
+  nonlinearity sets in.
+- **Radial step** (`check_dissipative_convergence.jl`, $A_1 = 2.05$): primary at
+  steps 0.1, 0.05, 0.025 changes $F_H/\hat E_2$ by $-1.6\times10^{-10}$, then
+  $+1.7\times10^{-10}$ (relative $4\times10^{-8}$). The sign alternates: this
+  is the Newton-tolerance floor, not RK4 error. Not checked above
+  $A_1 \approx 9$, where the primary is not step-converged.
+- **$l$-truncation** (same script): adding $(6,0)$ changes $F_H/\hat E_2$ by
+  $10^{-15}$, $1.4\times10^{-4}$, $4.5\times10^{-4}$ at $A_1 = 0.001, 2.05, 13$.
+- **Resonance at $M\mu = 0.3$** (`check_dissipative_resonance.jl`): scanning the
+  drive frequency at fixed background shows a resonance in the $m = 0$ response
+  near $\omega \approx 0.295$–$0.296$, with a sharp dip just above. This is
+  consistent with the hydrogenic $m = 0$ level near $0.2966$. $\omega_0$ sits on
+  its lower flank, at 60–75% of the peak flux, at both $A_1 = 0.001$ and $0.06$.
+  So the enhancement is already present in the linear limit (it is part of the
+  perturbative $F_0$ as well).
+- **Condition number at $M\mu = 0.3$** (same script): the growth from 12 to
+  4100 is *not* that resonance. $\sigma_\text{min}/\sigma_\text{max}$ is flat
+  across the frequency band, and its singular vector at $A_1 = 0.06$ lies
+  entirely on the outer $l = 2, 4$ amplitudes. Those two outer solutions line
+  up as they are integrated inward through the cloud, where the background
+  mixes even $l$. This is a shooting artifact, harmless at $4\times10^3$ (the
+  residual and power identity confirm the solution). The driver warns above
+  $10^8$; the fix would be re-orthogonalizing the outer solutions.
+- Not checked: outer-radius convergence of the $m = 0$ field, and an
+  independent evaluation of the perturbative $F_0$ (Eq. (38)) to compare
+  coefficients.
+
+## Checks so far (secondary)
 
 - Linear limit (A₁ = 0): ω₂ = 0.4156284036 + 6.3703e-11 i, matching spheroidal
   Leaver (`--N 2000`) in Re to 10 digits; Im is high by 7e-6 relative at step 0.2,

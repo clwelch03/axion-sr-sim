@@ -60,3 +60,28 @@ function background_coupling_matrix(mass_deficit_average, radius, spin, modes,
     ]
 end
 
+"""
+    mass_deficit_harmonic(radial_values, polar_values, azimuthal_values, grid,
+                          azimuthal_number)
+
+Return the coefficient of `exp(im * azimuthal_number * φ)` in `1 - cos ϕ₁` at
+each polar node, at one radius and time zero.
+
+For the primary (m₁ = 1), `exp(+im*k*φ)` at t = 0 is `exp(-im*k*ψ₁)`, with
+ψ₁ = ω₁t - φ, so `azimuthal_number = k` gives the part of `1 - cos ϕ₁`
+varying as `exp(-im*k*ψ₁)`. `azimuthal_number = 0` is
+[`averaged_mass_deficit`](@ref). The m = 0 field at 2ω₁ - ω₂ is driven by
+`azimuthal_number = 2` (Omiya et al. 2211.01949 Eqs. (51)-(52)).
+"""
+function mass_deficit_harmonic(radial_values, polar_values, azimuthal_values, grid,
+                               azimuthal_number)
+    field = reconstruct_field(radial_values, polar_values, azimuthal_values, grid)
+
+    # 2 sin²(ϕ/2) equals 1 - cos ϕ without cancellation when ϕ is small.
+    mass_deficit = 2 .* sin.(field ./ 2) .^ 2
+
+    # Averaging against conj(exp(im*m*φ)) keeps the exp(+im*m*φ) term.
+    return azimuthal_average(
+        mass_deficit .* transpose(conj.(azimuthal_values[azimuthal_number])), grid,
+    )
+end

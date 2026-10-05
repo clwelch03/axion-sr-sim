@@ -1,0 +1,23 @@
+1. Radial step at A1 = 2.05
+primary step   F_inf / E2hat^2        change
+0.1            7.677552955102675e-07  
+0.05           7.677552347211199e-07  -6.079e-14
+0.025          7.677552308796684e-07  -3.841e-15
+ratio of changes: 15.82 (16 if RK4 error dominates); relative change at step 0.1: 7.92e-08
+
+2. l-truncation and 3. far outer leg, relative change of F_inf / E2hat^2
+A1=0.001139 F_inf/E2hat^2 = 7.011527754843e-13
+    with l = 9       7.011527754843e-13  relative change 0.00e+00
+    far start 2500   7.011527754842e-13  relative change 7.60e-14
+    far start 10000  7.011527754843e-13  relative change 2.95e-14
+    far step 0.125   7.011527754686e-13  relative change 2.24e-11
+A1=2.052    F_inf/E2hat^2 = 7.677552955103e-07
+    with l = 9       7.677558050746e-07  relative change 6.64e-07
+    far start 2500   7.677552955104e-07  relative change 2.27e-13
+    far start 10000  7.677552955103e-07  relative change 2.98e-14
+    far step 0.125   7.677552955473e-07  relative change 4.82e-11
+A1=13       F_inf/E2hat^2 = 2.416578126646e-07
+    with l = 9       2.416592072206e-07  relative change 5.77e-06
+    far start 2500   2.416578126646e-07  relative change 9.62e-14
+    far start 10000  2.416578126646e-07  relative change 8.11e-15
+    far step 0.125   2.416578126598e-07  relative change 1.98e-11

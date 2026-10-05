@@ -1,0 +1,12 @@
+Mμ = 0.42; columns: primary_peak, primary_peak_time, secondary_peak, secondary_peak_time, primary_final, secondary_final
+  default (step 1e-3)          340.613  3.481  124.549  3.61  38.3404  63.3971
+  1. relative change, step 2e-3 vs 1e-3: 5.5e-05  2.9e-04  8.8e-08  0.0e+00  4.3e-12  2.4e-12
+     relative change, step 1e-3 vs 5e-4: 5.4e-06  1.4e-04  5.4e-07  1.4e-04  2.4e-13  1.1e-13
+  2. relative change, every other point:  3.3e-06  0.0e+00  6.0e-07  0.0e+00  2.0e-06  6.8e-07
+  3. d ln E1 / d(ω_{1,I} t) over [0, 1]: 2.000964; E2 at t = 1: 1.00e-08
+Mμ = 0.30; columns: primary_peak, primary_peak_time, secondary_peak, secondary_peak_time, primary_final, secondary_final
+  default (step 1e-3)          502.621  1.823  172.167  1.945  59.6565  83.9999
+  1. relative change, step 2e-3 vs 1e-3: 2.3e-05  5.5e-04  1.4e-05  5.1e-04  4.7e-14  2.0e-14
+     relative change, step 1e-3 vs 5e-4: 1.5e-05  2.7e-04  4.0e-09  0.0e+00  4.4e-15  2.7e-15
+  2. relative change, every other point:  6.1e-09  0.0e+00  6.1e-09  0.0e+00  1.3e-11  6.3e-12
+  3. d ln E1 / d(ω_{1,I} t) over [0, 1]: 2.017268; E2 at t = 1: 1.71e-08

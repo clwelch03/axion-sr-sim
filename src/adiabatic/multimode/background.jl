@@ -85,3 +85,23 @@ function mass_deficit_harmonic(radial_values, polar_values, azimuthal_values, gr
         mass_deficit .* transpose(conj.(azimuthal_values[azimuthal_number])), grid,
     )
 end
+
+"""
+    sine_harmonic(radial_values, polar_values, azimuthal_values, grid, azimuthal_number)
+
+Return the coefficient of `exp(im * azimuthal_number * φ)` in `sin ϕ₁` at each
+polar node, at one radius and time zero.
+
+`sin ϕ₁` is real, so the coefficient of `exp(-im*k*φ)` is the conjugate of the
+one returned for `k`. The m = 3 field at 2ω₂ - ω₁ is driven by the part of
+`sin ϕ₁` varying as `exp(+im*ψ₁)`, which is `conj(sine_harmonic(..., 1))`
+(Omiya et al. 2211.01949 Eqs. (51)-(52)).
+"""
+function sine_harmonic(radial_values, polar_values, azimuthal_values, grid, azimuthal_number)
+    field = reconstruct_field(radial_values, polar_values, azimuthal_values, grid)
+
+    # Averaging against conj(exp(im*m*φ)) keeps the exp(+im*m*φ) term.
+    return azimuthal_average(
+        sin.(field) .* transpose(conj.(azimuthal_values[azimuthal_number])), grid,
+    )
+end

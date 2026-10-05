@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-10-02. Active work: reproducing Omiya, Takahashi, Tanaka & Yoshino,
+Updated 2026-10-05. Active work: reproducing Omiya, Takahashi, Tanaka & Yoshino,
 *Impact of multiple modes…* ([2211.01949v1](docs/papers/2211.01949v1.pdf)),
 Sec. III — a nonlinear l = m = 1 primary with a linear l = m = 2 secondary on it,
 evolved by energy and angular-momentum balance (Eqs. 62–63). The single-cloud
@@ -15,7 +15,10 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
 
 ## Where things stand
 
-Pieces 1–4 of six are done at $M\mu = 0.42$ and $0.3$, $a/M = 0.99$:
+All six pieces are done at $M\mu = 0.42$ and $0.3$, $a/M = 0.99$, and the
+nonperturbative curves of the paper's **Fig. 6 are reproduced** (piece 6):
+peak and plateau energies agree with the figure to reading precision
+(`plots/multimode_fig6_analogue.png`; table in the campaign README, "Piece 6").
 
 1. Period average ⟨1 − cos ϕ₁⟩ of the primary (`src/adiabatic/multimode/background.jl`).
 2. Secondary eigenproblem, Eq. (61), continued along all 232 primary points
@@ -27,6 +30,15 @@ Pieces 1–4 of six are done at $M\mu = 0.42$ and $0.3$, $a/M = 0.99$:
    in `background.jl`, driver `drivers/dissipative_fluxes.jl`). Explained step by
    step in [docs/multimode-piece4-guide.md](docs/multimode-piece4-guide.md).
    Results: `results/cosine_dissipative_m0.csv`, `results/alpha030_cosine_dissipative_m0.csv`.
+5. The driven $m = 3$ field at $\omega_3 = 2\,\mathrm{Re}\,\omega_2 - \mathrm{Re}\,\omega_1$,
+   radiating to infinity (`multimode/radiative_mode.jl`, `sine_harmonic` in
+   `background.jl`, driver `drivers/radiative_fluxes.jl`). $\omega_3$ is just
+   above $\mu$, so its outgoing series is started at $r_* = 5000$ and integrated
+   in to the primary's boundary. Results: `results/cosine_radiative_m3.csv`,
+   `results/alpha030_cosine_radiative_m3.csv`.
+6. Evolution of $E_1, E_2$ by energy and angular-momentum balance, written in
+   the cloud energies (`multimode/two_cloud_evolution.jl`, driver
+   `drivers/two_cloud_evolution.jl`, plot `scripts/plot_fig6.py`).
 
 Validated: linear limits against spheroidal Leaver (both clouds, both α);
 small-A₁ coefficients (Re ω₂ shift −0.0101 A₁², Γ₂/Γ₂^lin − 1 = 42 A₁²);
@@ -66,6 +78,12 @@ are integrated inward. It is not the resonance.
 - **Mμ = 0.3 Newton tolerance** follows the residual's change from one ulp of
   Re ω₂ (`AXION_SECONDARY_ULP_TOLERANCE_FACTOR=2`); a fixed tolerance fails
   partway along the branch because that floor grows as the secondary contracts.
+- **Piece 6 in cloud energies** $E_1$, $E_2 = \hat E_2|A_2|^2$ (the paper's
+  unit-energy normalization), so $d\hat E_2/dA_1$ never appears; the
+  $d\omega_2/dE_1$ term from $J_2 = 2E_2/\omega_2$ is kept. Coefficients are
+  splined in $E_1$, not $\ln E_1$.
+- **$m = 3$ horizon flux included** in $F_E$, $F_J$ (Eq. (65)); it is negative
+  (superradiant) and at most $3\times10^{-4}$ of the flux to infinity.
 
 ## Known caveats
 
@@ -76,33 +94,33 @@ are integrated inward. It is not the resonance.
   E₁ ≈ 1000 (A₁ ≲ 0.8, step-converged to ~1e-7).
 - Unchecked: secondary l-truncation (l ≤ 6) and outer boundary at large A₁.
   The paper reports neither.
-- Piece 4: the outer-radius convergence of the $m = 0$ field is unchecked, and
-  so is the coefficient against an independent evaluation of the perturbative
-  $F_0$ (Eq. (38)/(A11), e.g. by a Green's function). The power law matches;
-  the prefactor has not been compared.
+- Pieces 4–5: the outer-radius convergence of the $m = 0$ field is unchecked, and
+  so is each coefficient against an independent evaluation of the perturbative
+  $F_0$ and $F_3$ (Eqs. (38)–(39), (A11), (A14), e.g. by a Green's function).
+  The power laws match; the prefactors have not been compared.
 
-## Next step: piece 5
+## Next steps
 
-The $m = 3$ field at $\omega_3 = 2\,\mathrm{Re}\,\omega_2 - \mathrm{Re}\,\omega_1$
-(Eqs. (51)–(52)). Its source is quadratic in the secondary:
-$\tfrac12\sin\phi_1\,\phi_2^2$ projected onto $(\omega_3, m = 3)$, which
-needs the $e^{+i\psi_1}$ harmonic of $\sin\phi_1$ (my notation
-$\psi_1 = \omega_1 t - \varphi$) times $P_2^2$. The flux is the outgoing flux to
-infinity, $F_3 E_1 E_2^2$ in the perturbative Eq. (39)/(A14). It reuses the
-piece 4 structure (combined integration, superposition solve, power identity),
-with two differences:
-- the outer boundary is outgoing, not decaying;
-- $\omega_3 \approx 0.423$ is just above $\mu = 0.42$ at $M\mu = 0.42$, so the
-  radial wavelength is about $120M$ and the outer boundary needs care (series
-  validity, outer radius).
-
-Then piece 6: $J$, Eqs. (62)–(63), and Fig. 6.
+- **Commit.** Pieces 5 and 6 (library, drivers, tests, results CSVs, docs)
+  are uncommitted as of 2026-10-05.
+- **Perturbative coefficients.** The small-$E_1$ limits of the spline
+  coefficients `m0_flux_coefficient` and `m3_flux_coefficient` are the paper's
+  $F_0$ and $F_3$ (Eqs. (38)–(39)). An independent evaluation of those (for
+  example by the Green's-function formula) would check the prefactors of
+  pieces 4–5, which so far are checked only through power laws and the power
+  identity. The same coefficients would also give the perturbative curves of
+  Fig. 6.
+- **$M\mu = 0.3$ details.** Our $E_1$ peak looks ~10% below the figure and the
+  plateaus 5–10% above; this is at the limit of reading a log axis. Not
+  investigated.
+- Beyond Sec. III: see the design doc's last section.
 
 ## Working with the user
 
 Build incrementally with a checkpoint per piece; the user types library code
 from pasted snippets (paste only code that has been run), Claude may write
-drivers, scripts, and runs. Define new notation in place, and prefer naming
+drivers, scripts, and runs. Exception: on 2026-10-05 the user asked Claude to
+write the piece 6 library code directly to finish that day. Define new notation in place, and prefer naming
 physical quantities over bookkeeping symbols. Size checks to what the next
 result needs; keep checks that can change a conclusion. Heavy runs go through
 Slurm; check `git status` first — this is a shared workspace.

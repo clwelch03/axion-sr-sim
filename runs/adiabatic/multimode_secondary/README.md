@@ -185,6 +185,144 @@ Checks (scripts in `tests/adiabatic/`, logs in `logs/`):
   independent evaluation of the perturbative $F_0$ (Eq. (38)) to compare
   coefficients.
 
+### Piece 5: the driven $m = 3$ field
+
+The $m = 3$ field at $\omega_3 = 2\,\mathrm{Re}\,\omega_2 - \mathrm{Re}\,\omega_1$
+(Eqs. (51)–(52)), driven by $\tfrac12\mu^2\,\overline{[\sin\phi_1]_1}\,P_2^2$:
+the $e^{+i\psi_1}$ harmonic of $\sin\phi_1$ times the secondary's profile
+squared, with modes $(l, m) = (3,3), (5,3), (7,3)$. It radiates to infinity:
+this is the perturbative $F_3$ (Eq. (39), (A14)). Library code:
+`src/adiabatic/multimode/radiative_mode.jl` (and `sine_harmonic` in
+`background.jl`).
+
+Two differences from piece 4:
+
+- **Far outer leg.** $\omega_3$ is above $\mu$ by only $2$–$9\times10^{-3}$
+  ($M\mu = 0.42$) and $6$–$9\times10^{-4}$ ($0.3$), so the outgoing series does
+  not converge at the primary's outer boundary. `radiative_outer_boundary_state`
+  starts it at $r_* = 5000$ (order 16) and integrates the source-free Kerr
+  equation inward to the boundary at step 0.25. The primary's averaged
+  background (its radiating tail, $\lesssim 10^{-7}$) is left out of that leg;
+  see the comment in the function.
+- **Two fluxes.** $F_\infty$ is the outward current at the primary's outer
+  boundary (equal to the flux to infinity, since the leg has no source and a
+  real operator). $F_H$ is negative: $\omega_3 < 3\Omega_H$, so the black hole
+  feeds the field. Eq. (65) counts both.
+
+```bash
+julia --project=. src/adiabatic/drivers/radiative_fluxes.jl \
+    runs/adiabatic/fig2_20260922/results/cosine_branch.jls \
+    runs/adiabatic/multimode_secondary/results/cosine_secondary.jls \
+    runs/adiabatic/multimode_secondary/results/cosine_secondary_energy.csv \
+    runs/adiabatic/multimode_secondary/results/cosine_radiative_m3.csv
+julia --project=. src/adiabatic/drivers/radiative_fluxes.jl \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_branch.jls \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary.jls \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary_energy.csv \
+    runs/adiabatic/multimode_secondary/results/alpha030_cosine_radiative_m3.csv
+```
+
+About 4–9 s per point locally. The key column is
+`infinity_flux_per_energy_squared` $= F_\infty/\hat E_2^2$: flux per unit
+secondary energy squared, independent of the secondary's normalization.
+`AXION_RADIATIVE_MAX_L` (odd, default 7) changes the $l$ truncation.
+
+Results (2026-10-05), `results/cosine_radiative_m3.csv` (232 points) and
+`results/alpha030_cosine_radiative_m3.csv` (83 points):
+
+| | $M\mu = 0.42$ | $M\mu = 0.3$ |
+|---|---|---|
+| $\omega_3$ along the branch | 0.42233–0.43118 | 0.30060–0.30086 |
+| $F_\infty/\hat E_2^2$ | $7.0\times10^{-13}$, peak $1.96\times10^{-6}$ at $A_1 = 5.0$, $2.4\times10^{-7}$ at 13 | $3.1\times10^{-12}$ → $5.2\times10^{-9}$ (monotonic) |
+| power ratio $(F_H+F_\infty)/\text{source work}$ | within $6.2\times10^{-8}$ of 1 | within $2.4\times10^{-10}$ of 1 |
+| residual after solve / before | $\le 10^{-13}$ | $\le 4\times10^{-14}$ |
+| $-F_H/F_\infty$ | $\le 2.8\times10^{-4}$ | $\le 1.5\times10^{-11}$ |
+| share of $F_\infty$ in $l = 5$, $l = 7$ | $\le 5.7\times10^{-4}$, $\le 10^{-9}$ | $\le 5\times10^{-4}$, $\le 2.3\times10^{-10}$ |
+| scaled condition number of the matching matrix | 1.7–159 | up to 1009 |
+
+Checks (scripts in `tests/adiabatic/`):
+
+- `check_sine_harmonic.jl` (5a): $[\sin\phi_1]_0$ and $[\sin\phi_1]_2$ vanish to
+  round-off; $[\sin\phi_1]_1 \to P_1$ with relative difference $0.592\,A_1^2$;
+  azimuthal grid doubling changes nothing.
+- `check_radiative_rhs.jl` (5b): with the source off the radial current is
+  conserved up to RK4 error (ratio per halving reaches 15.5 inward by step
+  0.0125); even-$l$ projections of the source vanish.
+- `check_radiative_outer.jl`, `check_radiative_far_background.jl` (5c): the
+  outgoing series satisfies the equation (16 per halving); the boundary state
+  is independent of series order and far start; the series used directly at
+  the boundary would be off by up to 14% ($0.42$) and 160% ($0.3$). Leaving
+  out the primary's background changes the solution by $\le 10^{-7}$.
+- `check_radiative_solve.jl` (5d): residual, power identity, $l$ shares; the
+  small-$A_1$ log-slope of $F_\infty/\hat E_2^2$ is $1.9999$, the $E_1$ law of
+  the perturbative $F_3E_1E_2^2$ (1.9989 at $M\mu = 0.3$). It bends below 2
+  sooner than piece 4's slope bends below 4.
+- `check_radiative_convergence.jl` (5e, log in `logs/`), relative changes of
+  $F_\infty/\hat E_2^2$:
+  - radial step at $A_1 = 2.05$: $7.9\times10^{-8}$ from step 0.1 to 0.05,
+    ratio of successive changes 15.8 (RK4 error);
+  - adding $l = 9$: $0$, $6.6\times10^{-7}$, $5.8\times10^{-6}$ at
+    $A_1 = 0.001, 2.05, 13$;
+  - far start 2500 or 10000, far step 0.125: $\le 5\times10^{-11}$. The flux
+    is far less sensitive than the boundary state itself ($4\times10^{-7}$),
+    because the far-leg error is mostly a phase that the outer amplitudes absorb.
+- Not checked: the coefficient against an independent perturbative $F_3$
+  (Eq. (A14)).
+
+### Piece 6: two-cloud evolution, the paper's Fig. 6
+
+Energy and angular-momentum balance (Eqs. (62)–(63)) written in the cloud
+energies $E_1$ and $E_2 = \hat E_2|A_2|^2$ (the paper's unit-energy
+normalization of the secondary); equations and choices in
+[multimode-adiabatic-design.md](../../../docs/multimode-adiabatic-design.md),
+"Piece 6 design". The coefficients come from the piece 1–5 tables, splined in
+$E_1$. Library code: `src/adiabatic/multimode/two_cloud_evolution.jl`; driver
+and table reader: `src/adiabatic/drivers/two_cloud_evolution.jl`.
+
+```bash
+julia --project=. src/adiabatic/drivers/two_cloud_evolution.jl
+PYTHONPATH=src python runs/adiabatic/multimode_secondary/scripts/plot_fig6.py
+```
+
+A few seconds in all. Writes `results/two_cloud_evolution_alpha042.csv` and
+`_alpha030.csv` (time in units of $\omega_{1,I}$, energies in $F_a^2M$) and
+`plots/multimode_fig6_analogue.png` (nonperturbative curves only).
+
+Results (2026-10-05), against Fig. 6 read by eye on its log axes:
+
+| | $M\mu = 0.42$ | paper | $M\mu = 0.3$ | paper |
+|---|---|---|---|---|
+| $E_1$ peak (value at $\omega_{1,I}t$) | 341 at 3.48 | ~350 at ~3.5 | 503 at 1.82 | ~550 at ~1.85 |
+| $E_2$ peak | 125 at 3.61 | ~130 at ~3.6 | 172 at 1.95 | ~170 at ~1.95 |
+| $E_1$, $E_2$ at $\omega_{1,I}t = 10$ | 38, 63 | ~38, ~65 | 60, 84 | ~55, ~78 |
+
+Agreement is at reading precision at $M\mu = 0.42$; at $0.3$ our peak looks
+about 10% lower and our plateaus 5–10% higher than the figure, at the limit of
+what can be read off it.
+
+Checks (scripts in `tests/adiabatic/`):
+
+- `check_two_cloud_splines.jl` (6a): the not-a-knot spline reproduces a cubic
+  to $10^{-14}$ and converges at fourth order; splines from every other saved
+  point miss the omitted points by $\le 5.5\times10^{-3}$ (relative to the
+  coefficient's maximum) at $M\mu = 0.42$, $E_1 \le 1000$, and
+  $\le 4\times10^{-6}$ at $0.3$. Splines in $\ln E_1$ were 5–100 times worse.
+- `check_two_cloud_rates.jl` (6b): one channel at a time, the rates obey the
+  exact limits to $\le 6\times10^{-12}$: the primary alone grows at $-F_1$; the
+  secondary alone leaves $E_1$ fixed; the $m = 0$ channel moves energy as
+  $F/\omega_0$ quanta, each taking two primary quanta and giving one
+  secondary quantum; the $m = 3$ channel the reverse at $F/\omega_3$. At the
+  first point $F_1/E_1 = -2\,\mathrm{Im}\,\omega_1$ to $10^{-6}$.
+- `check_two_cloud_evolution.jl` (6c, log in `logs/`): time step 2e-3 → 5e-4
+  changes the final energies by $\le 4\times10^{-12}$ and the peaks by
+  $\le 5\times10^{-5}$ (peak times move by one sample); splines from every
+  other point change everything by $\le 2\times10^{-6}$; the initial slope of
+  $\ln E_1$ is 2.001 ($0.42$) and 2.017 ($0.3$, where the growth rate
+  already rises with amplitude).
+- Not checked: how much each approximation of Sec. III matters (for
+  example the secondary's own nonlinearity at $E_2 \sim 100$), and the
+  perturbative curves of the figure.
+
 ## Checks so far (secondary)
 
 - Linear limit (A₁ = 0): ω₂ = 0.4156284036 + 6.3703e-11 i, matching spheroidal

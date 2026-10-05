@@ -5,6 +5,8 @@ for filename in (
     "multimode/secondary_mode",
     "multimode/secondary_energy",
     "multimode/dissipative_mode",
+    "multimode/radiative_mode",
+    "multimode/two_cloud_evolution",
     "tortoise",
     "stationary/radial",
     "stationary/boundary_series",

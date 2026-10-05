@@ -84,8 +84,32 @@ to boundary fluxes, so 2Γ₂E₂ = −(F_H + F_out) exactly; the code satisfies
 | 3 | Ê₂(A₁), fluxes, energy balance | done at Mμ = 0.42 |
 | 3b | Pieces 1–3 at Mμ = 0.3 for Fig. 7 | done; Fig. 7 peaks reproduced to reading precision |
 | 4 | Driven $m = 0$ field at $2\omega_1 - \omega_2$, horizon flux | done at $M\mu = 0.42$ and $0.3$; power identity, $F_H \propto A_1^4$, step and $l$ convergence ([piece 4 guide](multimode-piece4-guide.md)) |
-| 5 | Driven m = 3 field at 2ω₂ − ω₁, flux to infinity | next; 2ω₂ − ω₁ ≈ 0.423 vs μ = 0.42: radial wavelength ~120M, outer-boundary care needed |
-| 6 | J, Eqs. (62)–(63), Fig. 6 | J₂ = m₂E₂/Re ω₂ for the single-frequency secondary; J₁ from δE₁/ω₁ = δJ₁/m₁ (Eq. 72) |
+| 5 | Driven $m = 3$ field at $2\omega_2 - \omega_1$, flux to infinity | done at $M\mu = 0.42$ and $0.3$; outgoing series started at $r_* = 5000$ (it does not converge at the primary's boundary); power identity, $F_\infty \propto A_1^2$, step, $l = 9$, and far-leg convergence ([campaign README](../runs/adiabatic/multimode_secondary/README.md), "Piece 5") |
+| 6 | $J$, Eqs. (62)–(63), Fig. 6 | done 2026-10-05; nonperturbative curves of Fig. 6 reproduced at both $M\mu$ to reading precision; exact one-channel limits, step and spline convergence ([campaign README](../runs/adiabatic/multimode_secondary/README.md), "Piece 6") |
+
+**Piece 6 design (confirmed 2026-10-05).** Variables are the cloud energies
+$E_1$ (labels the primary branch; monotonic on both saved branches) and
+$E_2 = \hat E_2(A_1)|A_2|^2$ (Eq. 69). $E_2 = |A_2|^2$ in the paper's
+normalization (unit-energy secondary), so this is their (62)–(63); it avoids
+differentiating our normalization-dependent $\hat E_2$. With
+$J = J_1(E_1) + 2E_2/\omega_2(E_1)$ and $dJ_1 = dE_1/\omega_1$ (Eq. 72):
+
+$$
+\dot E_1 + \dot E_2 = -F_E, \qquad
+\Big(\frac{1}{\omega_1} - \frac{2E_2}{\omega_2^2}\frac{d\omega_2}{dE_1}\Big)\dot E_1
++ \frac{2}{\omega_2}\dot E_2 = -F_J .
+$$
+
+$F_E$ sums the primary's own flux $F_1(E_1)$, the secondary's own flux
+$\propto E_2$, the $m = 0$ flux $\propto E_2$, and the $m = 3$ flux
+($F_\infty + F_H$, Eq. (65)) $\propto E_2^2$. In $F_J$ these carry
+$1/\omega_1$, $2/\omega_2$, $0$, $3/\omega_3$. All frequencies are real parts.
+Coefficients are not-a-knot cubic splines in $E_1$ of each flux divided by
+its leading small-field power; $d\omega_2/dE_1$ comes from the $\omega_2$
+spline. (Splines in $\ln E_1$, first proposed, were 5–100 times worse when
+built from every other point, and their $d\omega_2/dE_1$ was off by 120% at
+small $E_1$: the coefficients are smooth in $E_1 \propto A_1^2$, not in
+$\ln E_1$.) Initial data and time unit as in Fig. 6.
 
 Planned checks for pieces 4–5: field amplitude ∝ A₂ (m = 0) and ∝ A₂² (m = 3);
 small-A₁ powers against the perturbative F₀, F₃ (Eqs. 38–39, (A11), (A14)); F_J = (m/Ω)F_E

@@ -124,6 +124,30 @@ Estimate GW power, torque, and accumulated losses as described in item 6;
 post-processing diagnoses their importance but does not produce a trajectory
 with radiation reaction.
 
+### Scalar normalization result
+
+![Physical normalization and scalar energy accounting for the two saved trajectories](../plots/scalar_physical_normalization.png)
+
+[Vector PDF](../plots/scalar_physical_normalization.pdf).
+The upper panels show net energy extracted from the BH, the change in stored
+cloud energy since the first sample, and accumulated outward scalar losses
+at $f_a=10^{16}\,\mathrm{GeV}$. Extraction equals stored-energy change plus
+outward loss, with maximum residuals of 0.31% and 0.27% of peak cloud energy
+for $\alpha=0.42$ and $0.3$, respectively, at the saved time sampling.
+The cloud can settle to nearly constant energy while extraction and emission
+continue. Here $M_0$ and $J_{\rm BH,0}$ denote the initial BH mass and angular
+momentum; the assumed axion rest energy is $3\times10^{-13}\,\mathrm{eV}$.
+
+The lower panels rescale the same dimensionless trajectories by $f_a^2$,
+holding their dimensionless seeds fixed. They compare peak cloud energy,
+final net energy extraction, and final net angular-momentum extraction with
+the initial BH reservoirs. The horizontal guides mark the initial angular
+momentum and the reversible Kerr rotational-energy bound at $\chi_0=0.99$.
+Shading begins when cumulative extraction exceeds either bound anywhere on
+the saved trajectory; unshaded values do not establish fixed-background
+validity. These curves are scalar-only diagnostics over 0.709 and 2.841 days,
+not evolved BH spin histories or matched-physical-seed comparisons.
+
 ## 2. Coupled black-hole and cloud evolution
 
 This is the most direct connection to

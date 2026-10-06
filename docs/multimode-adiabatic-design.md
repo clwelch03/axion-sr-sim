@@ -122,6 +122,63 @@ small-A₁ powers against the perturbative F₀, F₃ (Eqs. 38–39, (A11), (A14
 per channel. The campaign records which checks have been performed;
 open validation work is listed in the handoff.
 
+### What a configuration and its fluxes mean
+
+In the current model, a *cloud configuration* is the instantaneous pair
+$(E_1,E_2)$ at fixed BH parameters. On the selected monotonic primary branch,
+$E_1$ selects the nonlinear primary profile, the secondary eigenmode on that
+background, and the associated driven responses. $E_2$ sets the secondary's
+population through $|A_2|^2=E_2/\hat E_2(E_1)$. The spatial profiles follow
+these stationary solutions adiabatically; the secondary does not yet reshape
+the primary, and the driven fields have no independently evolved populations.
+
+The boundary currents were calculated when constructing the stationary
+tables. `multimode/scalar_energy_accounting.jl` reconstructs them along a saved
+trajectory by interpolating coefficients in $E_1$ and restoring the energy
+factors:
+
+| Channel | Energy flux at each boundary |
+|---|---|
+| Primary | $C_1(E_1)E_1$ |
+| Secondary | $C_2(E_1)E_2$ |
+| Driven $m=0$ | $C_0(E_1)E_1^2E_2$ |
+| Driven $m=3$ | $C_3(E_1)E_1E_2^2$ |
+
+Each boundary has its own coefficient. These coefficients retain the
+nonlinear dependence on the primary profile; factoring out the leading
+small-field powers does not replace that dependence with a perturbative
+approximation. Dividing the tabulated fluxes by the corresponding reference
+energies removes the arbitrary secondary amplitude normalization.
+
+Summing the channels gives $F_H$, positive into the BH, and $F_{\rm out}$,
+positive outward. Thus negative $F_H$ means net extraction, including any
+energy returned through the dissipative channel. Outward accounting uses
+finite-radius currents for the primary, secondary, and $m=0$ fields, and
+the infinity flux for $m=3$. This radiative channel is scalar radiation;
+GW losses are not included. Multiplying each channel's energy flux by
+$m/\omega$ gives its angular-momentum flux, so $m=0$ transports energy but
+no angular momentum.
+
+Fluxes are rates per $x=t/M$. Convert saved times $\tau=\gamma_1 x$ back to
+$x$ before integrating. From the initial saved time $x_0$, define
+
+$$
+E_{\rm extracted}(x)=-\int_{x_0}^{x}F_H\,dx',\qquad
+E_{\rm outward}(x)=\int_{x_0}^{x}F_{\rm out}\,dx'.
+$$
+
+The energy check is
+$E_{\rm cloud}(x)-E_{\rm cloud}(x_0)=E_{\rm extracted}-E_{\rm outward}$,
+with $E_{\rm cloud}=E_1+E_2$. Angular-momentum fluxes are integrated with
+the same signs. This checks consistency with the evolution's balance
+equations, not the validity of the underlying adiabatic approximation.
+`observables/physical_normalization.jl` supplies the conversion to physical
+units; the normalization script reports powers, torques, and cumulative
+fractions of the initial BH reservoirs. This remains postprocessing on a
+fixed background: a cloud-energy plateau can coexist with continuing BH
+extraction balanced by outward radiation. Evolving the BH mass and spin
+requires feeding those horizon fluxes back into the dynamics.
+
 ## Code identities to keep separate
 
 The assembled stationary routines assign frequencies as

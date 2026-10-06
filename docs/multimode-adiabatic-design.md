@@ -1,9 +1,11 @@
 # Multimode adiabatic evolution: design and Sec. III reproduction
 
-Revised 2026-10-02. Equation numbers refer to the PDF
+Equation numbers refer to the PDF
 [2211.01949v1](papers/2211.01949v1.pdf) (Omiya, Takahashi, Tanaka & Yoshino),
 not the arXiv HTML, whose numbering differs. Fixed Kerr background throughout.
+Current capabilities, caveats, and next steps: [project handoff](../HANDOFF.md).
 Results and commands: [secondary campaign](../runs/adiabatic/multimode_secondary/README.md).
+This document owns equations, implementation decisions, and the component map.
 
 See the [September 28 literature review](multimode-literature-review-2026-09-28.md)
 for prior work and the narrower novelty claim: mutual nonlinear profile
@@ -72,20 +74,24 @@ redefining A₂ → f(A₁)A₂ changes variables but not the trajectory in (E�
 period-averaged, is ½μ²⟨cos ϕ₁⟩ϕ₂²: a mass term with effective mass squared
 μ²⟨cos ϕ₁⟩. Kinetic and gradient terms reuse `energy_per_tortoise_radius` with
 α = 0. On the time-independent averaged background this energy is conserved up
-to boundary fluxes, so 2Γ₂E₂ = −(F_H + F_out) exactly; the code satisfies it to
-3e-6 at every branch point.
+to boundary fluxes, so 2Γ₂E₂ = −(F_H + F_out) exactly. The campaign records
+the numerical check of this identity for each saved branch.
 
 ## Reproduction pieces
 
-| Piece | Content | Status |
+The pieces identify components of the calculation; completion and validation
+are tracked in the handoff and campaign. Paths below are relative to
+`src/adiabatic/`.
+
+| Piece | Content | Implementation |
 |---|---|---|
-| 1 | ⟨1 − cos ϕ₁⟩ from a saved primary | done; exact quadrature and small-field checks |
-| 2 | Secondary eigenproblem (61) along the primary branch | done at Mμ = 0.42; Leaver linear limit, A₁² scaling, step convergence at A₁ = 2.05 |
-| 3 | Ê₂(A₁), fluxes, energy balance | done at Mμ = 0.42 |
-| 3b | Pieces 1–3 at Mμ = 0.3 for Fig. 7 | done; Fig. 7 peaks reproduced to reading precision |
-| 4 | Driven $m = 0$ field at $2\omega_1 - \omega_2$, horizon flux | done at $M\mu = 0.42$ and $0.3$; power identity, $F_H \propto A_1^4$, step and $l$ convergence ([piece 4 guide](multimode-piece4-guide.md)) |
-| 5 | Driven $m = 3$ field at $2\omega_2 - \omega_1$, flux to infinity | done at $M\mu = 0.42$ and $0.3$; outgoing series started at $r_* = 5000$ (it does not converge at the primary's boundary); power identity, $F_\infty \propto A_1^2$, step, $l = 9$, and far-leg convergence ([campaign README](../runs/adiabatic/multimode_secondary/README.md), "Piece 5") |
-| 6 | $J$, Eqs. (62)–(63), Fig. 6 | done 2026-10-05; nonperturbative curves of Fig. 6 reproduced at both $M\mu$ to reading precision; exact one-channel limits, step and spline convergence ([campaign README](../runs/adiabatic/multimode_secondary/README.md), "Piece 6") |
+| 1 | Period-averaged primary background | `multimode/background.jl` |
+| 2 | Secondary eigenproblem (61) along the primary branch | `multimode/secondary_mode.jl` |
+| 3 | Secondary energy, fluxes, and energy balance | `multimode/secondary_energy.jl` |
+| 3b | Repeat pieces 1–3 at the Fig. 7 parameters | Same routines, separate campaign inputs |
+| 4 | Driven $m = 0$ field and horizon flux | `multimode/dissipative_mode.jl`; [piece 4 guide](multimode-piece4-guide.md) |
+| 5 | Driven $m = 3$ field and flux to infinity | `multimode/radiative_mode.jl` |
+| 6 | Energy/angular-momentum balance (62)–(63) | `multimode/two_cloud_evolution.jl` |
 
 **Piece 6 design (confirmed 2026-10-05).** Variables are the cloud energies
 $E_1$ (labels the primary branch; monotonic on both saved branches) and
@@ -111,9 +117,10 @@ built from every other point, and their $d\omega_2/dE_1$ was off by 120% at
 small $E_1$: the coefficients are smooth in $E_1 \propto A_1^2$, not in
 $\ln E_1$.) Initial data and time unit as in Fig. 6.
 
-Planned checks for pieces 4–5: field amplitude ∝ A₂ (m = 0) and ∝ A₂² (m = 3);
+Validation identities for pieces 4–5: field amplitude ∝ A₂ (m = 0) and ∝ A₂² (m = 3);
 small-A₁ powers against the perturbative F₀, F₃ (Eqs. 38–39, (A11), (A14)); F_J = (m/Ω)F_E
-per channel.
+per channel. The campaign records which checks have been performed;
+open validation work is listed in the handoff.
 
 ## Code identities to keep separate
 
@@ -134,6 +141,10 @@ series helpers `horizon_boundary_data` / `outer_boundary_data`, which accept
 $m = 0$.
 
 ## Beyond Sec. III
+
+These are extension ideas. See [the handoff](../HANDOFF.md#next-steps) for
+project priorities and the [October 6 proposal](further_work_1006.md) for the
+comparison of possible research directions.
 
 **Two mutually nonlinear clouds.** A quasi-periodic field Φ(r, θ; ψ₁, ψ₂) with
 ψ_a = ω_a t − m_a φ, expanded in Fourier vectors **q**, generalizes the

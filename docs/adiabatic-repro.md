@@ -5,26 +5,19 @@ Reference: Omiya, Takahashi & Tanaka,
 See [adiabatic-design.md](adiabatic-design.md) for equations, conventions,
 module responsibilities, nonlinear matching, and observables.
 
-## Status — 2026-09-24
+## How to use this record
 
-The Julia implementation includes linear and nonlinear matching, cosine,
-quartic, and sextic source/energy potentials, continuation predictors, retained
-radial profiles, and energy integration. Campaign drivers calculate signed
-finite-radius horizon and outer fluxes. Newton corrections support centered
-finite differences and ForwardDiff Jacobians on the real-packed residual.
-
-All three preliminary Fig. 2 branches have saved data at spin=0.99, alpha=0.42.
-The [campaign README](../runs/adiabatic/fig2_20260922/README.md) records table
-sizes, current defaults, restart recipes, and plotting commands. Its
-[history](../runs/adiabatic/fig2_20260922/HISTORY.md) records the numerical
-experiments. The earlier seven-point
-[small-amplitude branch](../runs/adiabatic/small_amplitude/README.md) remains a
-separate reference.
-
-These are stationary families, not yet a slow-time evolution. Full
-high-amplitude radial, boundary, quadrature, and harmonic-truncation convergence
-has not been established. Predictor and Jacobian comparisons establish local
-solve behavior, not discretization accuracy.
+[HANDOFF.md](../HANDOFF.md) owns current capabilities, open caveats, and next
+steps. This guide retains observable conventions and validation evidence.
+Use the [Figure 2 campaign](../runs/adiabatic/fig2_20260922/README.md) for
+stationary tables and continuation recipes, the
+[amplitude campaign](../runs/adiabatic/amplitude_evolution/README.md) for
+single-cloud derivatives and time evolution, and the
+[secondary campaign](../runs/adiabatic/multimode_secondary/README.md) for the
+multimode extension. The earlier
+[small-amplitude branch](../runs/adiabatic/small_amplitude/README.md) is a
+separate reference. Predictor and Jacobian comparisons establish local solve
+behavior, not discretization accuracy.
 
 ## Figure 2 observables and data
 
@@ -109,21 +102,17 @@ Generated frequencies and diagnostics are written to
 `plots/fig13_adiabatic_points.csv`. Add `--skip-eigenvalue` to omit the ARPACK
 comparison when redrawing.
 
-## Remaining checkpoints
+## High-amplitude radial check — 2026-10-02
 
-1. Check high-amplitude radial spacing, finite boundaries, angular quadrature,
-   and retained-mode dependence. Extend or refine branches where needed for
-   the intended Figure 2 comparison. Radial spacing is now known to fail at
-   high amplitude (2026-10-02): the saved cosine solutions (step 0.1),
-   re-evaluated at steps 0.05 and 0.025, have scaled matching residual ≈ 8e-8
-   at A0 = 2.05, 3e-7 at 6.26, 4e-5 at 9.14, 6e-4 at 10.2, 2e-2 at 12.4, and
-   4e-2 at 13, and a Newton re-solve at step 0.05 from the saved A0 = 13
-   solution stagnates. The flux zero near A0 ≈ 12.96 lies in this region. See
-   the [secondary campaign README](../runs/adiabatic/multimode_secondary/README.md).
-2. Implement slow amplitude evolution using `E′(A0) dA0/dt = -F_tot`, checking
-   the small-amplitude limit and behavior near energy turning points.
-3. Compare converged curves and evolution with the target figure before
-   claiming a completed reproduction; then vary physical parameters.
+The saved cosine solutions (step 0.1), re-evaluated at steps 0.05 and 0.025,
+have scaled matching residuals about $8\times10^{-8}$ at $A_0 = 2.05$,
+$3\times10^{-7}$ at 6.26, $4\times10^{-5}$ at 9.14, $6\times10^{-4}$ at 10.2,
+$2\times10^{-2}$ at 12.4, and $4\times10^{-2}$ at 13. A Newton re-solve at
+step 0.05 from the saved $A_0 = 13$ solution stagnates. The flux zero near
+$A_0 \simeq 12.96$ lies in this region. See the
+[secondary campaign checks](../runs/adiabatic/multimode_secondary/README.md#checks-so-far-secondary)
+for the procedure and the [handoff](../HANDOFF.md#known-caveats) for the
+resulting limits on interpretation.
 
 ## Code boundaries
 

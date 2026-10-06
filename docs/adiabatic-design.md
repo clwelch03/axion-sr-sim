@@ -12,7 +12,12 @@ We build the implementation in stages:
 4. Add self-interactions and continue the solutions in amplitude.
 5. Calculate energy and fluxes, then evolve the amplitude.
 
-The current Julia implementation includes linear matching and its comparison with Leaver’s continued-fraction method, nonlinear continuation for three potentials, retained profiles, and energy/flux diagnostics. Slow amplitude evolution remains to be implemented. See [the reproduction status](adiabatic-repro.md) for validation limits and [the campaign README](../runs/adiabatic/fig2_20260922/README.md) for saved results. The initial nonlinear target is $a/M=0.99$, $M\mu=0.42$, starting from the fundamental $l_0=m_0=1$ cloud on a fixed Kerr background.
+Current capabilities, validation limits, and next steps are recorded in
+[the project handoff](../HANDOFF.md). This document describes the equations
+and implementation. See [the reproduction record](adiabatic-repro.md) for
+validation evidence and [the campaign index](../runs/README.md) for saved
+results and commands. The single-cloud nonlinear target is $a/M=0.99$,
+$M\mu=0.42$, starting from the fundamental $l_0=m_0=1$ cloud on fixed Kerr.
 
 ## 2. Field expansion and conventions
 
@@ -304,8 +309,9 @@ cancellation safeguards. Source and energy functions supply the mass factor
 After accepting a solution, reconstruct profiles and integrate energy on both
 radial branches with composite Simpson quadrature. The campaign drivers also
 evaluate finite-radius boundary currents. Their signed total flux enters the
-planned slow evolution equation `E′(A0) dA0/dt = -F_tot`. That time evolution
-is not implemented by radial RK4 or by amplitude continuation.
+slow evolution equation `E′(A0) dA0/dt = -F_tot`, integrated by
+`amplitude_evolution/time_integration.jl`. Radial RK4 and amplitude
+continuation construct the stationary inputs to that time evolution.
 
 Load the library with `include("src/adiabatic/load.jl")` from the repository root.
 Paths below are relative to `src/adiabatic/`:
@@ -318,6 +324,8 @@ Paths below are relative to `src/adiabatic/`:
 | `stationary/integration.jl`, `stationary/matching.jl` | Radial RK4, residuals, and Newton solves |
 | `stationary/continuation_predictor.jl` | Predictions from accepted branch history |
 | `observables/energy.jl` | Energy density and branch quadrature |
+| `amplitude_evolution/` | Implicit derivatives, Hermite interpolation, and slow time integration |
+| `multimode/` | Secondary cloud, driven fields, and two-cloud balance equations; see [multimode design](multimode-adiabatic-design.md) |
 | `drivers/` | Small- and finite-amplitude continuation, branch derivatives, profile inspection, and Fig. 13 points |
 | `fig13_points.py`, `plot_profiles.py` | Python adapter and profile plotting |
 
@@ -338,16 +346,15 @@ energy and signed boundary fluxes. `drivers/branch_energy_derivatives.jl`
 corrects each input point to residual <=1e-10 and saves those derivatives,
 corrected states, and seed hashes in resumable shards.
 
-`amplitude_evolution/interpolation.jl` contains cubic Hermite energy
-interpolation and a shared normalized-state Hermite predictor. The latter is
-only a Newton guess. The current `amplitude_rate` library function still uses
-linear flux interpolation; the campaign assessment scripts explicitly use
-Hermite flux slopes. Production time evolution must resolve that difference.
+`amplitude_evolution/interpolation.jl` uses cubic Hermite interpolation for
+energy and each signed boundary flux, with saved amplitude derivatives.
+`amplitude_rate` evaluates `-total_flux/energy_derivative` on the containing
+interval, rejecting extrapolation and an exactly zero energy derivative.
+The shared normalized-state Hermite predictor supplies only a Newton guess;
+it must be corrected before use as a stationary solution.
 
-The dense cosine derivative table has 372 points through A0=11.9851915.
-All 370 interior leave-one-out checks meet 0.1% on the saved grid, with worst
-energy-derivative error 0.0036%. This tests interpolation at wider spacing,
-not spatial convergence. A separate 54-point derivative extension through
-A0=13 is prepared, covering the preliminary flux zero near A0=12.96. See the
-[amplitude campaign](../runs/adiabatic/amplitude_evolution/README.md) for its status.
-Historical Figure 2 diagnostics use the old drivers at commit `aa17cb5`.
+`amplitude_evolution/time_integration.jl` evolves the amplitude using those
+interpolated rates. The [amplitude campaign](../runs/adiabatic/amplitude_evolution/README.md)
+owns the selected derivative tables, trajectory recipe, and interpolation
+checks. Those checks do not establish spatial convergence. Historical
+Figure 2 diagnostics use the old drivers at commit `aa17cb5`.

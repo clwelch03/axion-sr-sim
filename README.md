@@ -4,20 +4,22 @@ From-scratch reproduction of Dolan 1212.1477 Sec. III: the coupled-ℓ tower for
 massive scalar quasi-bound state on Kerr, evolved in the time domain, with an
 eigenvalue cross-check and a Leaver continued-fraction benchmark. A second
 reproduction, Omiya, Takahashi & Tanaka [2201.04382](https://arxiv.org/abs/2201.04382),
-now includes stationary nonlinear profiles, continuation, energy, and flux
+uses stationary nonlinear profiles, continuation, energy, and flux
 calculations for cosine, quartic, and sextic potentials in `src/adiabatic/`.
-The saved Figure 2 branches are preliminary; slow amplitude evolution and
-high-amplitude radial/angular convergence remain open.
+The multimode extension follows Omiya et al. 2211.01949 Sec. III, coupling a
+secondary cloud and driven fields to the nonlinear primary on fixed Kerr.
 
-Start with the [documentation index](docs/README.md) or the
-[Figure 2 campaign](runs/adiabatic/fig2_20260922/README.md).
+Start with the [project handoff](HANDOFF.md) for current capabilities,
+validation limits, and next steps. Use the [documentation index](docs/README.md)
+for equations and research records, and the [campaign index](runs/README.md)
+for saved results and reproduction commands.
 
 - **[Dolan reproduction](docs/dolan-repro.md)** — current entry points and
   dated linear validation results.
 - **[`docs/adiabatic-design.md`](docs/adiabatic-design.md)** — adiabatic equations,
   code structure, numerical choices, nonlinear matching, and observables.
 - **[`docs/adiabatic-repro.md`](docs/adiabatic-repro.md)** — adiabatic validation
-  results, run commands, and remaining checkpoints.
+  records and observable conventions.
 - **[Dolan design](docs/DESIGN.md)** — unfinished time-domain design draft.
 - **[CLAUDE.md](CLAUDE.md)** — working conventions and how to run the solver, tests, and
   `runs/`.
@@ -39,7 +41,7 @@ conda activate BHsuper
 ```
 
 Adiabatic solves also require Julia and the repository project dependencies
-(FastGaussQuadrature and ForwardDiff):
+(listed in `Project.toml`):
 
 ```bash
 julia --project=. -e 'using Pkg; Pkg.instantiate()'

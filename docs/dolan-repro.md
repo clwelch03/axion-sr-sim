@@ -4,7 +4,8 @@
 
 The solver is packaged under `src/dolan/`, with independent benchmarks in
 `src/common/`. The original reproduction branch and extraction tasks below
-are historical. Working conventions are in [CLAUDE.md](../CLAUDE.md).
+are historical. Working conventions are in [CLAUDE.md](../CLAUDE.md);
+current project status and priorities are in [HANDOFF.md](../HANDOFF.md).
 
 - [Dolan Fig. 13 campaign](../runs/dolan/fig13/README.md): peak runs and
   alpha/resolution sweeps, including the `t=10^6 M` array recipe.
@@ -15,7 +16,7 @@ are historical. Working conventions are in [CLAUDE.md](../CLAUDE.md).
 - [Nonlinear progress](nonlinear-progress.md) and
   [performance experiments](nonlinear-performance.md): positive odd-m source
   and synchronized RK4 checks, including the optional Julia benchmark bridge.
-- [Adiabatic status](adiabatic-repro.md): the subsequent stationary-profile
+- [Adiabatic validation record](adiabatic-repro.md): the subsequent stationary-profile
   approach to slow cloud evolution.
 
 ## Original linear reproduction record

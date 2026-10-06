@@ -1,5 +1,37 @@
 # Dolan Figure 13 time-domain runs
 
+## Start here
+
+This campaign measures linear quasi-bound growth rates from time-domain probe
+signals for comparison with Dolan Fig. 13 and the eigenvalue/Leaver benchmarks.
+For the standard comparison, use the `sweep/*_n6_t1000000.npz` records
+($M/6$ spacing, the plotter's default). The `n4` and `n8` records are resolution
+comparisons; `peak/dolan_fig13_a099_alpha042_t100000.npz` is the earlier,
+shorter peak run. These NPZ files are local scratch artifacts, absent from a
+fresh Git checkout.
+
+From the repository root in the Python environment, plot with available
+time-domain records or analyze one record:
+
+```bash
+PYTHONPATH=src python -m dolan.fig13_growth_rates --grid-spacing-n 6
+PYTHONPATH=src python -m dolan.analyze_timedomain_run runs/dolan/fig13/sweep/dolan_fig13_a099_alpha042_n6_t1000000.npz
+```
+
+The plot command also computes eigenvalue/Leaver comparisons and writes
+`plots/fig13_growth_rates.png`. The recipes below regenerate single points
+or the sweep; select `GRID_N=6` for the standard comparison. To resume, run
+the underlying `dolan.measure_gamma` command with the same numerical settings
+and output path plus `--resume`. The submission scripts do not add that flag
+automatically, so resubmitting one starts a fresh calculation.
+
+**Validation limit:** a fixed final time does not give uniform first-overtone
+accuracy across alpha, especially near low-growth regions and the threshold.
+The [reproduction record](../../../docs/dolan-repro.md) contains dated
+measurements; [HANDOFF.md](../../../HANDOFF.md) owns project status.
+
+## Layout and preservation
+
 `peak/` holds single-point results, `sweep/` holds the alpha/resolution sweep,
 `scripts/` holds submission recipes, and `logs/` holds Slurm output.
 Run commands from the repository root.

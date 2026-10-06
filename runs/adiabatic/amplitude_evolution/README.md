@@ -1,5 +1,76 @@
 # Amplitude evolution checks
 
+## Start here
+
+This campaign computes single-cloud cosine amplitude evolution from stationary
+energy and flux derivatives at spin 0.99, alpha 0.42. It supplies a separate
+single-cloud calculation from the [two-cloud campaign](../multimode_secondary/README.md).
+Paths in the table are relative to this campaign.
+
+| Current artifact | Role |
+|---|---|
+| `results/cosine_evolution_derivatives.{csv,jls}` | Preferred evolution input: 426 points, 372 dense plus 54 extension points, through $A_0 = 13$ |
+| `results/cosine_evolution.{csv,jls}` | Saved trajectory through $t/M = 4\times10^7$, approaching $A_0 \simeq 12.96268$ on the saved grid |
+| `results/cosine_dense_derivatives.{csv,jls}` | 372-point subset through $A_0 \simeq 11.985$, used for the dense interpolation checks |
+| `seeds/cosine_dense_20260925.jls`, `seeds/cosine_extension_20260928.jls` | Frozen inputs for the corresponding four derivative shards each |
+
+To rebuild the merged table from saved shards and rerun the time integration,
+run from the repository root:
+
+```bash
+julia --project=. runs/adiabatic/amplitude_evolution/scripts/merge_derivatives.jl
+julia --project=. runs/adiabatic/amplitude_evolution/scripts/evolve_cosine.jl
+```
+
+The merge verifies seed hashes, shard coverage, settings, finite outputs,
+matching residuals, and ordered amplitudes. Both commands replace their named
+merged/trajectory outputs. Evolution starts from the first amplitude and
+compares time steps 500 and 250; it does not resume a partial trajectory.
+It uses Hermite interpolation for both energy and signed fluxes.
+
+**Validation limit:** the dense subset's 370 interior leave-one-out checks
+meet the 0.1% interpolation target on the saved spatial grid. This does not
+validate the high-amplitude spatial solve or establish physical saturation:
+the primary fails radial-step convergence above approximately $A_0 = 9$.
+See [HANDOFF.md](../../../HANDOFF.md#known-caveats) for project caveats and
+the [September 28 record](../../../docs/adiabatic-branch-work-2026-09-28.md)
+for the dense-table evidence. Recheck the dense interpolation without solving:
+
+```bash
+julia --project=. runs/adiabatic/amplitude_evolution/scripts/assess_dense_selfcheck.jl
+```
+
+The older 178-point `cosine_derivatives.*` and `cosine_flux_derivatives.*`
+tables, interpolation-check seeds, and retry outputs are retained validation
+records. They are superseded as evolution inputs by the 426-point table.
+`submit_derivatives.sh` and `summarize_derivatives.py` still target the old
+178-point calculation; use the recipes below for the dense and extension data.
+
+## Recompute or resume the derivative shards
+
+Use the existing frozen seeds. The following Slurm array resumes the four
+**dense** output shards; the checked-in extension recipe resumes the other
+four. Submit from the repository root, with one writer per shard:
+
+```bash
+mkdir -p runs/adiabatic/amplitude_evolution/logs
+sbatch --job-name=axion_dense_derivatives --account=pc_heptheory --partition=lr6 --qos=lr_normal \
+    --nodes=1 --ntasks=1 --cpus-per-task=1 --time=01:00:00 --array=0-3%4 \
+    --output='runs/adiabatic/amplitude_evolution/logs/dense-%A_%a.out' \
+    --wrap='export OPENBLAS_NUM_THREADS=1 JULIA_NUM_THREADS=1; /global/home/users/clwelch/.juliaup/bin/julia --project=. src/adiabatic/drivers/branch_energy_derivatives.jl runs/adiabatic/amplitude_evolution/seeds/cosine_dense_20260925.jls "runs/adiabatic/amplitude_evolution/results/cosine_dense_derivatives_part${SLURM_ARRAY_TASK_ID}" "${SLURM_ARRAY_TASK_ID}" 4'
+sbatch runs/adiabatic/amplitude_evolution/scripts/submit_extension_derivatives.sh
+```
+
+Wait for both arrays to complete before merging. The derivative driver checks
+restart metadata before accepting existing points. For a distinct experiment,
+use separate output prefixes and retain the frozen inputs and existing shards.
+
+## Historical validation records
+
+The sections below preserve the September 24 experiments and their conclusions
+at that time. Their proposed follow-ups are historical; the current inputs and
+recipes are above, and project next steps are in the handoff.
+
 ## Physical interpolation checks — 2026-09-24
 
 `tests/adiabatic/check_branch_interpolation.jl` prepares quarter-, mid-, and
@@ -63,8 +134,9 @@ rate can also result from cancellation between those errors, so it does not
 independently validate either ingredient. The interpolation is not yet validated
 for production at the requested accuracy.
 
-Next experiment: compute flux amplitude derivatives from the already saved state
-derivatives and test Hermite flux interpolation against these same references.
+Next experiment proposed on September 24: compute flux amplitude derivatives
+from the already saved state derivatives and test Hermite flux interpolation
+against these same references.
 This will isolate the benefit of improving flux interpolation. Energy errors in
 sparse intervals will still require attention. No time integration or spatial
 convergence claim follows from the present checks.

@@ -4,13 +4,17 @@ Run submission commands from the repository root. Each campaign keeps its
 recipes, results, seeds, and logs together. Reusable solvers remain in `src/`;
 figures remain in `plots/`.
 
+Each campaign's **Start here** section identifies its current inputs, results,
+validation limits, and reproduction commands. For project-wide status and
+priorities, use [HANDOFF.md](../HANDOFF.md).
+
 | Campaign | Contents and reproduction |
 |---|---|
 | [Dolan Fig. 13](dolan/fig13/README.md) | Single-point time-domain runs and the alpha/resolution sweep |
 | [Adiabatic Fig. 2, 2026-09-22](adiabatic/fig2_20260922/README.md) | Cosine, quartic, and sextic continuation, refinement, and diagnostics |
 | [Small-amplitude checks](adiabatic/small_amplitude/README.md) | Initial continuation, profiles, and nonlinear convergence results |
-| [Amplitude evolution](adiabatic/amplitude_evolution/README.md) | Dense branch derivatives, interpolation checks, and A0(t) |
-| [Multimode secondary](adiabatic/multimode_secondary/README.md) | 2211.01949 Sec. III: secondary cloud on the primary at Mμ = 0.42 and 0.3, energies, Fig. 7 reproduction |
+| [Amplitude evolution](adiabatic/amplitude_evolution/README.md) | Merged 426-point derivative table, interpolation checks, and single-cloud A0(t) |
+| [Multimode secondary](adiabatic/multimode_secondary/README.md) | 2211.01949 Sec. III: secondary cloud, driven fluxes, and Figs. 6–7 at Mμ = 0.42 and 0.3 |
 
 ## Conventions
 
@@ -19,7 +23,8 @@ figures remain in `plots/`.
 - `seeds/`: preserved inputs for restarts and comparisons.
 - `diagnostics/`: experiments grouped by purpose, with their scripts and outputs.
 - `logs/`: Slurm output, named with job IDs. Create this directory before submission.
-- `README.md`: current entry points and settings; `HISTORY.md`: dated experiments.
+- `README.md`: current inputs/results, validation limits, and reproduction or
+  restart commands at the top; dated experiments below or in `HISTORY.md`.
 
 Record the code revision, submission command (including environment overrides),
 job IDs, input seed, and output paths when starting or resuming a campaign.

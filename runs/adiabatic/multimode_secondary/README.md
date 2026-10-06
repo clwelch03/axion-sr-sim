@@ -1,5 +1,67 @@
 # Secondary cloud on the nonlinear primary (Omiya et al. 2211.01949, Sec. III)
 
+## Start here
+
+This campaign computes a linear secondary cloud on a nonlinear primary,
+the driven $m = 0$ and $m = 3$ fluxes, and two-cloud evolution on fixed Kerr
+at $a/M = 0.99$, $M\mu = 0.42$ and $0.3$. It supplies the nonperturbative
+Fig. 6 trajectories and the Fig. 7 profile comparison. All commands run from
+the repository root. [HANDOFF.md](../../../HANDOFF.md) owns project status
+and priorities; the records below give the detailed numerical evidence.
+
+| Input/result | $M\mu = 0.42$ | $M\mu = 0.3$ |
+|---|---|---|
+| Primary checkpoint/table | `../fig2_20260922/results/cosine_branch.{jls,csv}` | `results/alpha030_cosine_branch.{jls,csv}` |
+| Averaged secondary checkpoint/table | `results/cosine_secondary.{jls,csv}` | `results/alpha030_cosine_secondary.{jls,csv}` |
+| Secondary energy table | `results/cosine_secondary_energy.csv` | `results/alpha030_cosine_secondary_energy.csv` |
+| Driven flux tables | `results/cosine_dissipative_m0.csv`, `results/cosine_radiative_m3.csv` | `results/alpha030_cosine_dissipative_m0.csv`, `results/alpha030_cosine_radiative_m3.csv` |
+| Evolution result | `results/two_cloud_evolution_alpha042.csv` | `results/two_cloud_evolution_alpha030.csv` |
+
+Paths in the table are relative to this campaign. The coefficient tables
+contain 232 aligned points at $M\mu = 0.42$ and 83 at $0.3$. The evolution
+files each contain 1001 saved times. Use the averaged secondary results;
+`cosine_secondary_fixed_time.*` is a superseded phase-dependent experiment,
+retained for the comparison below.
+
+Redraw Fig. 6 directly from saved evolution CSVs:
+
+```bash
+PYTHONPATH=src python runs/adiabatic/multimode_secondary/scripts/plot_fig6.py
+```
+
+To regenerate those CSVs from the saved coefficient tables, then redraw:
+
+```bash
+julia --project=. src/adiabatic/drivers/two_cloud_evolution.jl
+PYTHONPATH=src python runs/adiabatic/multimode_secondary/scripts/plot_fig6.py
+```
+
+Output: `plots/multimode_fig6_analogue.png`. The evolution command replaces
+both trajectory CSVs. For Fig. 7, reconstruct profiles from saved checkpoints
+and plot at the comparison energy:
+
+```bash
+julia --project=. runs/adiabatic/multimode_secondary/scripts/export_profiles.jl alpha030 660
+PYTHONPATH=src python runs/adiabatic/multimode_secondary/scripts/plot_fig7_analogue.py alpha030 660
+```
+
+This writes `work/alpha030_profiles.csv` and
+`plots/multimode_alpha030_fig7_analogue.png`. Full primary/secondary and flux
+recipes appear below. Continuation resumes an existing prefix; energy and
+flux exporters recompute and replace their output CSVs. Run costly solves
+through Slurm, with one writer per output.
+
+**Validation limits:** Fig. 6 agreement is at reading precision at $M\mu = 0.42$;
+the $0.3$ primary peak is about 10% lower and plateaus 5–10% higher than the
+paper's plotted values. Independent perturbative flux prefactors and the
+physical impact of the Sec. III approximations remain unchecked. The full
+high-amplitude tables inherit the primary's radial convergence failure above
+$A_1 \simeq 9$; the $M\mu = 0.42$ Fig. 6 trajectory stays below that range.
+See the channel and secondary checks below for the tested domains and
+remaining boundary/angular checks.
+
+## Secondary eigenproblem and normalization
+
 The l = m = 2 secondary of Eq. (61), solved as an eigenproblem for ω₂ on each
 saved point of the cosine primary branch
 (`runs/adiabatic/fig2_20260922/results/cosine_branch.jls`, a/M = 0.99, Mμ = 0.42).
@@ -11,6 +73,7 @@ outer amplitude to 1. Library code: `src/adiabatic/multimode/`; driver:
 ## Running
 
 ```bash
+mkdir -p runs/adiabatic/multimode_secondary/logs
 sbatch runs/adiabatic/multimode_secondary/scripts/submit_secondary.sh
 ```
 
@@ -71,6 +134,15 @@ includes the interaction term (μ²/2)⟨cos ϕ₁⟩ϕ₂². The balance
 Ê₂ falls from 7.9e8 to 2.9e3; this reflects the normalization at r* = 150 as
 the secondary contracts, not a physical energy change. About 0.15% of the
 linear secondary's energy lies beyond r* = 150 (outer flux at small A₁).
+
+Regenerate the $M\mu = 0.42$ secondary energy table after continuation:
+
+```bash
+julia --project=. src/adiabatic/drivers/secondary_energies.jl \
+    runs/adiabatic/fig2_20260922/results/cosine_branch.jls \
+    runs/adiabatic/multimode_secondary/results/cosine_secondary.jls \
+    runs/adiabatic/multimode_secondary/results/cosine_secondary_energy.csv
+```
 
 ### Mμ = 0.3: the paper's Fig. 7
 

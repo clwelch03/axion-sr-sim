@@ -1,9 +1,38 @@
 # Adiabatic Figure 2 campaign — 2026-09-22
 
-Preliminary cosine, quartic, and sextic branches at spin=0.99 and alpha=0.42.
-These branches have not been checked for radial/angular convergence.
-See [HISTORY.md](HISTORY.md) and [the September 28 work record](../../../docs/adiabatic-branch-work-2026-09-28.md)
-for dated experiments and validation.
+## Start here
+
+This campaign computes stationary cosine, quartic, and sextic branches at
+spin 0.99 and alpha 0.42. Use `results/cosine_branch.{csv,jls}` for the
+primary input to the multimode campaign. For the Figure 2 plot, use the
+production `*_branch.csv` tables together with `quartic_gap.csv` and the
+quartic/sextic `*_refined.csv` tables; the plotting script merges them and
+retains production values at shared amplitudes.
+
+From the repository root, redraw the saved tables without solving:
+
+```bash
+python runs/adiabatic/fig2_20260922/scripts/plot_branch.py
+```
+
+Output: `plots/preliminary_fig2_20260922.{png,pdf}`. To continue a branch,
+use [Reproduce or resume](#reproduce-or-resume); existing output prefixes
+resume automatically. `seeds/` supplies frozen inputs for fresh outputs and
+diagnostic comparisons, rather than newer production results.
+
+**Validation limit:** the branches are preliminary. The cosine primary is
+known to fail radial-step convergence above approximately $A_0 = 9$, so the
+flux zero near 12.96 is not an established physical saturation point. Full
+high-amplitude boundary, angular, and mode-truncation convergence is also
+unestablished. See [the handoff](../../../HANDOFF.md#known-caveats) for
+project caveats and the [amplitude campaign](../amplitude_evolution/README.md)
+for derivatives and single-cloud time evolution.
+
+Older diagnostic scripts require the revision in
+[Historical driver freeze](#historical-driver-freeze).
+[HISTORY.md](HISTORY.md) and the
+[September 28 work record](../../../docs/adiabatic-branch-work-2026-09-28.md)
+retain their dated experiments and next-step lists.
 
 ## Files and current results
 

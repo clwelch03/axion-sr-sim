@@ -6,20 +6,18 @@ eigenvalue cross-check and a Leaver benchmark. Extracted from the GRChombo fork
 (`clwelch03/GRChombo-Axion-SR`, `Examples/AxionSuperradiance/radial1d/`); GRChombo
 is no longer part of this line of work.
 
-The repo now has two lines of work: the Dolan time-domain tower (Python,
-`src/dolan/`) and the adiabatic nonlinear-cloud method of Omiya, Takahashi &
-Tanaka (Julia, `src/adiabatic/`), which is the active one. The multimode
-extension (Omiya et al. 2211.01949, Sec. III) is at the design stage.
+The two lines of work are the Dolan time-domain tower (Python, `src/dolan/`)
+and the adiabatic nonlinear-cloud method and multimode extension (Julia,
+`src/adiabatic/`).
 
-Start with `docs/README.md` for the documentation index and `HANDOFF.md` for
-where to resume (check its date; it can lag the docs). Current adiabatic state:
-`docs/adiabatic-repro.md` (checkpoints) and `docs/adiabatic-branch-work-2026-09-28.md`
-(latest session: dense derivatives, cosine flux zero, open items).
-`docs/multimode-adiabatic-design.md` is a proposal only; no multimode solver
-exists. `docs/dolan-repro.md` contains Dolan entry points and dated validation
-history; `docs/DESIGN.md` is its unfinished design draft. Dated docs and reviews
-(`*-review*.md`, `nonlinear-*.md`) are records, not current defaults. This file
-is about how to work in the repo.
+This file records working conventions. [HANDOFF.md](HANDOFF.md) is the
+authoritative project status: capabilities, open caveats, and next steps.
+Use [docs/README.md](docs/README.md) for the documentation index and
+[runs/README.md](runs/README.md) for campaign results and exact recipes.
+Design documents explain equations and implementation decisions; reproduction
+guides and dated notes preserve validation evidence. Historical next-step
+lists are records of their dates. Update the handoff when a checkpoint changes
+and the relevant campaign README when its inputs, outputs, or recipes change.
 
 Reference PDFs are in `docs/papers/`. Cite equation numbers from those PDFs,
 not from arXiv HTML (the numbers can differ).
@@ -75,6 +73,9 @@ to numerical methods, and is using this reproduction to learn the method.
 
 - Build incrementally, one piece at a time. The user follows and confirms each
   step.
+- The user types library code from pasted snippets; paste only code that has
+  been run. Claude may write drivers, scripts, and runs. The user's October 5
+  request to write the piece 6 library directly was a task-specific exception.
 - Do not hand back a finished module. Do not silently lift code. Do not skip the
   hard part to get a fast result.
 - Each step gets a cheap decisive checkpoint before moving on (see above).
@@ -91,7 +92,7 @@ the repo root with `PYTHONPATH=src python -m dolan.<module>`.
 An editable install (`python -m pip install -e . --no-deps`) allows omitting
 `PYTHONPATH=src`. Pytest includes `src` through `pyproject.toml`.
 For adiabatic work, read `docs/adiabatic-design.md` for the numerical design and
-`docs/adiabatic-repro.md` for current results and remaining checkpoints.
+`HANDOFF.md` for current results and remaining checkpoints.
 
 - **Eigenvalue growth rate (linear, fast):**
   `PYTHONPATH=src python -m dolan.fig13_growth_rates` — sweeps α at a=0.99, overlays `solve_qbs`
@@ -109,6 +110,7 @@ For adiabatic work, read `docs/adiabatic-design.md` for the numerical design and
   mpmath; use `spheroidal=True` for the apples-to-apples comparison).
 
 Heavy runs go through SLURM — see `runs/README.md` for the submit scripts.
+Check `git status` before making changes: this is a shared workspace.
 
 ### Julia (adiabatic)
 
@@ -129,11 +131,9 @@ per checkpoint prefix; an existing output is always resumed.
   `branch_fitting.jl`, `branch_sensitivity.jl`); recipe
   `runs/adiabatic/amplitude_evolution/scripts/evolve_cosine.jl`.
 
-Open caveats as of 2026-09-28: radial, outer-radius, mode-truncation, and angular
-convergence at large amplitude are unchecked, so the cosine flux zero near
-A0 ≈ 12.96 is not yet interpreted physically. Energy derivatives above
-A0 = 11.985 needed a follow-up extension run. The seven `fig2_20260922/diagnostics/`
-scripts run unchanged only at commit `aa17cb5`.
+See [the handoff](HANDOFF.md#known-caveats) for validation limits and the
+[Figure 2 campaign](runs/adiabatic/fig2_20260922/README.md#historical-driver-freeze)
+for the revision needed to reproduce frozen diagnostic scripts.
 
 ### Tests
 
@@ -184,14 +184,18 @@ radial equations, boundaries, integration, matching, and continuation predictors
 saved branch table and integrates the slow amplitude A0(t). `drivers/` contains small- and
 finite-amplitude continuation (`continue_branch.jl` for all three potentials),
 branch energy derivatives, profile inspection, and the Julia Fig. 13 adapter.
+`multimode/` contains the averaged primary background, secondary eigenproblem,
+secondary energy, driven dissipative/radiative fields, and two-cloud evolution;
+their command-line drivers also live in `drivers/`.
 Campaign submit scripts, results, and flux diagnostics live under `runs/adiabatic/`.
 See `docs/adiabatic-design.md` for the complete map and conventions.
 
 ## runs/ layout
 
 `runs/` groups simulations by campaign: `dolan/fig13/`,
-`adiabatic/fig2_20260922/`, `adiabatic/small_amplitude/`, and
-`adiabatic/amplitude_evolution/` (dense derivative tables, seeds, evolution).
+`adiabatic/fig2_20260922/`, `adiabatic/small_amplitude/`,
+`adiabatic/amplitude_evolution/` (dense derivative tables, seeds, evolution),
+and `adiabatic/multimode_secondary/` (secondary cloud and two-cloud evolution).
 See `runs/README.md` for the index, migration map, and preservation policy.
 
 Campaign `scripts/` directories contain recipes; `results/` (or Dolan's

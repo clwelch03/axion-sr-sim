@@ -5,7 +5,15 @@
 This campaign tests whether the existing nonlinear primary solver can follow
 small changes in $\alpha=M_{\rm BH}\mu$ and $\chi=a/M_{\rm BH}$ at fixed outer
 amplitude $A_0$. It is a local stationary-solve checkpoint toward coupled
-BH–cloud evolution. It does not evolve the BH or any cloud population.
+BH–cloud evolution. The subsequent checks below solve the secondary and
+driven scalar fields on the nonlinear primary backgrounds. This campaign does
+not evolve the BH or any cloud population.
+
+Current result: the primary, averaged secondary, and driven $m=0,3$ fields
+can all be solved on the nearby nonlinear backgrounds. The ten-point response
+run passed 133/135 checks; two coarse-grid $m=3$ horizon-flux comparisons
+required another radial refinement. That targeted refinement passed all
+28 checks at the original tolerances. Details and preserved failures are below.
 
 The inputs are selected cosine solutions in
 `../fig2_20260922/results/cosine_branch.jls`, at $\alpha=0.42$, $\chi=0.99$:
@@ -50,8 +58,8 @@ has been applied.
 Holding the outer coefficient $A_0$ fixed across backgrounds does **not** hold
 physical cloud energy, occupation, or the radial profile fixed. These cases
 are neighboring configurations, not points selected by a physical trajectory.
-Only the primary is solved here; the secondary and driven responses on these
-new backgrounds remain a subsequent checkpoint. Radial-step comparison alone
+The first two stages solve only the primary; secondary and driven responses
+are recorded in the final stage below. Radial-step comparison alone
 does not establish angular, endpoint, or boundary-series convergence.
 
 ## Run and restart
@@ -211,4 +219,196 @@ Both finite-amplitude and frozen dilute restart checks skip all accepted
 solves and reproduce their observable comparisons. These results establish
 local primary continuation at this nonlinear amplitude, with the stated
 radial checks. Angular/endpoint convergence and the secondary/driven-field
-response on the shifted backgrounds remain separate checks.
+response on the shifted backgrounds remain separate checks at this stage.
+
+## Secondary and driven fields on the finite-amplitude backgrounds
+
+`scripts/check_secondary_backgrounds.jl` takes the completed primary checkpoint
+and solves the averaged secondary, the driven $m=0$ field, and the driven
+$m=3$ field for each of its ten entries. It uses the saved secondary at
+primary branch index 50 as the baseline seed and follows the same source-point
+routes as the primary checks. The secondary's real frequency divided by alpha
+is preserved only in the initial guess; Newton then corrects the frequency
+and free boundary amplitudes on the new primary profile and Kerr background.
+
+The secondary modes are $(2,2),(4,2),(6,2)$; driven modes are
+$(0,0),(2,0),(4,0)$ and $(3,3),(5,3),(7,3)$. The 16-by-31 angular grid is
+unchanged. Secondary and driven near-zone integrations use twice the primary
+step, as in the existing solver. Thus the half-step entries refine both the
+primary and these near-zone solves. The radiative far leg retains its checked
+start at $r_*=5000$ and spacing 0.25; it is not refined in this experiment.
+Secondary matching tolerance is $10^{-8}$ with a ForwardDiff Jacobian.
+
+For the secondary reference normalization $A_2=1$, let $\hat E_2$ be its
+computed energy. The saved coefficients include
+
+$$
+\frac{F_{2,H}}{\hat E_2},\qquad
+\frac{F_{0,H}}{\hat E_2},\qquad
+\frac{F_{3,\infty}}{\hat E_2^2},\qquad
+\frac{F_{3,H}}{\hat E_2^2}.
+$$
+
+These remove the arbitrary secondary normalization. At a chosen physical
+population in code units, multiply the first two by $E_2$ and the latter two
+by $E_2^2$. They still include the primary-amplitude dependence: these are not
+the additionally $E_1$-factored spline coefficients of the two-cloud ODE.
+The driven frequencies are $\omega_0=2\omega_{1,R}-\omega_{2,R}$ and
+$\omega_3=2\omega_{2,R}-\omega_{1,R}$. The recorded radiative threshold margin
+is $\omega_3-\alpha$ in instantaneous $M=1$ units.
+
+The 135 acceptance checks comprise seven observable comparisons for each of
+five reference/route/refinement pairs, plus ten checks on each configuration:
+primary reconstruction, secondary matching and energy balance, each driven
+field's power identity and relative matching residual, each matching matrix's
+condition number, and the expected channel signs/thresholds. Comparison
+tolerances are $10^{-6}$ for the saved baseline, $10^{-5}$ for route and return,
+and $10^{-4}$ for radial refinement. Secondary energy balance must agree within
+$10^{-4}$; driven source-work/flux balances within $10^{-5}$. Both relative
+driven matching residuals must be below $10^{-9}$ and column-scaled matrix
+condition numbers below $10^8$.
+
+Run from the repository root:
+
+```bash
+sbatch --parsable runs/adiabatic/background_continuation/scripts/submit_secondary.sh
+```
+
+One CPU, 45-minute time limit. The driver checkpoints each completed background
+and refuses a resume with changed input/driver metadata. It saves the secondary
+and driven boundary amplitudes, but not the large reconstructed profile arrays;
+these can be regenerated from the checkpoint and primary inputs. To rerun the
+completed checkpoint's comparisons:
+
+```bash
+julia --project=. runs/adiabatic/background_continuation/scripts/check_secondary_backgrounds.jl \
+    runs/adiabatic/background_continuation/results/amplitude2052/nearby_backgrounds.jls \
+    runs/adiabatic/background_continuation/results/amplitude2052/secondary
+```
+
+### October 8, 2026 submission
+
+- Source revision: `0ef376427ce99b8d9bbb271b1b7f6899c9a3c6bd`; new driver
+  uncommitted, with its hash and all input hashes recorded in the checkpoint.
+- Slurm job: `26749758`; log: `logs/secondary-26749758.out`.
+- Primary input: `results/amplitude2052/nearby_backgrounds.jls`.
+- Secondary seed: `../multimode_secondary/results/cosine_secondary.jls`, index 50.
+- Outputs: `results/amplitude2052/secondary/secondary_backgrounds.{jls,csv}`
+  and `secondary_checks.csv` in the same directory.
+- Status: all ten backgrounds solved; 133 of 135 checks passed. The job
+  exited `1:0` after 2 minutes 52 seconds because the two $m=3$ horizon-flux
+  refinement comparisons exceeded their $10^{-4}$ relative tolerance.
+  The original failure records are preserved in `secondary_checks.csv`.
+
+### Secondary and driven-field results
+
+At all ten configurations the secondary grows, $m=0$ carries energy into the
+BH, and $m=3$ radiates outward above its mass threshold. The positive margin
+$M\omega_3-\alpha$ ranges from 0.009492 to 0.009684. The matching matrices
+have column-scaled condition numbers 188–200 for $m=0$ and 154–164 for $m=3$.
+No nearly singular matching matrix appears in these local samples.
+
+| Case | $\alpha$ | $\chi$ | $M\omega_{2,R}$ | $M\omega_{2,I}$ | $F_{0,H}/\hat E_2$ | $F_{3,\infty}/\hat E_2^2$ |
+|---|---:|---:|---:|---:|---:|---:|
+| Baseline | 0.420 | 0.990 | 0.4135056505 | 2.29141014e-8 | 4.42216142e-3 | 7.67755296e-7 |
+| Lower alpha | 0.419 | 0.990 | 0.4125211958 | 2.28490507e-8 | 4.48536708e-3 | 7.75976895e-7 |
+| Higher alpha | 0.421 | 0.990 | 0.4144898835 | 2.29751033e-8 | 4.35905591e-3 | 7.59372768e-7 |
+| Lower spin | 0.420 | 0.989 | 0.4135097803 | 2.28599708e-8 | 4.41346620e-3 | 7.65763311e-7 |
+| Higher spin | 0.420 | 0.991 | 0.4135015393 | 2.29682182e-8 | 4.43081064e-3 | 7.69735840e-7 |
+| Both lower | 0.419 | 0.989 | 0.4125252945 | 2.27955105e-8 | 4.47676082e-3 | 7.74023721e-7 |
+
+All table entries use primary step 0.1 and secondary/driven near-zone step 0.2.
+The saved baseline observables reproduce within $7.0\times10^{-13}$ relative.
+Two routes to the joint offset agree in all seven observables within
+$2.35\times10^{-12}$; returning to baseline agrees within $2.78\times10^{-11}$.
+These are solver consistency checks, not independent accuracy estimates.
+
+Across all ten cases, the secondary energy-balance discrepancy is at most
+$2.56\times10^{-6}$, while source-work/flux discrepancies are below
+$7.46\times10^{-8}$ for $m=0$ and $2.99\times10^{-8}$ for $m=3$.
+Driven matching residuals relative to the source residual are below
+$3.74\times10^{-15}$ and $2.37\times10^{-14}$, respectively.
+
+Primary-step refinement 0.1 to 0.05 (also refining the secondary and driven
+near-zone steps from 0.2 to 0.1) gives:
+
+| Observable | Baseline relative change | Joint-offset relative change |
+|---|---:|---:|
+| $\omega_{2,R}$ | 1.70e-10 | 1.71e-10 |
+| $\omega_{2,I}$ | 5.89e-6 | 5.90e-6 |
+| $\hat E_2$ | 9.10e-8 | 9.17e-8 |
+| $F_{2,H}/\hat E_2$ | 3.78e-6 | 3.61e-6 |
+| $F_{0,H}/\hat E_2$ | 3.72e-8 | 4.06e-8 |
+| $F_{3,\infty}/\hat E_2^2$ | 7.92e-8 | 7.79e-8 |
+| $F_{3,H}/\hat E_2^2$ | **1.590e-4** | **1.515e-4** |
+
+Only the final row exceeds the predeclared $10^{-4}$ tolerance. At baseline,
+$F_{3,H}/F_{3,\infty}=-2.00\times10^{-7}$, so this concerns a very small
+component of the radiative channel; it remains part of the BH flux budget.
+Its failing tolerance is not relaxed or replaced by normalization to the
+larger infinity flux.
+
+### Targeted further radial refinement
+
+`scripts/refine_secondary_backgrounds.jl` re-solves the primary, secondary,
+and both driven fields at primary step 0.025 at baseline and the joint offset.
+It starts from their accepted step-0.05 solutions and applies the same
+$10^{-4}$ relative observable tolerance to this next refinement. The
+original ten-point results and failing checks are left intact.
+
+```bash
+sbatch --parsable runs/adiabatic/background_continuation/scripts/submit_secondary_refinement.sh
+```
+
+- Job: `26749926`; log: `logs/secondary-refine-26749926.out`.
+- One CPU, 30-minute limit; source revision as above, with the exact new driver
+  hash and input hashes in its checkpoint.
+- Output directory: `results/amplitude2052/secondary/quarter_step/`, containing
+  `refined_responses.{jls,csv}` and `refinement_checks.csv`.
+- Status: completed successfully, exit `0:0`, elapsed 3 minutes 15 seconds.
+  Both backgrounds pass all 28 checks. Resuming the completed refinement
+  reproduces the checks without rerunning any stationary solves.
+
+The 0.05-to-0.025 primary-step comparison (secondary/driven near-zone steps
+0.1 to 0.05) gives:
+
+| Observable | Baseline relative change | Joint-offset relative change |
+|---|---:|---:|
+| $\omega_{2,R}$ | 1.07e-11 | 1.08e-11 |
+| $\omega_{2,I}$ | 3.57e-7 | 3.58e-7 |
+| $\hat E_2$ | 5.74e-9 | 5.79e-9 |
+| $F_{2,H}/\hat E_2$ | 1.43e-7 | 1.38e-7 |
+| $F_{0,H}/\hat E_2$ | 3.76e-8 | 3.69e-8 |
+| $F_{3,\infty}/\hat E_2^2$ | 5.00e-9 | 4.92e-9 |
+| $F_{3,H}/\hat E_2^2$ | **5.10e-6** | **4.87e-6** |
+
+The previously failing $m=3$ horizon-flux changes shrink by factors 31.21 and
+31.13. This supports convergence at the finer spacing; it does not establish
+pure fourth-order error for that observable. The secondary imaginary-frequency
+and $m=3$ infinity-flux changes shrink by approximately 16. The $m=0$ coefficient
+changes stay near $4\times10^{-8}$, consistent with the previously observed
+solver-tolerance floor rather than a measured RK4 convergence order.
+On the finest grid, the secondary energy balance agrees within
+$1.74\times10^{-8}$, and driven power balances within $4.10\times10^{-9}$
+($m=0$) and $1.15\times10^{-10}$ ($m=3$).
+
+The refinement rows retain the source labels `baseline_half_step` and
+`combined_half_step`; their `primary_step` column is **0.025**. For the next
+calculation, use primary spacing 0.05 or finer when requiring $10^{-4}$
+relative accuracy in the small $m=3$ horizon contribution at these tested
+points. Only baseline and the joint offset have this extra refinement;
+the other backgrounds retain their original spatial settings.
+
+The original 135-check script intentionally still exits with its two recorded
+coarse-grid failures on replay. Replay the successful targeted follow-up with:
+
+```bash
+julia --project=. runs/adiabatic/background_continuation/scripts/refine_secondary_backgrounds.jl
+```
+
+This completes the local stationary-response checkpoint for all retained scalar
+channels at $A_0\simeq2.052$. It does not establish angular/endpoint convergence
+on these backgrounds, independently validate the transfer prefactors, or
+include secondary feedback on the primary. The next coupled-evolution step
+is the cloud energy/angular-momentum balance on the changing BH background,
+using fixed reference units and a specified $f_a$ and seed prescription.

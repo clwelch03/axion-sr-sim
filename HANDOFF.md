@@ -47,8 +47,18 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
   $M\omega_I$ is 6.137 times its dilute value. Half-step changes in imaginary
   frequency and horizon flux are below $1.1\times10^{-8}$ relative; the small
   outward flux changes by $6.8\times10^{-5}$ relative. These are local primary
-  stationary checkpoints, not a coupled BH trajectory. Angular/endpoint checks
-  and secondary/driven responses on shifted backgrounds remain separate work.
+  stationary checkpoints, not a coupled BH trajectory; angular/endpoint checks
+  remain separate work.
+- **Secondary and driven background response:** the averaged secondary and
+  $m=0,3$ fields now solve on all ten nonlinear-primary configurations above.
+  The initial 133/135 passing checks include route agreement, secondary energy
+  balance, and driven power identities. Two coarse-grid $m=3$ horizon-flux
+  comparisons miss the $10^{-4}$ relative tolerance. Re-solving baseline and
+  the joint offset at primary step 0.025 passes all 28 follow-up checks, with
+  changes in that flux reduced from about $1.6\times10^{-4}$ to at most
+  $5.10\times10^{-6}$ relative. Original failures are preserved. See the
+  [response results and refinement](runs/adiabatic/background_continuation/README.md#secondary-and-driven-fields-on-the-finite-amplitude-backgrounds).
+  This establishes local scalar response at fixed $A_0$, not BH–cloud evolution.
 - **Dolan time-domain work:** the coupled-tower solver, eigenvalue/Leaver
   comparison, and frequency-filter analysis have a
   [linear validation record](docs/dolan-repro.md) and
@@ -109,8 +119,10 @@ scan, and convergence evidence. Use its averaged secondary results;
 ## Next steps
 
 - **Coupled-BH preparation:** local primary continuation in alpha and spin
-  now works at both dilute amplitude and $A_0\simeq2.052$. Next check the
-  secondary and driven channels on those changed backgrounds.
+  now works at both dilute amplitude and $A_0\simeq2.052$; the secondary and
+  driven channels are checked on the nonlinear backgrounds, with the targeted
+  refinement described above. Use primary step 0.05 or finer for the tested
+  small $m=3$ horizon-flux accuracy requirement.
   Derive the cloud balance with changing BH parameters before integrating a
   scalar-only BH–cloud trajectory; the fixed outer amplitude used in the
   stationary check is not a prescription for physical cloud evolution.

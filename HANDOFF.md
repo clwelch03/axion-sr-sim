@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-10-06. This is the authoritative project status: what works,
+Updated 2026-10-08. This is the authoritative project status: what works,
 open caveats, and next steps. Campaign READMEs own exact commands, saved-result
 paths, and detailed validation records; design documents own equations and
 implementation decisions.
@@ -35,13 +35,42 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
   merged 426-point derivative table and a saved cosine trajectory through
   $t/M = 4\times10^7$. Its approach to $A_0 \simeq 12.96268$ is a result on
   the saved spatial grid, subject to the high-amplitude caveat below.
+- **Stationary background continuation:** ten primary-only solves at fixed
+  $A_0=0.0011390625$ around $(\alpha,\chi)=(0.42,0.99)$ pass twenty observable
+  comparisons. Offsets of $\pm0.001$ in alpha/spin converge in two or three
+  Newton corrections; two routes to the joint downward offset agree in growth
+  rate to $4.01\times10^{-10}$ relative. Halving the radial step changes growth
+  by at most $1.91\times10^{-8}$ relative. See the
+  [background-continuation campaign](runs/adiabatic/background_continuation/README.md).
+  The same ten solves and twenty comparisons also pass at
+  $A_0=2.051758324382913$, where the primary peak field is about 1.446 and
+  $M\omega_I$ is 6.137 times its dilute value. Half-step changes in imaginary
+  frequency and horizon flux are below $1.1\times10^{-8}$ relative; the small
+  outward flux changes by $6.8\times10^{-5}$ relative. These are local primary
+  stationary checkpoints, not a coupled BH trajectory. Angular/endpoint checks
+  and secondary/driven responses on shifted backgrounds remain separate work.
 - **Dolan time-domain work:** the coupled-tower solver, eigenvalue/Leaver
   comparison, and frequency-filter analysis have a
   [linear validation record](docs/dolan-repro.md) and
   [Fig. 13 campaign](runs/dolan/fig13/README.md). The nonlinear source and
   synchronized RK4 have [separate checks](docs/nonlinear-progress.md);
   those do not establish accurate collapse evolution.
-- **Extensions:** coupled black-hole mass/spin evolution, GW losses, self-gravity,
+- **Self-gravity benchmark:** a standalone Newtonian Poisson check on an
+  analytic hydrogenic $211$ density recovers the monopole/quadrupole shift
+  $\delta\omega/\mu=-(237/1280)\alpha^2 M_c/M_{\rm BH}$. All 16 checks pass,
+  including radial refinement, angular/outer-radius checks, and an independent
+  exact radial integral. See the [derivation and command](docs/adiabatic-self-gravity-review.md#211-benchmark-checkpoint--october-7-2026).
+  Saved nonlinear profiles and scalar evolution still have no gravity correction.
+- **Dilute self-gravity screening:** published hydrogenic self/cross shifts
+  have been evaluated on both saved two-cloud energy trajectories. At
+  $f_a=10^{16}$ GeV, peak $|\delta\omega_1|/\mu$ is $7.70\times10^{-6}$
+  (alpha 0.42) and $5.80\times10^{-6}$ (0.30); the outward scalar threshold
+  margin changes by at most 0.0219% and 0.0483%. At $10^{17}$ GeV these
+  changes become 2.19% and 4.83%. See the
+  [campaign recipe and limits](runs/adiabatic/multimode_secondary/README.md#dilute-self-gravity-estimates--october-7-2026).
+  This is an analytic-coefficient estimate, not the nonlinear frequency
+  response or a bound on scalar flux errors. BH evolution remains separate.
+- **Extensions:** coupled black-hole mass/spin evolution, GW losses, self-gravity feedback,
   mutual nonlinear cloud response, additional independent clouds, and a PDE
   handoff remain proposals. The [October 6 research note](docs/further_work_1006.md)
   discusses their ordering and scientific motivation.
@@ -79,6 +108,12 @@ scan, and convergence evidence. Use its averaged secondary results;
 
 ## Next steps
 
+- **Coupled-BH preparation:** local primary continuation in alpha and spin
+  now works at both dilute amplitude and $A_0\simeq2.052$. Next check the
+  secondary and driven channels on those changed backgrounds.
+  Derive the cloud balance with changing BH parameters before integrating a
+  scalar-only BH–cloud trajectory; the fixed outer amplitude used in the
+  stationary check is not a prescription for physical cloud evolution.
 - **Perturbative coefficients.** The small-$E_1$ limits of the spline
   coefficients `m0_flux_coefficient` and `m3_flux_coefficient` are the paper's
   $F_0$ and $F_3$ (Eqs. (38)–(39)). An independent evaluation of those (for

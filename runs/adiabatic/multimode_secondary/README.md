@@ -60,6 +60,80 @@ $A_1 \simeq 9$; the $M\mu = 0.42$ Fig. 6 trajectory stays below that range.
 See the channel and secondary checks below for the tested domains and
 remaining boundary/angular checks.
 
+## Dilute self-gravity estimates — October 7, 2026
+
+Apply published hydrogenic self- and cross-gravity coefficients to the saved
+scalar trajectories:
+
+```bash
+julia --project=. runs/adiabatic/multimode_secondary/scripts/estimate_self_gravity.jl
+```
+
+The script uses [Baryakhtar et al., Appendix G](https://arxiv.org/html/2011.11646#A7)
+with its rounded coefficients, writing $q_i=M_{c,i}/M_0=\epsilon_f E_i$ and
+$\epsilon_f=(f_a/M_{\rm Pl})^2$ with the unreduced Planck mass:
+
+$$
+\frac{\delta\omega_1}{\mu}=-\alpha^2(0.19q_1+0.11q_2),\qquad
+\frac{\delta\omega_2}{\mu}=-\alpha^2(0.11q_1+0.09q_2).
+$$
+
+The occupation-to-mass conversion uses $M_{c,i}\simeq\mu N_i$, at leading
+nonrelativistic order. These are extrapolated dilute estimates using the saved
+energies; no actual-profile Poisson calculation, nonlinear scalar response,
+metric correction, or corrected evolution is performed. Frequencies used for
+the comparison margins are interpolated from the existing nonlinear tables.
+The $0.19$ coefficient is the published rounded value of $237/1280$.
+
+All entries below are maxima over the 1001 saved samples; maxima in different
+columns need not occur together. Define the splitting $s=\omega_2-\omega_1$
+and outward $m=3$ scalar threshold margin $d_3=2\omega_2-\omega_1-\mu$.
+Their corrections are $\delta s=\delta\omega_2-\delta\omega_1$ and
+$\delta d_3=2\delta\omega_2-\delta\omega_1$.
+
+| $\alpha$ | $f_a$ [GeV] | $\max|\delta\omega_1|/\mu$ | $\max|\delta\omega_2|/\mu$ | $\max|\delta s/s|$ | $\max|\delta d_3/d_3|$ |
+|---|---:|---:|---:|---:|---:|
+| 0.42 | $10^{16}$ | $7.70\times10^{-6}$ | $4.49\times10^{-6}$ | 0.0177% | 0.0219% |
+| 0.30 | $10^{16}$ | $5.80\times10^{-6}$ | $3.38\times10^{-6}$ | 0.0317% | 0.0483% |
+| 0.42 | $10^{17}$ | $7.70\times10^{-4}$ | $4.49\times10^{-4}$ | 1.77% | 2.19% |
+| 0.30 | $10^{17}$ | $5.80\times10^{-4}$ | $3.38\times10^{-4}$ | 3.17% | 4.83% |
+
+Both frequencies decrease; the splitting increases and $d_3$ decreases.
+No threshold changes sign through $f_a=10^{17}$ GeV. At that decay constant,
+the primary superradiant margin increases by at most 1.24% (0.42) and 0.126%
+(0.30); the secondary margin changes by at most 0.0417% and 0.0178%.
+The distance of the driven $m=0$ frequency below the positive scalar mass
+threshold increases by at most 2.31% and 3.98%, respectively.
+These are changes in detunings, not calculated fractional flux changes.
+Bound-resonance detunings and nonlinear profile responses have not been checked.
+
+All shifts scale as $f_a^2$ for these unchanged trajectories: results at
+$10^{15}$ GeV are 100 times smaller than at $10^{16}$ GeV.
+The peak cloud mass fractions at $10^{17}$ GeV are 0.0232 and 0.0343, while
+scalar cumulative angular-momentum extraction is 0.149 and 0.353 of the
+initial BH angular momentum. Frozen BH parameters therefore need a separate
+assessment even where these gravity shifts look modest. At $10^{18}$ GeV
+the inferred peak cloud mass exceeds the initial BH mass and scalar
+extraction exceeds its reservoirs; those rows are flagged and are not
+physical predictions.
+
+Outputs (replaced on rerun):
+
+- `results/self_gravity_estimate_summary.csv`: four decay constants per alpha,
+  including superradiant/threshold comparisons and scalar reservoir flags.
+- `results/self_gravity_estimate_alpha042_fa1e16.csv` and
+  `results/self_gravity_estimate_alpha030_fa1e16.csv`: every saved time,
+  mass fractions, separate self/cross shifts, and unperturbed margins at
+  $f_a=10^{16}$ GeV. Frequencies/shifts are in code units $GM_0\omega$;
+  divide by $\alpha$ to obtain $\omega/\mu$. Physical time assumes axion
+  rest energy $3\times10^{-13}$ eV and covers 0.709 and 2.841 days.
+
+Checks: independent CSV recomputation of the mass-to-shift conversion,
+combination-frequency signs, maximum threshold ratios, $f_a^2$ scaling, and
+absence of threshold crossings through $10^{17}$ GeV passed. The scalar
+normalization script retains its direct-run results and can now be included
+without executing its report loop.
+
 ## Secondary eigenproblem and normalization
 
 The l = m = 2 secondary of Eq. (61), solved as an eigenproblem for ω₂ on each

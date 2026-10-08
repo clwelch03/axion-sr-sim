@@ -162,22 +162,24 @@ function print_normalization_summary(alpha, accounting, decay_constants, reports
     end
 end
 
-# Campaign choices: fixed-background diagnostics, with the Regge figure's axion mass.
-axion_energy = 3e-13u"eV"
-initial_spin = 0.99
-decay_constants = [1e15, 1e16, 1e17, 1e18] .* u"GeV"
-normalization_reports = Dict()
+if abspath(PROGRAM_FILE) == abspath(@__FILE__)
+    # Campaign choices: fixed-background diagnostics, with the Regge figure's axion mass.
+    axion_energy = 3e-13u"eV"
+    initial_spin = 0.99
+    decay_constants = [1e15, 1e16, 1e17, 1e18] .* u"GeV"
+    normalization_reports = Dict()
 
-for (alpha, label) in ((0.42, "alpha042"), (0.3, "alpha030"))
-    accounting = scalar_accounting(alpha, label)
-    reference_units = black_hole_reference_units(alpha, axion_energy)
-    reports = [
-        normalize_accounting(accounting, reference_units, decay_constant, initial_spin)
-        for decay_constant in decay_constants
-    ]
+    for (alpha, label) in ((0.42, "alpha042"), (0.3, "alpha030"))
+        accounting = scalar_accounting(alpha, label)
+        reference_units = black_hole_reference_units(alpha, axion_energy)
+        reports = [
+            normalize_accounting(accounting, reference_units, decay_constant, initial_spin)
+            for decay_constant in decay_constants
+        ]
 
-    print_normalization_summary(alpha, accounting, decay_constants, reports)
-    for (decay_constant, report) in zip(decay_constants, reports)
-        normalization_reports[(alpha, decay_constant)] = report
+        print_normalization_summary(alpha, accounting, decay_constants, reports)
+        for (decay_constant, report) in zip(decay_constants, reports)
+            normalization_reports[(alpha, decay_constant)] = report
+        end
     end
 end

@@ -435,6 +435,19 @@ later project if gravitational deformation requires it. A self-interaction
 bosenova alone does not establish that need; short fixed-background PDE
 validation can proceed where the gravity diagnostic supports that approximation.
 
+**October 7 preliminary estimate:** applying the published dilute hydrogenic
+self- and cross-gravity coefficients to the saved cloud energies gives maximum
+$|\delta\omega_{211}|/\mu=7.70\times10^{-6}$ and $5.80\times10^{-6}$ at
+$f_a=10^{16}$ GeV, for $\alpha=0.42$ and $0.3$. The correction to the outward
+scalar threshold margin $2\omega_2-\omega_1-\mu$ is at most 0.0219% and
+0.0483%, respectively. At $10^{17}$ GeV these become 2.19% and 4.83%; no
+threshold crossing is predicted at those values. These estimates use
+hydrogenic coefficients and the saved nonlinear frequencies for the margins;
+they do not calculate gravity on the nonlinear profiles or their response.
+They also do not quantify changes in transfer rates or nearby bound resonances.
+The [campaign record](../runs/adiabatic/multimode_secondary/README.md#dilute-self-gravity-estimates--october-7-2026)
+contains the formulas, outputs, both-mode shifts, and BH-reservoir caveats.
+
 ## 1. Additional modes and the missing evolution equations
 
 Here, an additional mode means an independent bound cloud labeled by its

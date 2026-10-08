@@ -15,6 +15,7 @@ priorities, use [HANDOFF.md](../HANDOFF.md).
 | [Small-amplitude checks](adiabatic/small_amplitude/README.md) | Initial continuation, profiles, and nonlinear convergence results |
 | [Amplitude evolution](adiabatic/amplitude_evolution/README.md) | Merged 426-point derivative table, interpolation checks, and single-cloud A0(t) |
 | [Multimode secondary](adiabatic/multimode_secondary/README.md) | 2211.01949 Sec. III: secondary cloud, driven fluxes, and Figs. 6–7 at Mμ = 0.42 and 0.3 |
+| [Background continuation](adiabatic/background_continuation/README.md) | Local stationary primary solves in alpha and spin, with route/return and radial-step checks |
 
 ## Conventions
 

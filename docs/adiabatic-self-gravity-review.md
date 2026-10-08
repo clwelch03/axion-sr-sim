@@ -8,6 +8,10 @@ field amplitude. A multipole Poisson calculation is a useful first diagnostic;
 a sourced metric perturbation on Kerr is the systematic relativistic extension.
 These are proposals, not implemented or validated gravity calculations.
 
+**October 7 update:** the standalone dilute Newtonian $211$ benchmark below
+is now checked. Gravity on the saved nonlinear profiles and gravitational
+feedback remain unimplemented.
+
 This supplements the earlier [time-domain backreaction review](gravitational-backreaction-review.md).
 The present implementation already has nonlinear matching, energy/flux
 observables, implicit branch derivatives, and an amplitude integrator in
@@ -256,3 +260,115 @@ The distinctive extension is a gravitational response of the *nonlinear*
 adiabatic branch. The papers reviewed supply the ingredients and benchmarks,
 but I did not find a ready-made calculation combining our full cosine branch,
 its radiative harmonics, and self-consistent relativistic metric feedback.
+
+## 211 benchmark checkpoint — October 7, 2026
+
+This first piece solves the Newtonian potential of an analytic, dilute,
+single-mode cloud. It uses no Kerr profiles or horizon boundary conditions.
+The derivation follows the Poisson and frequency-perturbation prescription in
+[Baryakhtar et al., Appendix G](https://arxiv.org/html/2011.11646#A7);
+the rational coefficients below are independently evaluated here.
+
+Use $c=\hbar=1$ with $G$ explicit, $\alpha=GM_{\rm BH}\mu$, and define the
+Bohr radius $a_B=1/(\mu\alpha)$. This notation avoids confusing the cloud
+length scale with Kerr spin. Normalize the single-particle wavefunction by
+$\int|\psi_{211}|^2d^3r=1$:
+
+$$
+\psi_{211}=R_{21}(r)Y_{11}(\theta,\varphi),\qquad
+R_{21}=\frac{1}{2\sqrt6\,a_B^{3/2}}
+        \frac{r}{a_B}e^{-r/(2a_B)},\qquad
+|Y_{11}|^2=\frac{3}{8\pi}\sin^2\theta.
+$$
+
+For occupation $N$, the leading nonrelativistic mass is $M_c=N\mu$ and the
+fast-oscillation-averaged density is $\rho=M_c|\psi_{211}|^2$.
+Define $x=r/a_B$ and the dimensionless density $f=a_B^3\rho/M_c$.
+With $P_L$ denoting Legendre polynomials, rather than normalized spherical
+harmonics,
+
+$$
+f(x,\theta)=\frac{x^2e^{-x}}{96\pi}
+             [1-P_2(\cos\theta)]
+           =f_0(x)+f_2(x)P_2(\cos\theta),
+\qquad f_2=-f_0.
+$$
+
+The normalization is $4\pi\int_0^\infty x^2f_0dx=1$.
+Write the cloud potential as
+$U=(GM_c/a_B)\sum_{L=0,2}v_L(x)P_L(\cos\theta)$.
+Regularity at the origin and $U\to0$ at infinity give
+
+$$
+v_L(x)=-\frac{4\pi}{2L+1}\left[
+ x^{-L-1}\int_0^x y^{L+2}f_L(y)dy
+ +x^L\int_x^\infty y^{1-L}f_L(y)dy\right].
+$$
+
+The two integrals include matter inside and outside the evaluation radius.
+In particular, $v_0(0)=-1/4$, $v_2(0)=0$, $v_0\sim-1/x$, and
+$v_2\sim6/x^3$ at large $x$. The BH potential is already responsible for the
+hydrogenic wavefunction; it is not included again in $U$.
+
+Angular orthogonality gives the frequency shift
+
+$$
+\frac{\delta\omega}{\mu}
+=\frac{GM_c}{a_B}\,4\pi\sum_{L=0,2}\frac{1}{2L+1}
+  \int_0^\infty x^2 f_L(x)v_L(x)dx
+=-\frac{GM_c}{a_B}\left(\frac{93}{512}+\frac{9}{2560}\right).
+$$
+
+For an independent exact evaluation, use the radial probability density
+$w(x)=x^4e^{-x}/24$. The symmetric radial integrals are
+
+$$
+J_L=\frac{2}{24^2}\int_0^\infty x^{3-L}e^{-x}
+       \int_0^x y^{4+L}e^{-y}dy\,dx.
+$$
+
+The monopole coefficient is $J_0=93/512$; the quadrupole coefficient is
+$J_2/25=9/2560$, with the factor $1/25$ supplied by the angular projection
+and Green function. The inner integral is a finite incomplete-gamma
+polynomial, so these values can be obtained with exact rational arithmetic.
+Consequently,
+
+$$
+\boxed{\frac{\delta\omega_{211}}{\mu}
+=-\frac{237}{1280}\alpha^2\frac{M_c}{M_{\rm BH}}.}
+$$
+
+There is no factor $1/2$ in the frequency shift. The total gravitational
+binding energy instead is $W=\tfrac12\int\rho U\,d^3r
+=\tfrac12N\delta\omega$ for this fixed profile. Differentiating
+$W\propto N^2$ with respect to $N$ recovers $\delta\omega$.
+For the fixed-background code normalization $M_c/M_{\rm BH}=\epsilon_f E_1$,
+this becomes $GM_{\rm BH}\delta\omega=-(237/1280)\alpha^3\epsilon_f E_1$,
+at the same leading dilute order, with the unreduced-Planck convention
+$\epsilon_f=(f_a/M_{\rm Pl})^2$.
+
+Run the standalone check from the repository root:
+
+```bash
+julia --project=. tests/adiabatic/check_self_gravity_211.jl
+```
+
+The script projects the density using the repo's normalized polar harmonics,
+evaluates the potential with cumulative radial trapezoids, and integrates its
+expectation value. It independently evaluates $J_L$ with rational arithmetic.
+All 16 checks passed. At $x_{\max}=40$ and 8 polar nodes:
+
+| Radial spacing | Monopole coefficient | Quadrupole coefficient | Absolute error in their sum |
+|---|---:|---:|---:|
+| 0.08 | 0.1816458337 | 0.0035166666 | $6.250\times10^{-6}$ |
+| 0.04 | 0.1816419271 | 0.0035158854 | $1.563\times10^{-6}$ |
+| 0.02 | 0.1816409505 | 0.0035156901 | $3.906\times10^{-7}$ |
+| 0.01 | 0.1816407064 | 0.0035156413 | $9.766\times10^{-8}$ |
+
+The exact sum is $0.18515625$. Refinement gives second-order radial
+convergence. Separate checks increase the polar nodes from 8 to 16 and
+$x_{\max}$ from 40 to 60; coefficient changes satisfy relative tolerances
+of $10^{-13}$ and $10^{-11}$, respectively. Normalization, absence of an
+$L=4$ source, origin limits, and far-field moments also pass.
+This validates the analytic-source Newtonian calculation, not the density
+prescription, boundaries, or frequency response for nonlinear Kerr clouds.

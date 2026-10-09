@@ -59,6 +59,17 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
   $5.10\times10^{-6}$ relative. Original failures are preserved. See the
   [response results and refinement](runs/adiabatic/background_continuation/README.md#secondary-and-driven-fields-on-the-finite-amplitude-backgrounds).
   This establishes local scalar response at fixed $A_0$, not BH–cloud evolution.
+- **Coupled-balance prototype:** the leading small-cloud-mass scalar-only
+  balance is derived in [the balance note](docs/coupled-bh-cloud-balance.md),
+  with BH mass/angular momentum and both cloud energies in fixed initial-BH
+  units. The campaign's `check_coupled_balance.jl` passes 44 checks against
+  the existing nonlinear RHS, dilute channel counting, unit conversion, and
+  a changing-background occupation-conservation example. The latter exposes
+  the metric-work term required beyond the leading approximation. Actual
+  nonlinear metric work and cloud angular-momentum background derivatives
+  remain unevaluated; the four-variable RHS is a driver prototype, not a
+  time-integrated coupled trajectory. See the
+  [checkpoint recipe and illustrative RHS](runs/adiabatic/background_continuation/README.md#coupled-balance-checkpoint--october-8-2026).
 - **Dolan time-domain work:** the coupled-tower solver, eigenvalue/Leaver
   comparison, and frequency-filter analysis have a
   [linear validation record](docs/dolan-repro.md) and
@@ -123,9 +134,19 @@ scan, and convergence evidence. Use its averaged secondary results;
   driven channels are checked on the nonlinear backgrounds, with the targeted
   refinement described above. Use primary step 0.05 or finer for the tested
   small $m=3$ horizon-flux accuracy requirement.
-  Derive the cloud balance with changing BH parameters before integrating a
-  scalar-only BH–cloud trajectory; the fixed outer amplitude used in the
-  stationary check is not a prescription for physical cloud evolution.
+  The leading balance is now derived and its algebra checked. Its functions
+  now live in `src/adiabatic/multimode/coupled_balance.jl`, with units and
+  equations documented in the source. The user stopped the time-integrator
+  draft to require small, explained implementation steps. Stationary-table
+  job 26757461 was cancelled; `runs/adiabatic/coupled_local/` contains paused
+  drafts, not a validated trajectory. Review the balance piece together before
+  adding state conversion and one time step. Subsequently build
+  a limited trajectory with refreshed stationary data, fixed reference units,
+  and specified physical seeds/$f_a$, monitoring small cloud mass and regular
+  response. The fixed outer amplitude used in the stationary check is not
+  an evolution prescription. Beyond the leading approximation, evaluate
+  metric work, background angular response, and consistent gravitational
+  energy/boundary accounting as described in the balance note.
 - **Perturbative coefficients.** The small-$E_1$ limits of the spline
   coefficients `m0_flux_coefficient` and `m3_flux_coefficient` are the paper's
   $F_0$ and $F_3$ (Eqs. (38)–(39)). An independent evaluation of those (for

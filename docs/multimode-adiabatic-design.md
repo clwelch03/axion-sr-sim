@@ -199,6 +199,12 @@ $m = 0$.
 
 ## Beyond Sec. III
 
+The [coupled BH–cloud balance checkpoint](coupled-bh-cloud-balance.md) derives
+the first scalar-only instantaneous-background extension, its fixed reference
+units, and the response/work terms omitted at leading cloud-mass order.
+Its driver checks the rate algebra and existing fixed-BH limit; a trajectory
+with an updated stationary family is not yet implemented.
+
 These are extension ideas. See [the handoff](../HANDOFF.md#next-steps) for
 project priorities and the [October 6 proposal](further_work_1006.md) for the
 comparison of possible research directions.

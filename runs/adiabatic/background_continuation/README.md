@@ -412,3 +412,74 @@ on these backgrounds, independently validate the transfer prefactors, or
 include secondary feedback on the primary. The next coupled-evolution step
 is the cloud energy/angular-momentum balance on the changing BH background,
 using fixed reference units and a specified $f_a$ and seed prescription.
+
+## Coupled-balance checkpoint — October 8, 2026
+
+The balance equations now live in
+[`src/adiabatic/multimode/coupled_balance.jl`](../../../src/adiabatic/multimode/coupled_balance.jl).
+The check script below loads them through the library and supplies only the
+saved-data/analytic checkpoint. Coupled time integration is paused for
+piece-by-piece review; see the [draft status](../coupled_local/README.md).
+
+The derivation is in [Coupled BH–cloud balance](../../../docs/coupled-bh-cloud-balance.md).
+The four state variables are BH mass ratio $b=M/M_0$, BH angular momentum
+$j=J/M_0^2$, and cloud energies $q_i=E_i^{\rm physical}/(\epsilon_f M_0)$.
+The existing code energies are $e_i=q_i/b$. The prototype combines the
+instantaneous two-cloud balance matrix with separate horizon mass and torque
+updates. It is the leading small-cloud-mass model: bulk metric work and cloud
+angular-momentum background-response terms are written down but not evaluated
+on the nonlinear profiles. No coupled trajectory has been integrated.
+
+Run the inexpensive saved-data/algebra checkpoint on the login node:
+
+```bash
+julia --compiled-modules=existing --project=. \
+    runs/adiabatic/background_continuation/scripts/check_coupled_balance.jl
+```
+
+The compiled-module flag permits existing Julia caches without attempting to
+write missing optional test-extension caches in the read-only home directory.
+The checks perform no stationary solves or Slurm submissions. They verify:
+
+- the existing nonlinear two-cloud rates at the saved baseline;
+- dilute primary/secondary growth and $m=0,3$ transfer multiplicities;
+- horizon-only BH updates and the mass contribution to the spin derivative;
+- physical/code-energy and torque conversion when $M/M_0\ne1$;
+- the energy and angular-momentum audit identities of the stated approximation;
+- an independent two-mode model with conserved occupations under externally
+  prescribed slow frequency changes, including a counterexample to omitting
+  metric work while retaining the background angular response.
+
+All **44 checks pass**. This validates the algebra, units, and stated limits;
+it does not calculate the actual metric work or establish its smallness on
+our nonlinear branch. Library code and the existing fixed-BH integrator are
+unchanged. The driver is a tested prototype for the next implementation step.
+
+`results/balance/leading_rhs_example.csv` and `balance_checkpoint.jls` contain
+a local RHS example with the saved coarse baseline $A_0=2.051758324382913$,
+$e_1=1343.738715$, illustrative $e_2=0.1$, $b=1$, $\chi=0.99$, and
+$f_a=10^{16}$ GeV. The secondary frequency's energy derivative comes from the
+existing branch spline, not the fixed-amplitude background differences.
+The JLS metadata records the code revision and hashes of the driver, primary,
+secondary responses, and five branch-table inputs. These physical choices
+are not initial conditions selected for a production trajectory and do not
+impose a QCD-axion mass–decay-constant relation.
+
+| Quantity | Local example |
+|---|---:|
+| $\epsilon_f=(f_a/M_{\rm Pl})^2$ | 6.70883075e-7 |
+| Cloud mass fraction $\epsilon_f(e_1+e_2)$ | 9.01558649e-4 |
+| Balance-matrix condition number | 13.5982 |
+| $db/d\tau$ | -1.33560091e-9 |
+| $dj/d\tau$ | -4.10715128e-9 |
+| $d\chi/d\tau$ | -1.46266147e-9 |
+| $d\alpha/d\tau$ | -5.60952384e-10 |
+| $dq_1/d\tau$ | 1.51063808e-3 |
+| $dq_2/d\tau$ | 4.79496844e-4 |
+
+Here $\tau=t/M_0$; no physical duration is inferred without specifying $M_0$.
+The apparent difference between BH and cloud rate magnitudes is the
+$\epsilon_f$ in the definition of $q_i$. The next work is a trajectory driver
+that refreshes stationary data as $(e_1,\alpha,\chi)$ changes and monitors the
+light-cloud and regular-response assumptions. More accurate balance also
+requires the work/background-response calculation described in the derivation.

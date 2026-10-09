@@ -7,6 +7,7 @@ for filename in (
     "multimode/dissipative_mode",
     "multimode/radiative_mode",
     "multimode/two_cloud_evolution",
+    "multimode/coupled_balance",
     "multimode/scalar_energy_accounting",
     "tortoise",
     "stationary/radial",

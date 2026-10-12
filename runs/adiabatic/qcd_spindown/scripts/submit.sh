@@ -12,4 +12,4 @@ set -euo pipefail
 export OPENBLAS_NUM_THREADS=1
 export JULIA_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 /global/home/users/clwelch/.juliaup/bin/julia --project=. \
-    src/adiabatic/drivers/qcd_stationary_point.jl "$@"
+    src/adiabatic/primary_secondary/drivers/qcd_stationary_point.jl "$@"

@@ -1,5 +1,5 @@
 include(joinpath(
-    @__DIR__, "../../../../src/adiabatic/drivers/two_cloud_evolution.jl"
+    @__DIR__, "../../../../src/adiabatic/primary_secondary/drivers/two_cloud_evolution.jl"
 ))
 
 """

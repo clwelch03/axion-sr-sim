@@ -2,7 +2,7 @@
 using Serialization
 length(ARGS) == 4 || error("usage: stationary.jl SOURCE_ROOT TARGETS.csv OUTPUT_DIR SOURCE_HASH")
 source_root, targets_path, directory, source_hash = ARGS
-include(joinpath(source_root, "adiabatic/drivers/qcd_stationary_point.jl"))
+include(joinpath(source_root, "adiabatic/primary_secondary/load.jl"))
 mkpath(directory)
 for line in readlines(targets_path)[2:end]
     label, numbers... = split(line, ',')

@@ -149,7 +149,7 @@ $$
 $$
 
 Project the field equation onto each $Y_{l0}$. In the repo's convention
-(`stationary/radial.jl`), every cloud obeys a radial equation of the same shape:
+(`core/radial_operator.jl`), every cloud obeys a radial equation of the same shape:
 
 $$
 \frac{d}{dr}\!\left(\Delta \frac{dR_l}{dr}\right) + B_l(r)\, R_l
@@ -208,7 +208,7 @@ valid only where the source is negligible. That holds at both ends:
 
 Where each step's code is explained:
 
-| Step | Function (`multimode/dissipative_mode.jl`, 4a in `background.jl`) | Explained in |
+| Step | Function (`primary_secondary/dissipative_mode.jl`, 4a in `background.jl`) | Explained in |
 |---|---|---|
 | 4a | `mass_deficit_harmonic` | Section 3 |
 | 4b | `dissipative_source`, `dissipative_tortoise_rhs!` | Section 4; 5.3; end of 5.8 |
@@ -272,7 +272,7 @@ $$
 $$
 
 The second line is the radial equation of Section 4 rewritten in $r_*$
-(`tortoise_operator_coefficients` in `stationary/radial.jl` holds its
+(`tortoise_operator_coefficients` in `core/radial_operator.jl` holds its
 coefficients). At any $r_*$, the six complex numbers
 
 $$
@@ -356,7 +356,7 @@ up to $1/r^7$ reach the $10^{-15}$ level.
 The **boundary state** (step 4c, `dissipative_boundary_state`) evaluates one of
 these series and its $r_*$-derivative at a given $r_*$ and amplitudes. It
 returns the six numbers $(R_l, Q_l)$. The series themselves are the existing
-`horizon_series` and `outer_series` (`stationary/boundary_series.jl`), shared
+`horizon_series` and `outer_series` (`core/boundary_series.jl`), shared
 with the primary and the secondary. They solve the equation **without $N$**:
 their recursion needs coefficients that are polynomials in $r$ (or $s$), and
 $N$ is built from the numerical primary. That is valid only where $N$ is
@@ -432,7 +432,7 @@ samples.
 
 The outward energy flux through a sphere at tortoise radius $r_*$ is, for a
 single-frequency field written as above (`outward_secondary_flux` in
-`multimode/secondary_energy.jl`),
+`primary_secondary/secondary_energy.jl`),
 
 $$
 F(r_*) = 4\pi\,\omega_0\,(r^2+a^2)\sum_l \mathrm{Im}\!\left(\overline{R_l}\,Q_l\right).
@@ -480,7 +480,7 @@ with a Green's function, as a second method.
 ## 8. Results so far (2026-10-02)
 
 All three checks run on the saved $M\mu = 0.42$ cosine branch and its averaged
-secondary. Scripts: `tests/adiabatic/check_mass_deficit_harmonic.jl`,
+secondary. Scripts: `tests/adiabatic/primary_secondary/check_mass_deficit_harmonic.jl`,
 `check_dissipative_current.jl`, `check_dissipative_boundary.jl`.
 
 ### Step 4a: the mass-deficit harmonic
@@ -598,7 +598,7 @@ zero separates the background's effect from the rest.
    $-4\pi\omega_0\int dr\,\mathrm{Im}\sum_l \overline{R^0_l}S_l$ (Section 6),
    integrated over the saved profiles with Simpson's rule.
 
-Script: `tests/adiabatic/check_dissipative_solve.jl`.
+Script: `tests/adiabatic/primary_secondary/check_dissipative_solve.jl`.
 
 | $A_1$ | $\omega_0$ | cond (scaled) | residual after / before | $F_H/\hat E_2$ | power ratio | $l = 2$ share | $l = 4$ share |
 |---|---|---|---|---|---|---|---|
@@ -628,7 +628,7 @@ and agreement with the perturbative $F_0$ (step 4e and the optional check).
 
 ### Step 4e: along both branches
 
-The driver `src/adiabatic/drivers/dissipative_fluxes.jl` runs steps 4a–4d at
+The driver `src/adiabatic/primary_secondary/drivers/dissipative_fluxes.jl` runs steps 4a–4d at
 every saved point. Commands, the full results table, and file names are in
 the [campaign README](../runs/adiabatic/multimode_secondary/README.md), section
 "Piece 4". In brief:
@@ -648,7 +648,7 @@ the [campaign README](../runs/adiabatic/multimode_secondary/README.md), section
 **The condition number at $M\mu = 0.3$.** The scaled condition number of
 $\mathsf{M}$ grows from 12 to 4100 along the $M\mu = 0.3$ branch, while
 $\omega_0$ barely moves. Two cheap tests settled what it means
-(`tests/adiabatic/check_dissipative_resonance.jl`):
+(`tests/adiabatic/primary_secondary/check_dissipative_resonance.jl`):
 
 1. **Scan the drive frequency** at fixed primary, secondary, and source. The
    $m = 0$ response has a real resonance near $\omega \approx 0.295$–$0.296$,

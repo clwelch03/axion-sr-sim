@@ -1,26 +1,2 @@
-for filename in (
-    "angular",
-    "stationary/nonlinear",
-    "multimode/background",
-    "multimode/secondary_mode",
-    "multimode/secondary_energy",
-    "multimode/dissipative_mode",
-    "multimode/radiative_mode",
-    "multimode/two_cloud_evolution",
-    "multimode/coupled_balance",
-    "multimode/scalar_energy_accounting",
-    "tortoise",
-    "stationary/radial",
-    "stationary/boundary_series",
-    "stationary/boundaries",
-    "stationary/integration",
-    "stationary/matching",
-    "stationary/continuation_predictor",
-    "observables/energy",
-    "observables/physical_normalization",
-    "amplitude_evolution/branch_sensitivity",
-    "amplitude_evolution/interpolation",
-    "amplitude_evolution/time_integration",
-)
-    include(joinpath(@__DIR__, filename * ".jl"))
-end
+# Public loader for the implemented single-cloud and primary/secondary models.
+include(joinpath(@__DIR__, "primary_secondary/load.jl"))

@@ -11,7 +11,7 @@ the [Figure 2 campaign](../fig2_20260922/README.md).
 Redraw the saved profiles from the repository root:
 
 ```bash
-python src/adiabatic/plot_profiles.py
+python src/adiabatic/single_cloud/drivers/plot_profiles.py
 ```
 
 This writes `plots/adiabatic_profiles.png`. These checks establish behavior in
@@ -30,11 +30,11 @@ These are preserved reference results, separate from the finite-amplitude
 From the repository root:
 
 ```bash
-julia --project=. src/adiabatic/drivers/continuation.jl
-julia --project=. src/adiabatic/drivers/inspect_profile_agreement.jl
-python src/adiabatic/plot_profiles.py
-julia --project=. tests/adiabatic/check_nonlinear_convergence.jl
-julia --project=. tests/adiabatic/check_energy_convergence.jl
+julia --project=. src/adiabatic/single_cloud/drivers/continuation.jl
+julia --project=. src/adiabatic/single_cloud/drivers/inspect_profile_agreement.jl
+python src/adiabatic/single_cloud/drivers/plot_profiles.py
+julia --project=. tests/adiabatic/single_cloud/check_nonlinear_convergence.jl
+julia --project=. tests/adiabatic/single_cloud/check_energy_convergence.jl
 ```
 
 The first two commands replace the corresponding saved results; plotting only

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Prepare queries with tests/adiabatic/check_branch_interpolation.jl first.
+# Prepare queries with tests/adiabatic/single_cloud/check_branch_interpolation.jl first.
 #SBATCH --job-name=axion_interpolation
 #SBATCH --account=pc_heptheory
 #SBATCH --partition=lr6
@@ -14,7 +14,7 @@ set -euo pipefail
 export OPENBLAS_NUM_THREADS=1
 export JULIA_NUM_THREADS=1
 /global/home/users/clwelch/.juliaup/bin/julia --project=. \
-    src/adiabatic/drivers/branch_energy_derivatives.jl \
+    src/adiabatic/single_cloud/drivers/branch_energy_derivatives.jl \
     runs/adiabatic/amplitude_evolution/seeds/interpolation_checks_20260924.jls \
     "runs/adiabatic/amplitude_evolution/results/interpolation_checks_part${SLURM_ARRAY_TASK_ID}" \
     "${SLURM_ARRAY_TASK_ID}" 4

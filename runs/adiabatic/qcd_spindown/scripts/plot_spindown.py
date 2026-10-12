@@ -16,7 +16,7 @@ import numpy as np
 from scipy.optimize import brentq
 
 from common import plotstyle
-from adiabatic.qcd_spindown import (
+from adiabatic.primary_secondary.qcd_spindown import (
     CSV_HEADER, EPSILON, INITIAL_CLOUD_FRACTIONS, StationaryTrack,
     evolve, independent_coefficients, physical_state, save_metadata,
     trajectory_array,

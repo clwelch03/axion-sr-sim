@@ -9,7 +9,7 @@ additional response terms. Its equations impose no QCD relation between mass
 and decay constant; the later campaign below selects that relation explicitly.
 
 The instantaneous balance functions now live in
-[`src/adiabatic/multimode/coupled_balance.jl`](../src/adiabatic/multimode/coupled_balance.jl),
+[`src/adiabatic/primary_secondary/coupled_balance.jl`](../src/adiabatic/primary_secondary/coupled_balance.jl),
 loaded through `src/adiabatic/load.jl`. The campaign's
 `check_coupled_balance.jl` supplies saved inputs and validation only.
 This was the first implementation piece; the local alpha=0.42 integrator draft

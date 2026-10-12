@@ -14,6 +14,6 @@ set -euo pipefail
 export OPENBLAS_NUM_THREADS=1 JULIA_NUM_THREADS=1
 export AXION_TARGET_AMPLITUDE="${AXION_TARGET_AMPLITUDE:-0.06}"
 export AXION_RUN_SECONDS="${AXION_RUN_SECONDS:-13800}"
-/global/home/users/clwelch/.juliaup/bin/julia --project=. src/adiabatic/drivers/continue_branch.jl \
+/global/home/users/clwelch/.juliaup/bin/julia --project=. src/adiabatic/single_cloud/drivers/continue_branch.jl \
     cosine runs/adiabatic/multimode_secondary/seeds/alpha030_linear_seed.jls \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_branch

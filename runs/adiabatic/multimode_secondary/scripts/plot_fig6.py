@@ -3,7 +3,7 @@
 PYTHONPATH=src python runs/adiabatic/multimode_secondary/scripts/plot_fig6.py
 
 Reads results/two_cloud_evolution_alpha042.csv and _alpha030.csv (written by
-src/adiabatic/drivers/two_cloud_evolution.jl). Writes
+src/adiabatic/primary_secondary/drivers/two_cloud_evolution.jl). Writes
 plots/multimode_fig6_analogue.png. Omiya et al. 2211.01949 Fig. 6: a/M = 0.99,
 Mμ = 0.42 and 0.3, E1(0) ~ 0.27 and 12 Fa² M, E2(0) = 1e-8 Fa² M, time in units
 of the linear growth rate ω_{1,I}. Only the nonperturbative curves are drawn.

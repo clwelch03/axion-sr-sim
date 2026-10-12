@@ -120,15 +120,15 @@ residual tolerance and spatial settings recorded in checkpoints. Only one writer
 per checkpoint prefix; an existing output is always resumed.
 
 - **Continue a stationary branch (all potentials):**
-  `AXION_TARGET_AMPLITUDE=13 julia --project=. src/adiabatic/drivers/continue_branch.jl cosine|quartic|sextic seed.jls output_prefix`.
-  `AXION_TARGET_AMPLITUDE` is required. `continue_cosine.jl` and
-  `continue_polynomial.jl` are superseded and pending removal; do not use them
-  for new work.
-- **Energy derivatives along a branch:** `src/adiabatic/drivers/branch_energy_derivatives.jl`
+  `AXION_TARGET_AMPLITUDE=13 julia --project=. src/adiabatic/single_cloud/drivers/continue_branch.jl cosine|quartic|sextic seed.jls output_prefix`.
+  `AXION_TARGET_AMPLITUDE` is required. The superseded cosine/polynomial
+  drivers live under the Figure 2 campaign's `scripts/legacy_continue_*.jl`;
+  use `continue_branch.jl` for new work.
+- **Energy derivatives along a branch:** `src/adiabatic/single_cloud/drivers/branch_energy_derivatives.jl`
   (sharded by Slurm array; merge with `runs/adiabatic/amplitude_evolution/scripts/merge_derivatives.jl`).
-- **Amplitude evolution:** `src/adiabatic/amplitude_evolution/` (`interpolation.jl`
-  Hermite interpolation of the branch table, `time_integration.jl`,
-  `branch_fitting.jl`, `branch_sensitivity.jl`); recipe
+- **Amplitude evolution:** `src/adiabatic/single_cloud/` (`interpolation.jl`
+  for the branch table, `evolution.jl`, and `branch_fitting.jl`), with generic
+  implicit differentiation in `src/adiabatic/core/sensitivity.jl`; recipe
   `runs/adiabatic/amplitude_evolution/scripts/evolve_cosine.jl`.
 
 See [the handoff](HANDOFF.md#known-caveats) for validation limits and the
@@ -177,18 +177,25 @@ Drivers:
 
 ### Adiabatic modules
 
-Load `src/adiabatic/load.jl` for the library. `angular.jl` and `tortoise.jl`
-provide the shared basis and geometry. `stationary/` contains potentials,
-radial equations, boundaries, integration, matching, and continuation predictors;
-`observables/energy.jl` integrates energy. `amplitude_evolution/` interpolates the
-saved branch table and integrates the slow amplitude A0(t). `drivers/` contains small- and
-finite-amplitude continuation (`continue_branch.jl` for all three potentials),
-branch energy derivatives, profile inspection, and the Julia Fig. 13 adapter.
-`multimode/` contains the averaged primary background, secondary eigenproblem,
-secondary energy, driven dissipative/radiative fields, and two-cloud evolution;
-their command-line drivers also live in `drivers/`.
-Campaign submit scripts, results, and flux diagnostics live under `runs/adiabatic/`.
-See `docs/adiabatic-design.md` for the complete map and conventions.
+Start with [the adiabatic source guide](src/adiabatic/README.md). The layout is
+organized by physical approximation: `core/` supplies shared mathematics,
+`single_cloud/` owns a nonlinear cloud and its harmonics, and
+`primary_secondary/` owns the asymmetric two-cloud model and its evolution.
+`multiphase/` is reserved for the planned mutual-deformation extension; its
+loader currently exposes only core.
+
+`src/adiabatic/load.jl` loads the implemented models. Each group also has an
+idempotent `load.jl` for narrower dependencies. Reusable setup and solve
+functions belong in model libraries; model-specific `drivers/` only arrange
+explicit command execution. Tests follow the same grouping under
+`tests/adiabatic/`; the root runner runs all current unit groups and loader
+checks. Python imports use `adiabatic.primary_secondary.qcd_spindown` and
+`adiabatic.single_cloud.fig13_points`.
+
+Campaign submit scripts, results, and flux diagnostics retain their locations
+under `runs/adiabatic/`. Frozen manifests must reject changed or moved sources
+until a separately validated migration or new campaign records the new code.
+See `docs/adiabatic-design.md` for equations and numerical conventions.
 
 ## runs/ layout
 

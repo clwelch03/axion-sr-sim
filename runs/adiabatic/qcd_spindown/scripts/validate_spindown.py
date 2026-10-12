@@ -11,7 +11,7 @@ import json
 import numpy as np
 from scipy.optimize import brentq
 
-from adiabatic.qcd_spindown import (
+from adiabatic.primary_secondary.qcd_spindown import (
     INITIAL_ALPHA, INITIAL_CLOUD_FRACTIONS, StationaryTrack, evolve, physical_state,
 )
 

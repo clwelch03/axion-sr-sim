@@ -25,7 +25,7 @@ CAMPAIGN = Path(__file__).resolve().parents[1]
 ROOT = CAMPAIGN.parents[2]
 SOURCE = ROOT / 'src'
 sys.path.insert(0, str(SOURCE))
-from adiabatic import qcd_spindown as balance
+from adiabatic.primary_secondary import qcd_spindown as balance
 from common.hydrogenic import growth_rate
 
 AGE_YEARS = 1e7
@@ -120,8 +120,13 @@ def load_manifest():
     # hashes let a verified path-only cleanup preserve that historical identity
     # while still rejecting changes to the shared solvers or current launchers.
     for name, expected in manifest['runtime_sha256'].items():
-        if hashlib.sha256((ROOT / name).read_bytes()).hexdigest() != expected:
-            raise RuntimeError(f'Campaign source changed: {name}')
+        source = ROOT / name
+        if not source.is_file() or hashlib.sha256(source.read_bytes()).hexdigest() != expected:
+            raise RuntimeError(
+                f'Campaign source changed or moved: {name}. '
+                'Use its recorded source revision, or validate a new campaign; '
+                'do not bypass the frozen source hashes.'
+            )
     return manifest
 
 

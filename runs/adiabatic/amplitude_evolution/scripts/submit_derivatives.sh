@@ -15,7 +15,7 @@ set -euo pipefail
 export OPENBLAS_NUM_THREADS=1
 export JULIA_NUM_THREADS=1
 /global/home/users/clwelch/.juliaup/bin/julia --project=. \
-    src/adiabatic/drivers/branch_energy_derivatives.jl \
+    src/adiabatic/single_cloud/drivers/branch_energy_derivatives.jl \
     runs/adiabatic/amplitude_evolution/seeds/cosine_branch_20260924.jls \
     "runs/adiabatic/amplitude_evolution/results/cosine_derivatives_part${SLURM_ARRAY_TASK_ID}" \
     "${SLURM_ARRAY_TASK_ID}" 4

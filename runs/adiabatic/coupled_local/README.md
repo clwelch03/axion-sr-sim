@@ -9,7 +9,7 @@ Their source hashes have changed since job submission, so their existing
 resume checks intentionally reject any older checkpoint.
 
 The first piece is the instantaneous balance evaluator in
-[`coupled_balance.jl`](../../../src/adiabatic/multimode/coupled_balance.jl).
+[`coupled_balance.jl`](../../../src/adiabatic/primary_secondary/coupled_balance.jl).
 It takes the current cloud response and boundary fluxes and returns BH/cloud
 rates in fixed initial-BH units. The existing
 [`check_coupled_balance.jl`](../background_continuation/scripts/check_coupled_balance.jl)

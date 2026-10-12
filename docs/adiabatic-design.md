@@ -310,26 +310,30 @@ After accepting a solution, reconstruct profiles and integrate energy on both
 radial branches with composite Simpson quadrature. The campaign drivers also
 evaluate finite-radius boundary currents. Their signed total flux enters the
 slow evolution equation `E′(A0) dA0/dt = -F_tot`, integrated by
-`amplitude_evolution/time_integration.jl`. Radial RK4 and amplitude
+`single_cloud/evolution.jl`. Radial RK4 and amplitude
 continuation construct the stationary inputs to that time evolution.
 
 Load the library with `include("src/adiabatic/load.jl")` from the repository root.
-Paths below are relative to `src/adiabatic/`:
+For the physical-model map and narrower loaders, start with the
+[source guide](../src/adiabatic/README.md). Paths below are relative to
+`src/adiabatic/`:
 
 | Location | Responsibility |
 |---|---|
-| `angular.jl`, `tortoise.jl` | Angular basis/quadrature and Kerr geometry |
-| `stationary/nonlinear.jl`, `stationary/radial.jl` | Potential projection and radial equations |
-| `stationary/boundary_series.jl`, `stationary/boundaries.jl` | Finite-radius boundary states |
-| `stationary/integration.jl`, `stationary/matching.jl` | Radial RK4, residuals, and Newton solves |
-| `stationary/continuation_predictor.jl` | Predictions from accepted branch history |
-| `observables/energy.jl` | Energy density and branch quadrature |
-| `amplitude_evolution/` | Implicit derivatives, Hermite interpolation, and slow time integration |
-| `multimode/` | Secondary cloud, driven fields, and two-cloud balance equations; see [multimode design](multimode-adiabatic-design.md) |
-| `drivers/` | Small- and finite-amplitude continuation, branch derivatives, profile inspection, and Fig. 13 points |
-| `fig13_points.py`, `plot_profiles.py` | Python adapter and profile plotting |
+| `core/angular.jl`, `core/geometry.jl` | Angular basis/quadrature and Kerr geometry |
+| `core/potentials.jl` | Potential values and stable nonlinear remainders |
+| `single_cloud/projection.jl`, `core/radial_operator.jl` | Potential projection and radial equations |
+| `core/boundary_series.jl`, `core/boundaries.jl` | Finite-radius boundary states |
+| `core/integration.jl`, `core/newton.jl`, `single_cloud/profiles.jl` | Radial RK4, general Newton methods, and single-cloud assembly/matching |
+| `single_cloud/continuation_predictor.jl` | Predictions from accepted branch history |
+| `single_cloud/observables.jl` | Energy density and branch quadrature |
+| `core/sensitivity.jl`, `single_cloud/interpolation.jl`, `single_cloud/evolution.jl` | Implicit derivatives, branch interpolation, and slow amplitude evolution |
+| `primary_secondary/` | Secondary cloud, driven fields, and two-cloud balance equations; see [multimode design](multimode-adiabatic-design.md) |
+| `single_cloud/drivers/`, `primary_secondary/drivers/` | Model-specific command-line entry points; reusable functions live in the model libraries |
+| `single_cloud/fig13_points.py`, `single_cloud/drivers/plot_profiles.py` | Python adapter and profile plotting |
+| `multiphase/` | Future mutually deforming independent-cloud model; currently only a core loader and scope documentation |
 
-The finite-amplitude continuation driver is `drivers/continue_branch.jl`,
+The finite-amplitude continuation driver is `single_cloud/drivers/continue_branch.jl`,
 shared by cosine, quartic, and sextic potentials. It takes explicit potential,
 seed, and output arguments and requires `AXION_TARGET_AMPLITUDE`. Existing
 outputs resume; fresh outputs use the seed. Every attempted amplitude step
@@ -340,20 +344,20 @@ diagnostics live under `runs/adiabatic/<campaign>/`. Tests live in
 
 ### Amplitude derivatives and interpolation
 
-`amplitude_evolution/branch_sensitivity.jl` differentiates the normalized
+`core/sensitivity.jl` differentiates the normalized
 stationary matching problem implicitly, then propagates the state tangent to
-energy and signed boundary fluxes. `drivers/branch_energy_derivatives.jl`
+energy and signed boundary fluxes. `single_cloud/drivers/branch_energy_derivatives.jl`
 corrects each input point to residual <=1e-10 and saves those derivatives,
 corrected states, and seed hashes in resumable shards.
 
-`amplitude_evolution/interpolation.jl` uses cubic Hermite interpolation for
+`single_cloud/interpolation.jl` uses cubic Hermite interpolation for
 energy and each signed boundary flux, with saved amplitude derivatives.
 `amplitude_rate` evaluates `-total_flux/energy_derivative` on the containing
 interval, rejecting extrapolation and an exactly zero energy derivative.
 The shared normalized-state Hermite predictor supplies only a Newton guess;
 it must be corrected before use as a stationary solution.
 
-`amplitude_evolution/time_integration.jl` evolves the amplitude using those
+`single_cloud/evolution.jl` evolves the amplitude using those
 interpolated rates. The [amplitude campaign](../runs/adiabatic/amplitude_evolution/README.md)
 owns the selected derivative tables, trajectory recipe, and interpolation
 checks. Those checks do not establish spatial convergence. Historical

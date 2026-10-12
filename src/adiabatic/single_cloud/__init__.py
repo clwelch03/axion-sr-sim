@@ -1,0 +1,1 @@
+"""Single cloud adiabatic components."""

@@ -239,7 +239,7 @@ def main():
     curves = leaver_curves()
     adiabatic_results = None
     if arguments.include_adiabatic:
-        from adiabatic.fig13_points import growth_rate_points
+        from adiabatic.single_cloud.fig13_points import growth_rate_points
         adiabatic_results = growth_rate_points(
             point_alpha_values, leaver_omega_by_alpha(curves), SPIN,
             "plots/fig13_adiabatic_points.csv", julia=arguments.julia)

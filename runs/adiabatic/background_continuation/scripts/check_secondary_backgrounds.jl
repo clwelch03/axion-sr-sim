@@ -1,6 +1,6 @@
 # Secondary and driven scalar responses on saved nearby primary backgrounds.
 using Serialization, SHA, Dates
-include(joinpath(@__DIR__, "../../../../src/adiabatic/drivers/radiative_fluxes.jl"))
+include(joinpath(@__DIR__, "../../../../src/adiabatic/primary_secondary/load.jl"))
 
 function reference_csv_row(path, primary_index)
     lines = readlines(path)

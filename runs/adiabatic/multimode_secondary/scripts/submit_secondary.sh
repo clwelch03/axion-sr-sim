@@ -12,6 +12,6 @@
 set -euo pipefail
 export OPENBLAS_NUM_THREADS=1 JULIA_NUM_THREADS=1
 /global/home/users/clwelch/.juliaup/bin/julia --project=. \
-    src/adiabatic/drivers/continue_secondary.jl \
+    src/adiabatic/primary_secondary/drivers/continue_secondary.jl \
     "${AXION_PRIMARY_PATH:-runs/adiabatic/fig2_20260922/results/cosine_branch.jls}" \
     "${AXION_OUTPUT_PREFIX:-runs/adiabatic/multimode_secondary/results/cosine_secondary}"

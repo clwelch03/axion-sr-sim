@@ -57,7 +57,7 @@ mkdir -p runs/adiabatic/amplitude_evolution/logs
 sbatch --job-name=axion_dense_derivatives --account=pc_heptheory --partition=lr6 --qos=lr_normal \
     --nodes=1 --ntasks=1 --cpus-per-task=1 --time=01:00:00 --array=0-3%4 \
     --output='runs/adiabatic/amplitude_evolution/logs/dense-%A_%a.out' \
-    --wrap='export OPENBLAS_NUM_THREADS=1 JULIA_NUM_THREADS=1; /global/home/users/clwelch/.juliaup/bin/julia --project=. src/adiabatic/drivers/branch_energy_derivatives.jl runs/adiabatic/amplitude_evolution/seeds/cosine_dense_20260925.jls "runs/adiabatic/amplitude_evolution/results/cosine_dense_derivatives_part${SLURM_ARRAY_TASK_ID}" "${SLURM_ARRAY_TASK_ID}" 4'
+    --wrap='export OPENBLAS_NUM_THREADS=1 JULIA_NUM_THREADS=1; /global/home/users/clwelch/.juliaup/bin/julia --project=. src/adiabatic/single_cloud/drivers/branch_energy_derivatives.jl runs/adiabatic/amplitude_evolution/seeds/cosine_dense_20260925.jls "runs/adiabatic/amplitude_evolution/results/cosine_dense_derivatives_part${SLURM_ARRAY_TASK_ID}" "${SLURM_ARRAY_TASK_ID}" 4'
 sbatch runs/adiabatic/amplitude_evolution/scripts/submit_extension_derivatives.sh
 ```
 
@@ -73,7 +73,7 @@ recipes are above, and project next steps are in the handoff.
 
 ## Physical interpolation checks — 2026-09-24
 
-`tests/adiabatic/check_branch_interpolation.jl` prepares quarter-, mid-, and
+`tests/adiabatic/single_cloud/check_branch_interpolation.jl` prepares quarter-, mid-, and
 three-quarter points in four saved intervals: [0.0820125, 0.12301875],
 [2.56469791, 3.20587238], [6.26146950, 7.82683687], and
 [11.80053105, 11.87454326]. The last interval supplies a finely sampled
@@ -87,10 +87,10 @@ settings and matching tolerance. The new points are separate validation data;
 they do not modify the original 178-point table.
 
 ```bash
-julia --project=. tests/adiabatic/check_branch_interpolation.jl prepare
+julia --project=. tests/adiabatic/single_cloud/check_branch_interpolation.jl prepare
 sbatch runs/adiabatic/amplitude_evolution/scripts/submit_interpolation_checks.sh
 # After all four tasks finish:
-julia --project=. tests/adiabatic/check_branch_interpolation.jl assess
+julia --project=. tests/adiabatic/single_cloud/check_branch_interpolation.jl assess
 ```
 
 Preparation refuses to overwrite its frozen seed. Job array **26351040** runs
@@ -111,7 +111,7 @@ interval. `prepare-retry` generated guesses for just those missing points using
 cubic Hermite interpolation of the saved states and implicit state derivatives:
 
 ```bash
-julia --project=. tests/adiabatic/check_branch_interpolation.jl prepare-retry
+julia --project=. tests/adiabatic/single_cloud/check_branch_interpolation.jl prepare-retry
 ```
 
 This saved `seeds/interpolation_retry_20260924.jls`. Retry job **26353282** ran
@@ -143,7 +143,7 @@ convergence claim follows from the present checks.
 
 ## Cosine branch derivatives — 2026-09-24
 
-The reusable driver `src/adiabatic/drivers/branch_energy_derivatives.jl`
+The reusable driver `src/adiabatic/single_cloud/drivers/branch_energy_derivatives.jl`
 computes the implicit energy derivative at each saved stationary solution.
 It checks/corrects matching to tolerance 1e-10, then recomputes energy and
 signed finite-radius fluxes with the same spatial settings. Outputs include
@@ -204,7 +204,7 @@ estimation rather than differences in matching tolerance.
 
 ## Implicit energy derivative — 2026-09-24
 
-The check driver is `tests/adiabatic/check_branch_sensitivity.jl`. It reads
+The check driver is `tests/adiabatic/single_cloud/check_branch_sensitivity.jl`. It reads
 the saved cosine branch without modifying it and tests the implicit state
 and energy derivatives against centered differences of separately corrected
 stationary solutions. The corrected solutions use the baseline state as
@@ -214,7 +214,7 @@ From the repository root:
 
 ```bash
 mkdir -p runs/adiabatic/amplitude_evolution/work
-sbatch --job-name=axion_sensitivity --account=pc_heptheory --partition=lr6 --qos=lr_normal --nodes=1 --ntasks=1 --cpus-per-task=1 --time=00:20:00 --output=runs/adiabatic/amplitude_evolution/work/sensitivity-%j.out --wrap='export OPENBLAS_NUM_THREADS=1 JULIA_NUM_THREADS=1; /global/home/users/clwelch/.juliaup/bin/julia --project=. tests/adiabatic/check_branch_sensitivity.jl'
+sbatch --job-name=axion_sensitivity --account=pc_heptheory --partition=lr6 --qos=lr_normal --nodes=1 --ntasks=1 --cpus-per-task=1 --time=00:20:00 --output=runs/adiabatic/amplitude_evolution/work/sensitivity-%j.out --wrap='export OPENBLAS_NUM_THREADS=1 JULIA_NUM_THREADS=1; /global/home/users/clwelch/.juliaup/bin/julia --project=. tests/adiabatic/single_cloud/check_branch_sensitivity.jl'
 ```
 
 Input: `runs/adiabatic/fig2_20260922/results/cosine_branch.jls`, selecting the

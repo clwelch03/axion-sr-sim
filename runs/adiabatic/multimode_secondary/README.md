@@ -32,7 +32,7 @@ PYTHONPATH=src python runs/adiabatic/multimode_secondary/scripts/plot_fig6.py
 To regenerate those CSVs from the saved coefficient tables, then redraw:
 
 ```bash
-julia --project=. src/adiabatic/drivers/two_cloud_evolution.jl
+julia --project=. src/adiabatic/primary_secondary/drivers/two_cloud_evolution.jl
 PYTHONPATH=src python runs/adiabatic/multimode_secondary/scripts/plot_fig6.py
 ```
 
@@ -141,8 +141,8 @@ saved point of the cosine primary branch
 (`runs/adiabatic/fig2_20260922/results/cosine_branch.jls`, a/M = 0.99, Mμ = 0.42).
 The secondary keeps (l, m₂) = (2,2), (4,2), (6,2), uses the primary's radial domain
 (r* from −100 to 150, matching at 5) at twice its step (0.2), and fixes the (2,2)
-outer amplitude to 1. Library code: `src/adiabatic/multimode/`; driver:
-`src/adiabatic/drivers/continue_secondary.jl`.
+outer amplitude to 1. Library code: `src/adiabatic/primary_secondary/`; driver:
+`src/adiabatic/primary_secondary/drivers/continue_secondary.jl`.
 
 ## Running
 
@@ -201,7 +201,7 @@ after Eq. (22)) implies for the (ω₂, m₂) equation. At order A₁² the two 
 agree; the conjugate term starts at A₁⁴.
 
 `results/cosine_secondary_energy.csv` (2026-10-02, from
-`src/adiabatic/drivers/secondary_energies.jl`): the averaged secondary's energy
+`src/adiabatic/primary_secondary/drivers/secondary_energies.jl`): the averaged secondary's energy
 Ê₂(A₁) per unit (2,2) outer amplitude, with horizon and outer fluxes. Energy
 includes the interaction term (μ²/2)⟨cos ϕ₁⟩ϕ₂². The balance
 −(F_H + F_out)/(2 Γ₂ E₂) lies between 0.9999965 and 1.0000001 at all 232 points.
@@ -212,7 +212,7 @@ linear secondary's energy lies beyond r* = 150 (outer flux at small A₁).
 Regenerate the $M\mu = 0.42$ secondary energy table after continuation:
 
 ```bash
-julia --project=. src/adiabatic/drivers/secondary_energies.jl \
+julia --project=. src/adiabatic/primary_secondary/drivers/secondary_energies.jl \
     runs/adiabatic/fig2_20260922/results/cosine_branch.jls \
     runs/adiabatic/multimode_secondary/results/cosine_secondary.jls \
     runs/adiabatic/multimode_secondary/results/cosine_secondary_energy.csv
@@ -227,10 +227,10 @@ all printed digits, secondary Γ₂ to 8e-6).
 ```bash
 julia --project=. runs/adiabatic/multimode_secondary/scripts/prepare_alpha030_seed.jl
 sbatch runs/adiabatic/multimode_secondary/scripts/submit_alpha030_primary.sh   # job 26640571
-AXION_SECONDARY_ULP_TOLERANCE_FACTOR=2 julia --project=. src/adiabatic/drivers/continue_secondary.jl \
+AXION_SECONDARY_ULP_TOLERANCE_FACTOR=2 julia --project=. src/adiabatic/primary_secondary/drivers/continue_secondary.jl \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_branch.jls \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary
-julia --project=. src/adiabatic/drivers/secondary_energies.jl \
+julia --project=. src/adiabatic/primary_secondary/drivers/secondary_energies.jl \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_branch.jls \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary.jls \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary_energy.csv
@@ -262,16 +262,16 @@ times the conjugate secondary, with modes $(l, m) = (0,0), (2,0), (4,0)$. It
 carries energy into the horizon: this is the dissipation of the perturbative
 $F_0$ (Eq. (38), (A11)). Method, notation, and every check are explained in
 [docs/multimode-piece4-guide.md](../../../docs/multimode-piece4-guide.md).
-Library code: `src/adiabatic/multimode/dissipative_mode.jl`
+Library code: `src/adiabatic/primary_secondary/dissipative_mode.jl`
 (and `mass_deficit_harmonic` in `background.jl`).
 
 ```bash
-julia --project=. src/adiabatic/drivers/dissipative_fluxes.jl \
+julia --project=. src/adiabatic/primary_secondary/drivers/dissipative_fluxes.jl \
     runs/adiabatic/fig2_20260922/results/cosine_branch.jls \
     runs/adiabatic/multimode_secondary/results/cosine_secondary.jls \
     runs/adiabatic/multimode_secondary/results/cosine_secondary_energy.csv \
     runs/adiabatic/multimode_secondary/results/cosine_dissipative_m0.csv
-julia --project=. src/adiabatic/drivers/dissipative_fluxes.jl \
+julia --project=. src/adiabatic/primary_secondary/drivers/dissipative_fluxes.jl \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_branch.jls \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary.jls \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary_energy.csv \
@@ -338,7 +338,7 @@ The $m = 3$ field at $\omega_3 = 2\,\mathrm{Re}\,\omega_2 - \mathrm{Re}\,\omega_
 the $e^{+i\psi_1}$ harmonic of $\sin\phi_1$ times the secondary's profile
 squared, with modes $(l, m) = (3,3), (5,3), (7,3)$. It radiates to infinity:
 this is the perturbative $F_3$ (Eq. (39), (A14)). Library code:
-`src/adiabatic/multimode/radiative_mode.jl` (and `sine_harmonic` in
+`src/adiabatic/primary_secondary/radiative_mode.jl` (and `sine_harmonic` in
 `background.jl`).
 
 Two differences from piece 4:
@@ -356,12 +356,12 @@ Two differences from piece 4:
   feeds the field. Eq. (65) counts both.
 
 ```bash
-julia --project=. src/adiabatic/drivers/radiative_fluxes.jl \
+julia --project=. src/adiabatic/primary_secondary/drivers/radiative_fluxes.jl \
     runs/adiabatic/fig2_20260922/results/cosine_branch.jls \
     runs/adiabatic/multimode_secondary/results/cosine_secondary.jls \
     runs/adiabatic/multimode_secondary/results/cosine_secondary_energy.csv \
     runs/adiabatic/multimode_secondary/results/cosine_radiative_m3.csv
-julia --project=. src/adiabatic/drivers/radiative_fluxes.jl \
+julia --project=. src/adiabatic/primary_secondary/drivers/radiative_fluxes.jl \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_branch.jls \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary.jls \
     runs/adiabatic/multimode_secondary/results/alpha030_cosine_secondary_energy.csv \
@@ -422,11 +422,11 @@ energies $E_1$ and $E_2 = \hat E_2|A_2|^2$ (the paper's unit-energy
 normalization of the secondary); equations and choices in
 [multimode-adiabatic-design.md](../../../docs/multimode-adiabatic-design.md),
 "Piece 6 design". The coefficients come from the piece 1–5 tables, splined in
-$E_1$. Library code: `src/adiabatic/multimode/two_cloud_evolution.jl`; driver
-and table reader: `src/adiabatic/drivers/two_cloud_evolution.jl`.
+$E_1$. Library code: `src/adiabatic/primary_secondary/evolution.jl`; driver
+and table reader: `src/adiabatic/primary_secondary/drivers/two_cloud_evolution.jl`.
 
 ```bash
-julia --project=. src/adiabatic/drivers/two_cloud_evolution.jl
+julia --project=. src/adiabatic/primary_secondary/drivers/two_cloud_evolution.jl
 PYTHONPATH=src python runs/adiabatic/multimode_secondary/scripts/plot_fig6.py
 ```
 
@@ -476,7 +476,7 @@ Checks (scripts in `tests/adiabatic/`):
   r*_out = 150, and agrees to 5e-7 at step 0.1, r*_out = 250.
 - Small A₁: Re shift = −0.0101 A₁², Γ₂/Γ₂(linear) − 1 = 42 A₁², constant to 5e-4
   over the three smallest saved amplitudes.
-- Radial step (`tests/adiabatic/check_secondary_step_convergence.jl`): at A₁ = 2.05,
+- Radial step (`tests/adiabatic/primary_secondary/check_secondary_step_convergence.jl`): at A₁ = 2.05,
   re-solving primary and secondary at half and quarter step changes ω₂ by
   7.0e-11 then 4.4e-12 (ratio 16, RK4-dominated); Γ₂ at the production step is
   accurate to about 6e-6 relative.

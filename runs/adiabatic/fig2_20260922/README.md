@@ -62,10 +62,10 @@ Energy and flux derivatives live in the separate
 
 ## Reproduce or resume
 
-The unified driver is `src/adiabatic/drivers/continue_branch.jl`:
+The unified driver is `src/adiabatic/single_cloud/drivers/continue_branch.jl`:
 
 ```bash
-AXION_TARGET_AMPLITUDE=13 julia --project=. src/adiabatic/drivers/continue_branch.jl \
+AXION_TARGET_AMPLITUDE=13 julia --project=. src/adiabatic/single_cloud/drivers/continue_branch.jl \
     cosine runs/adiabatic/fig2_20260922/seeds/preliminary_cosine_20260922.jls \
     runs/adiabatic/fig2_20260922/results/cosine_branch
 ```

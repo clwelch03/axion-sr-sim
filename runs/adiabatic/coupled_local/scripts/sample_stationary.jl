@@ -2,7 +2,7 @@
 # See ../README.md before using this recipe or its partial output.
 # Build or validate the local stationary surrogate; no time integration here.
 using Serialization, SHA, Dates
-include(joinpath(@__DIR__, "../../../../src/adiabatic/drivers/radiative_fluxes.jl"))
+include(joinpath(@__DIR__, "../../../../src/adiabatic/primary_secondary/load.jl"))
 
 function sample_stationary(output_directory; targets_path=nothing)
     repository = normpath(joinpath(@__DIR__, "../../../.."))

@@ -60,7 +60,8 @@ PYTHONPATH=src python -m dolan.measure_gamma --help          # time-domain evolu
 Packages live under `src/`:
 
 - `dolan/`: time-domain solver, nonlinear extensions, eigenmode solver and drivers.
-- `adiabatic/`: Julia stationary profiles and observables, plus Python plotting adapters.
+- `adiabatic/`: [model-based layout](src/adiabatic/README.md): shared `core/`,
+  `single_cloud/`, `primary_secondary/`, and the planned `multiphase/` extension.
 - `common/`: independent Leaver and hydrogenic benchmarks, plotting utilities.
 
 Run the commands above from the repository root. Alternatively, install with

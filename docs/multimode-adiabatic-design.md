@@ -85,13 +85,13 @@ are tracked in the handoff and campaign. Paths below are relative to
 
 | Piece | Content | Implementation |
 |---|---|---|
-| 1 | Period-averaged primary background | `multimode/background.jl` |
-| 2 | Secondary eigenproblem (61) along the primary branch | `multimode/secondary_mode.jl` |
-| 3 | Secondary energy, fluxes, and energy balance | `multimode/secondary_energy.jl` |
+| 1 | Period-averaged primary background | `primary_secondary/background.jl` |
+| 2 | Secondary eigenproblem (61) along the primary branch | `primary_secondary/secondary_mode.jl` |
+| 3 | Secondary energy, fluxes, and energy balance | `primary_secondary/secondary_energy.jl` |
 | 3b | Repeat pieces 1–3 at the Fig. 7 parameters | Same routines, separate campaign inputs |
-| 4 | Driven $m = 0$ field and horizon flux | `multimode/dissipative_mode.jl`; [piece 4 guide](multimode-piece4-guide.md) |
-| 5 | Driven $m = 3$ field and flux to infinity | `multimode/radiative_mode.jl` |
-| 6 | Energy/angular-momentum balance (62)–(63) | `multimode/two_cloud_evolution.jl` |
+| 4 | Driven $m = 0$ field and horizon flux | `primary_secondary/dissipative_mode.jl`; [piece 4 guide](multimode-piece4-guide.md) |
+| 5 | Driven $m = 3$ field and flux to infinity | `primary_secondary/radiative_mode.jl` |
+| 6 | Energy/angular-momentum balance (62)–(63) | `primary_secondary/evolution.jl` |
 
 **Piece 6 design (confirmed 2026-10-05).** Variables are the cloud energies
 $E_1$ (labels the primary branch; monotonic on both saved branches) and
@@ -133,7 +133,7 @@ these stationary solutions adiabatically; the secondary does not yet reshape
 the primary, and the driven fields have no independently evolved populations.
 
 The boundary currents were calculated when constructing the stationary
-tables. `multimode/scalar_energy_accounting.jl` reconstructs them along a saved
+tables. `primary_secondary/scalar_energy_accounting.jl` reconstructs them along a saved
 trajectory by interpolating coefficients in $E_1$ and restoring the energy
 factors:
 
@@ -172,7 +172,7 @@ $E_{\rm cloud}(x)-E_{\rm cloud}(x_0)=E_{\rm extracted}-E_{\rm outward}$,
 with $E_{\rm cloud}=E_1+E_2$. Angular-momentum fluxes are integrated with
 the same signs. This checks consistency with the evolution's balance
 equations, not the validity of the underlying adiabatic approximation.
-`observables/physical_normalization.jl` supplies the conversion to physical
+`core/units.jl` supplies the conversion to physical
 units; the normalization script reports powers, torques, and cumulative
 fractions of the initial BH reservoirs. This remains postprocessing on a
 fixed background: a cloud-energy plateau can coexist with continuing BH
@@ -192,7 +192,7 @@ block with `fundamental_m = m₂`. Keep three identities distinct:
 - the angular index l within each component.
 
 The $m = 0$ channel is a zero-$m$ block, which `linear_tortoise_rhs!` and
-`boundary_state` reject (they require $m > 0$). `multimode/dissipative_mode.jl`
+`boundary_state` reject (they require $m > 0$). `primary_secondary/dissipative_mode.jl`
 therefore assembles it directly from `tortoise_operator_coefficients` and the
 series helpers `horizon_boundary_data` / `outer_boundary_data`, which accept
 $m = 0$.

@@ -2,7 +2,7 @@
 using Test
 ENV["AXION_SEED_PATH"] = joinpath(@__DIR__, "../../seeds/cosine_before_predictor_comparison.jls")
 ENV["AXION_DIFFERENCE_STEP"] = "1e-8"
-include(joinpath(@__DIR__, "../../../../../src/adiabatic/drivers/continue_cosine.jl"))
+include(joinpath(@__DIR__, "../../../../../runs/adiabatic/fig2_20260922/scripts/legacy_continue_cosine.jl"))
 
 function compare_cosine_predictors()
     methods = [(label="secant", spacing=0.0),

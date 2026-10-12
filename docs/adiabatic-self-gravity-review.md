@@ -99,7 +99,7 @@ J=\left.\frac{\partial F}{\partial z}\right|_{z_0,\kappa=0},
 \]
 
 This is the same implicit differentiation pattern already used by
-[branch_sensitivity.jl](../src/adiabatic/amplitude_evolution/branch_sensitivity.jl).
+[branch_sensitivity.jl](../src/adiabatic/core/sensitivity.jl).
 The new work is the metric source/solve and its contribution to the radial
 operator and boundary data. It is not just an extra invocation of the existing
 derivative routine. Frequency dependence of the boundary series must remain
@@ -350,7 +350,7 @@ $\epsilon_f=(f_a/M_{\rm Pl})^2$.
 Run the standalone check from the repository root:
 
 ```bash
-julia --project=. tests/adiabatic/check_self_gravity_211.jl
+julia --project=. tests/adiabatic/core/check_self_gravity_211.jl
 ```
 
 The script projects the density using the repo's normalized polar harmonics,

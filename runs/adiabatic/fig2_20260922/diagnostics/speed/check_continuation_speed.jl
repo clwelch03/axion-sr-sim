@@ -2,7 +2,7 @@
 using Test
 ENV["AXION_SEED_PATH"] = get(ENV, "AXION_SEED_PATH",
     joinpath(@__DIR__, "../../seeds/seed_before_speed_check.jls"))
-include(joinpath(@__DIR__, "../../../../../src/adiabatic/drivers/continue_cosine.jl"))
+include(joinpath(@__DIR__, "../../../../../runs/adiabatic/fig2_20260922/scripts/legacy_continue_cosine.jl"))
 
 function measured_correction(label, continuation, target; difference_step=1e-8)
     prediction = predict_nonlinear_mode(continuation, target)

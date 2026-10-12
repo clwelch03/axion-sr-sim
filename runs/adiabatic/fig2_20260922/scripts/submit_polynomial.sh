@@ -17,6 +17,6 @@ export AXION_POTENTIAL="${AXION_POTENTIAL:-quartic}"
 # Preserve this recipe's previous finite-difference and history-spacing defaults.
 export AXION_JACOBIAN="${AXION_JACOBIAN:-finite}"
 export AXION_HISTORY_SPACING="${AXION_HISTORY_SPACING:-0.05}"
-/global/home/users/clwelch/.juliaup/bin/julia --project=. src/adiabatic/drivers/continue_branch.jl \
+/global/home/users/clwelch/.juliaup/bin/julia --project=. src/adiabatic/single_cloud/drivers/continue_branch.jl \
     "$AXION_POTENTIAL" "${AXION_SEED_PATH:-runs/adiabatic/fig2_20260922/seeds/preliminary_cosine_20260922.jls}" \
     "${AXION_OUTPUT_PREFIX:-runs/adiabatic/fig2_20260922/results/${AXION_POTENTIAL}_branch}"

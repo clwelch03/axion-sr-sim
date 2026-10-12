@@ -6,6 +6,13 @@ alpha=0.42 integrator draft. The model retains a nonlinear cosine-potential
 211 primary, a linear 322 cloud on its phase-averaged background, and the
 driven m=0 and m=3 scalar fields. BH mass and angular momentum both evolve.
 
+After the October 12 layout refactor, the solver is in
+`src/adiabatic/primary_secondary/` and the Python import is
+`adiabatic.primary_secondary.qcd_spindown`. Existing result tables remain
+readable at their original paths. New stationary runs hash the Julia library
+files as well as the driver; use a new output directory instead of resuming
+checkpoints whose source hash came from the earlier driver.
+
 ## Inputs and time origin
 
 - Initial BH mass: 20 solar masses; spin: 0.99.
@@ -23,7 +30,7 @@ driven m=0 and m=3 scalar fields. BH mass and angular momentum both evolve.
 
 ## Implementation
 
-[`qcd_stationary_point.jl`](../../../src/adiabatic/drivers/qcd_stationary_point.jl)
+[`qcd_stationary_point.jl`](../../../src/adiabatic/primary_secondary/drivers/qcd_stationary_point.jl)
 composes the existing stationary solvers and saves one independent checkpoint
 per target. It inverts primary energy by correcting the finite-amplitude
 stationary solution, solves the averaged 322 eigenproblem, and solves both
@@ -31,7 +38,7 @@ driven fields. An additional primary/secondary solve at the **same** alpha and
 spin measures `partial omega2 / partial E1`. This is not a derivative along
 the changing BH trajectory.
 
-[`qcd_spindown.py`](../../../src/adiabatic/qcd_spindown.py) implements the leading
+[`qcd_spindown.py`](../../../src/adiabatic/primary_secondary/qcd_spindown.py) implements the leading
 instantaneous-background balance in
 [`coupled-bh-cloud-balance.md`](../../../docs/coupled-bh-cloud-balance.md).
 It evolves BH mass/angular losses, logarithmic cloud energies, and accumulated

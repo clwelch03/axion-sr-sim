@@ -1,7 +1,7 @@
 # Independent, equally budgeted continuation experiments from one frozen seed.
 ENV["AXION_POTENTIAL"] = "quartic"
 ENV["AXION_SEED_PATH"] = joinpath(@__DIR__, "../../seeds/quartic_before_bounded_correction.jls")
-include(joinpath(@__DIR__, "../../../../../src/adiabatic/drivers/continue_polynomial.jl"))
+include(joinpath(@__DIR__, "../../../../../runs/adiabatic/fig2_20260922/scripts/legacy_continue_polynomial.jl"))
 
 const methods = [
     (label="secant_1e8", predictor=:secant, increment=1e-8, spacing=0.05, step_fraction=1.0),

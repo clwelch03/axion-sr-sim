@@ -1,0 +1,8 @@
+using Test
+include(joinpath(@__DIR__, "../../../src/adiabatic/core/load.jl"))
+include("test_boundaries.jl")
+include("test_branch_sensitivity.jl")
+include("test_geometry.jl")
+include("test_integration.jl")
+include("test_newton.jl")
+include("test_operators.jl")

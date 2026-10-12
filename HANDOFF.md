@@ -20,6 +20,26 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
 
 ## Where things stand
 
+- **Adiabatic layout refactor (October 12):** branch
+  `refactor/adiabatic-layout` groups source and tests by `core/`,
+  `single_cloud/`, and `primary_secondary/`. `multiphase/` has a scope README
+  and core-only loader; its physics is still unimplemented. Shared operators,
+  potentials, Newton/integration routines, quadrature, and sensitivities were
+  separated from single-cloud assembly. Reusable workflow functions now load
+  from model libraries; model drivers contain command execution. The root
+  Julia loader remains available. See the [source guide](src/adiabatic/README.md)
+  for current paths and imports, and the
+  [implementation plan](docs/multiphase-implementation-plan.md) for the next
+  physics milestones. Validation: 509 grouped Julia unit checks plus 10 loader
+  checks, 5 Python checks, and the 44-check coupled-balance benchmark pass.
+  A nonlinear profile, energy, frequencies, and both complete saved-table
+  Fig. 6 trajectories agree exactly before/after the refactor. The QCD grid's
+  independent reference-trajectory check retains its 1.71e-8 maximum spin
+  difference. The Python wheel builds and contains all 51 Julia source/driver
+  files. Numerical campaign artifacts and frozen manifests retain their
+  locations and contents; source hashes intentionally reject moved/changed
+  implementations. This validates the refactor, not new numerical convergence
+  or multiphase physics.
 - **QCD grid stopped before disconnect (October 12):** the requested 10x10 log
   grid spans 2–100 solar masses and 1e-14–1e-11 eV, with the final exclusion
   `alpha0 > 0.45`, leaving 83 cells (maximum 0.437617). The user selected a
@@ -173,7 +193,7 @@ scan, and convergence evidence. Use its averaged secondary results;
   refinement described above. Use primary step 0.05 or finer for the tested
   small $m=3$ horizon-flux accuracy requirement.
   The leading balance is now derived and its algebra checked. Its functions
-  now live in `src/adiabatic/multimode/coupled_balance.jl`, with units and
+  now live in `src/adiabatic/primary_secondary/coupled_balance.jl`, with units and
   equations documented in the source. The user stopped the time-integrator
   draft to require small, explained implementation steps. Stationary-table
   job 26757461 was cancelled; `runs/adiabatic/coupled_local/` contains paused

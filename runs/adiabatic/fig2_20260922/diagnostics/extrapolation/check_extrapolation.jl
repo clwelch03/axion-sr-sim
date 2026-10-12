@@ -2,7 +2,7 @@
 using Test
 ENV["AXION_SEED_PATH"] = get(ENV, "AXION_SEED_PATH",
     joinpath(@__DIR__, "../../seeds/seed_before_secant.jls"))
-include(joinpath(@__DIR__, "../../../../../src/adiabatic/drivers/continue_cosine.jl"))
+include(joinpath(@__DIR__, "../../../../../runs/adiabatic/fig2_20260922/scripts/legacy_continue_cosine.jl"))
 
 @testset "Saved branch: extrapolation and converged correction" begin
     target = 0.2782139804271685

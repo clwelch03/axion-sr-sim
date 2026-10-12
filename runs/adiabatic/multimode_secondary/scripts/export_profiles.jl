@@ -5,7 +5,7 @@
 # With a tag (e.g. alpha030): results/<tag>_cosine_branch.jls and
 # results/<tag>_cosine_secondary.jls, output work/<tag>_profiles.csv (ignored).
 using Serialization, Printf
-include(joinpath(@__DIR__, "../../../../src/adiabatic/drivers/continue_secondary.jl"))
+include(joinpath(@__DIR__, "../../../../src/adiabatic/primary_secondary/load.jl"))
 
 campaign = joinpath(@__DIR__, "..")
 tag = length(ARGS) >= 1 ? ARGS[1] : ""

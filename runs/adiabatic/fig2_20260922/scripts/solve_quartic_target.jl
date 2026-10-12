@@ -2,7 +2,7 @@
 ENV["AXION_POTENTIAL"] = "quartic"
 ENV["AXION_JACOBIAN"] = "forwarddiff"
 ENV["AXION_SEED_PATH"] = joinpath(@__DIR__, "../results/quartic_branch.jls")
-include(joinpath(@__DIR__, "../../../../src/adiabatic/drivers/continue_polynomial.jl"))
+include(joinpath(@__DIR__, "../../../../runs/adiabatic/fig2_20260922/scripts/legacy_continue_polynomial.jl"))
 
 function solve_quartic_target()
     target = 4.4

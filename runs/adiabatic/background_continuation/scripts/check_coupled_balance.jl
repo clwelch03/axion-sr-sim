@@ -1,8 +1,8 @@
 # Algebra and saved-data checkpoint, not a time integrator or production library.
 using Test, Serialization, LinearAlgebra, SHA
-include(joinpath(@__DIR__, "../../../../src/adiabatic/drivers/two_cloud_evolution.jl"))
+include(joinpath(@__DIR__, "../../../../src/adiabatic/primary_secondary/load.jl"))
 
-# Balance functions are loaded from src/adiabatic/multimode/coupled_balance.jl.
+# Balance functions are loaded from src/adiabatic/primary_secondary/coupled_balance.jl.
 # This driver only assembles saved inputs and checks the equations.
 
 function check_coupled_balance(; output=joinpath(@__DIR__, "../results/balance"))
@@ -143,7 +143,7 @@ function check_coupled_balance(; output=joinpath(@__DIR__, "../results/balance")
         primary_sha256=bytes2hex(sha256(read(primary_path))),
         response_sha256=bytes2hex(sha256(read(response_path))),
         script_sha256=bytes2hex(sha256(read(@__FILE__))),
-        balance_sha256=bytes2hex(sha256(read(joinpath(@__DIR__, "../../../../src/adiabatic/multimode/coupled_balance.jl")))),
+        balance_sha256=bytes2hex(sha256(read(joinpath(@__DIR__, "../../../../src/adiabatic/primary_secondary/coupled_balance.jl")))),
         revision=strip(read(`git rev-parse HEAD`,String)),
         table_sha256=[bytes2hex(sha256(read(path))) for path in TWO_CLOUD_TABLES[0.42]])
     serialize(joinpath(output,"balance_checkpoint.jls"),(;metadata,row))

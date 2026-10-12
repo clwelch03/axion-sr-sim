@@ -1,5 +1,5 @@
 # Fill amplitude gaps using bracketed guesses and independent nonlinear solves.
-include(joinpath(@__DIR__, "../../../../src/adiabatic/drivers/continue_branch.jl"))
+include(joinpath(@__DIR__, "../../../../src/adiabatic/single_cloud/load.jl"))
 
 function refine_branch(;
     potential_kind=Symbol(get(ENV, "AXION_POTENTIAL", "quartic")),

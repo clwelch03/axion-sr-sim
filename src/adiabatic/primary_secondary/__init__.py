@@ -1,0 +1,1 @@
+"""Primary secondary adiabatic components."""

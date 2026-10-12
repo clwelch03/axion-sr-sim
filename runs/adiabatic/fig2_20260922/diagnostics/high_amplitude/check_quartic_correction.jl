@@ -2,7 +2,7 @@
 using Test
 ENV["AXION_POTENTIAL"] = "quartic"
 ENV["AXION_SEED_PATH"] = joinpath(@__DIR__, "../../seeds/quartic_before_bounded_correction.jls")
-include(joinpath(@__DIR__, "../../../../../src/adiabatic/drivers/continue_polynomial.jl"))
+include(joinpath(@__DIR__, "../../../../../runs/adiabatic/fig2_20260922/scripts/legacy_continue_polynomial.jl"))
 
 function corrected_point(continuation, target, label)
     prediction = predict_nonlinear_mode_cubic(continuation, target; history_spacing=0.05)

@@ -7,6 +7,14 @@ summary job finished. The remaining diagnostic 26875867 was explicitly
 canceled before disconnect. No automatic retry or future submission is set.
 Inputs, source hashes, successful initial points, and failure logs are saved.
 
+**Layout migration, October 12:** shared source now lives under
+`src/adiabatic/core/`, `single_cloud/`, and `primary_secondary/`; the campaign's
+imports and launcher use these paths. The frozen manifest is unchanged and
+will reject the moved sources. Its saved results remain readable. Before any
+future submission, resolve the pilot failures below and validate a new campaign
+or an explicit source-manifest migration; the layout refactor did not authorize
+or perform a restart.
+
 This campaign follows the requested 10 by 10 logarithmic grid in initial BH
 mass (2–100 solar masses) and axion rest energy (1e-14–1e-11 eV). The final
 requested exclusion is **initial alpha > 0.45**, superseding the earlier

@@ -416,7 +416,7 @@ using fixed reference units and a specified $f_a$ and seed prescription.
 ## Coupled-balance checkpoint — October 8, 2026
 
 The balance equations now live in
-[`src/adiabatic/multimode/coupled_balance.jl`](../../../src/adiabatic/multimode/coupled_balance.jl).
+[`src/adiabatic/primary_secondary/coupled_balance.jl`](../../../src/adiabatic/primary_secondary/coupled_balance.jl).
 The check script below loads them through the library and supplies only the
 saved-data/analytic checkpoint. Coupled time integration is paused for
 piece-by-piece review; see the [draft status](../coupled_local/README.md).

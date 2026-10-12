@@ -1,7 +1,7 @@
 # Stationary continuation in alpha and spin at fixed outer amplitude.
 # Reuse the existing solver; do not evolve the BH or either cloud population.
 using Serialization, SHA, Dates
-include(joinpath(@__DIR__, "../../../../src/adiabatic/drivers/continue_branch.jl"))
+include(joinpath(@__DIR__, "../../../../src/adiabatic/single_cloud/load.jl"))
 
 function check_nearby_backgrounds(output_directory; branch_index=1)
     repository = normpath(joinpath(@__DIR__, "../../../.."))

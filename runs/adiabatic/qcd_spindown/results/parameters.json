@@ -1,0 +1,56 @@
+{
+  "mass_solar": 20.0,
+  "axion_eV": 1e-12,
+  "spin0": 0.99,
+  "fa_GeV": 5.7e+18,
+  "alpha0": 0.14966276123144445,
+  "epsilon": 0.21796991094505996,
+  "seed_code_energies": [
+    1e-05,
+    1e-08
+  ],
+  "seed_mass_fractions": [
+    2.1796991094505996e-06,
+    2.1796991094505997e-09
+  ],
+  "diagnostics": {
+    "max_energy_balance_error": 1.9131043550212565e-09,
+    "max_spin_change_under_time_refinement": 1.1408281985758606e-08,
+    "max_alpha_offset_from_stationary_track": 2.6782220885479546e-10,
+    "max_spin_offset_from_stationary_track": 3.6941242537280594e-05,
+    "max_primary_field_over_fa": 0.0009250418631130061,
+    "adiabatic_time_to_spin075_years": 0.09101972631710793,
+    "nr_time_to_spin075_years": 0.08155876128316099,
+    "adiabatic_final_spin": 0.5089530042005335,
+    "nr_final_spin": 0.5099512342121608,
+    "adiabatic_final_mass_solar": 18.319236154685917,
+    "adiabatic_final_secondary_fraction": 2.180529845784015e-09
+  },
+  "provenance": {
+    "repository_revision": "167a5afaa1260e9e359f07c2abd81135b4c6ed34",
+    "stationary_source_sha256": "e79082e5bc9d191b6c20b25ed13a51c9018f0a58317972ef08feaf7b88df97f1",
+    "stationary_csv_sha256": {
+      "point000.csv": "232303fd453cd8b107a96be7c8dd307991b1c920a0b0c180f24061e9a4160526",
+      "point001.csv": "fa336c2c38c0afeaf9e708e76a337863b01f91939900444941a7ee3a8e29da5b",
+      "point002.csv": "59ce7a38108bea6ec1e7b2b9b47238f52681e6070df03eb3e7629c755535e697",
+      "point003.csv": "db478745907a9555411d3fe6c9de2b5e62074c967c91f351c62005690cb7a7d9",
+      "point004.csv": "4c59cd16c37769d67ae31e2393cf6a91290b644bfd87d8ad795c711aa9dbbb0c",
+      "point005.csv": "09f68806bc82e7c8b44876ae8909b7858de26c1dcf859f5236bfbf7e74a572c6",
+      "point006.csv": "ec1ab9d04c69eeaa659fccbcd4b43918c171c31de5c44ef858f90263520ec655",
+      "point007.csv": "b0ab4463493fdbbb0afdda4f23b8f8fd6440fb432f267276b3d01bccd5617eb6",
+      "point008.csv": "eb3debd28ddbe2233daa47d78033dd462ef888a4f651f192d2103a33fd023b71",
+      "point009.csv": "caac9b2261e2f22b6eda2d400bc743593b62446b0f639d5886fa370f81ff69da",
+      "point010.csv": "5214119a2f88d468ada1aa06c94fc2c7bcbee08d36a39ff00f955fae9e09b5fe",
+      "point011.csv": "88fdda7ad3c0d02d954eedb0b03270cb259600ecc33880581a2f7729b19c6f58",
+      "point012.csv": "1ff9a43a387d10f79d7a10a4b270e965b6da3e6a3a6e812d729b3a88aa9ffba5",
+      "point013.csv": "abc75e2990b64acfc2796af86e32f6c8e993baa8137f66524a4e8a2e60e96444",
+      "point014.csv": "ca6292bd495681f97dac2132f87737cb66a04f46189f922142a1107d9d7af077",
+      "point015.csv": "d9334d5e39c3c28a6b35818cca53940d575b11aabe54cfc3a0e0984e49b8e524",
+      "point016.csv": "b8cef91366057064a9ca3116269dda94d22d005ce4448bdd1ebffb448995c797",
+      "point017.csv": "a5c639809139a0360b5a6cb580426ee77adde20ed87c611e055b87254e24cec0",
+      "point018.csv": "468581ccafbdf8fed80b038e925014ab96689126994af48b4de9fa87c79245fe",
+      "point019.csv": "b62a98fc91f2e2959c5f427690da2c2c29d9bbea76a208bf78534ec4ea61f508",
+      "point020.csv": "91ab436c65b51df730d0910dcb472b7d2fae281d409b12e2e25ef4b023d5537d"
+    }
+  }
+}

@@ -16,6 +16,8 @@ priorities, use [HANDOFF.md](../HANDOFF.md).
 | [Amplitude evolution](adiabatic/amplitude_evolution/README.md) | Merged 426-point derivative table, interpolation checks, and single-cloud A0(t) |
 | [Multimode secondary](adiabatic/multimode_secondary/README.md) | 2211.01949 Sec. III: secondary cloud, driven fluxes, and Figs. 6–7 at Mμ = 0.42 and 0.3 |
 | [Background continuation](adiabatic/background_continuation/README.md) | Local primary, secondary, and driven-field solves in alpha and spin, with route/return and radial-step checks |
+| [QCD spin-down](adiabatic/qcd_spindown/README.md) | Preliminary coupled 20-solar-mass BH/211/322 evolution at m_a=1e-12 eV, compared with linear nonrelativistic growth |
+| [QCD 10x10 grid](adiabatic/qcd_grid_20261012/README.md) | Alpha <= 0.45, 10-million-year cap; stopped before disconnect after a low-alpha pilot failure; frozen inputs and restart notes |
 
 ## Conventions
 

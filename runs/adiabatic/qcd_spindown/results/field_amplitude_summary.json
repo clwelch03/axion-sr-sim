@@ -1,0 +1,92 @@
+{
+  "fa_GeV": 5.7e+18,
+  "lambda_cosine": 3.077870113881195e-80,
+  "initial_primary_peak_Phi_over_fa": 5.376616222633236e-06,
+  "final_primary_peak_Phi_over_fa": 0.0009212721120836781,
+  "initial_primary_peak_Phi_GeV": 30646712469009.445,
+  "final_primary_peak_Phi_GeV": 5251251038876965.0,
+  "field_growth_factor": 171.34793965868712,
+  "max_cubic_over_mass": 1.41457050752129e-07,
+  "max_cubic_over_binding_scale": 2.955530187426816e-05,
+  "stationary_table_max_peak": 0.0009250418631130061,
+  "final_secondary_to_primary_energy": 2.5946218635865314e-08,
+  "checks": [
+    {
+      "name": "initial_field",
+      "relative_error": 1.3408139043491474e-09,
+      "tolerance": 1e-06
+    },
+    {
+      "name": "cubic_vs_pchip",
+      "relative_error": 1.6733082299102975e-05,
+      "tolerance": 0.0001
+    },
+    {
+      "name": "interior_one_peak_field",
+      "relative_error": 2.0798941030575335e-06,
+      "tolerance": 0.0001
+    },
+    {
+      "name": "interior_two_peak_field",
+      "relative_error": 1.2418627839738683e-05,
+      "tolerance": 0.0001
+    },
+    {
+      "name": "late_outer_peak_field",
+      "relative_error": 9.761550631370852e-06,
+      "tolerance": 0.0001
+    },
+    {
+      "name": "late_refined_peak_field",
+      "relative_error": 4.363436886989369e-05,
+      "tolerance": 0.0001
+    },
+    {
+      "name": "refine_point000_peak_field",
+      "relative_error": 9.536171852175812e-11,
+      "tolerance": 0.0001
+    },
+    {
+      "name": "refine_point011_peak_field",
+      "relative_error": 7.785860844933268e-11,
+      "tolerance": 0.0001
+    }
+  ],
+  "limitations": [
+    "Sampled real primary field, including its higher harmonics; independent secondary and driven fields omitted.",
+    "Interpolation checked against fresh solves, but angular sampling of the maximum is not refined.",
+    "Binding-scale ratio is a local diagnostic, not a proof of convergence or a secular phase-error estimate.",
+    "Inherits the preliminary scalar-only, cosine-potential, instantaneous-Kerr model of the saved trajectory."
+  ],
+  "input_sha256": {
+    "results/parameters.json": "96c7a73b85acc918ca8aac19d72f103d3b4525575ac7cd0a48c2c22d298a36e9",
+    "results/adiabatic.csv": "f1c84477cb94ebab9f8e9497f0d592868e75eec0d215af69097f02892ad115c8",
+    "results/stationary_v2/point000.csv": "232303fd453cd8b107a96be7c8dd307991b1c920a0b0c180f24061e9a4160526",
+    "results/stationary_v2/point001.csv": "fa336c2c38c0afeaf9e708e76a337863b01f91939900444941a7ee3a8e29da5b",
+    "results/stationary_v2/point002.csv": "59ce7a38108bea6ec1e7b2b9b47238f52681e6070df03eb3e7629c755535e697",
+    "results/stationary_v2/point003.csv": "db478745907a9555411d3fe6c9de2b5e62074c967c91f351c62005690cb7a7d9",
+    "results/stationary_v2/point004.csv": "4c59cd16c37769d67ae31e2393cf6a91290b644bfd87d8ad795c711aa9dbbb0c",
+    "results/stationary_v2/point005.csv": "09f68806bc82e7c8b44876ae8909b7858de26c1dcf859f5236bfbf7e74a572c6",
+    "results/stationary_v2/point006.csv": "ec1ab9d04c69eeaa659fccbcd4b43918c171c31de5c44ef858f90263520ec655",
+    "results/stationary_v2/point007.csv": "b0ab4463493fdbbb0afdda4f23b8f8fd6440fb432f267276b3d01bccd5617eb6",
+    "results/stationary_v2/point008.csv": "eb3debd28ddbe2233daa47d78033dd462ef888a4f651f192d2103a33fd023b71",
+    "results/stationary_v2/point009.csv": "caac9b2261e2f22b6eda2d400bc743593b62446b0f639d5886fa370f81ff69da",
+    "results/stationary_v2/point010.csv": "5214119a2f88d468ada1aa06c94fc2c7bcbee08d36a39ff00f955fae9e09b5fe",
+    "results/stationary_v2/point011.csv": "88fdda7ad3c0d02d954eedb0b03270cb259600ecc33880581a2f7729b19c6f58",
+    "results/stationary_v2/point012.csv": "1ff9a43a387d10f79d7a10a4b270e965b6da3e6a3a6e812d729b3a88aa9ffba5",
+    "results/stationary_v2/point013.csv": "abc75e2990b64acfc2796af86e32f6c8e993baa8137f66524a4e8a2e60e96444",
+    "results/stationary_v2/point014.csv": "ca6292bd495681f97dac2132f87737cb66a04f46189f922142a1107d9d7af077",
+    "results/stationary_v2/point015.csv": "d9334d5e39c3c28a6b35818cca53940d575b11aabe54cfc3a0e0984e49b8e524",
+    "results/stationary_v2/point016.csv": "b8cef91366057064a9ca3116269dda94d22d005ce4448bdd1ebffb448995c797",
+    "results/stationary_v2/point017.csv": "a5c639809139a0360b5a6cb580426ee77adde20ed87c611e055b87254e24cec0",
+    "results/stationary_v2/point018.csv": "468581ccafbdf8fed80b038e925014ab96689126994af48b4de9fa87c79245fe",
+    "results/stationary_v2/point019.csv": "b62a98fc91f2e2959c5f427690da2c2c29d9bbea76a208bf78534ec4ea61f508",
+    "results/stationary_v2/point020.csv": "91ab436c65b51df730d0910dcb472b7d2fae281d409b12e2e25ef4b023d5537d",
+    "results/validation/interior_one.csv": "e8badbf2367bf877d54d91daa63630ed27f0cd26496216850fb8fa2ba3e4c47e",
+    "results/validation/interior_two.csv": "84df2a9376d92b8536a2d4e61f85f14d3bd5960e9e0fe2dad60e87aa868323b9",
+    "results/validation/late_outer.csv": "c078e57c6f6768379ec85068e9264dca268de8418857561267fd826cc58af559",
+    "results/validation/late_refined.csv": "74b23e849e2fd1aced455f8454640ff884e04f42ec11a6b940cd669cfba6c785",
+    "results/radial_checks/refine_point000.csv": "9da1a2301c6ef8271c33520d35e8248a86a3dab8c644de856393f22b0394917c",
+    "results/radial_checks/refine_point011.csv": "4fc043be2f8bd9c872a9762e8cea9e44590f7432dd5455a6c13efde5f8939d56"
+  }
+}

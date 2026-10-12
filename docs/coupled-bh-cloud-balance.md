@@ -4,16 +4,21 @@ This is the October 8, 2026 balance checkpoint following the local stationary
 [background-response checks](../runs/adiabatic/background_continuation/README.md).
 It supplies a leading small-cloud-mass evolution law and separates the
 additional terms needed for a cloud on a genuinely time-dependent metric.
-It does not yet supply a time-integrated trajectory or a calculation of those
-additional response terms. No QCD relation between mass and decay constant is
-imposed.
+That checkpoint did not supply a time-integrated trajectory or calculate those
+additional response terms. Its equations impose no QCD relation between mass
+and decay constant; the later campaign below selects that relation explicitly.
 
 The instantaneous balance functions now live in
 [`src/adiabatic/multimode/coupled_balance.jl`](../src/adiabatic/multimode/coupled_balance.jl),
 loaded through `src/adiabatic/load.jl`. The campaign's
 `check_coupled_balance.jl` supplies saved inputs and validation only.
-This is the first implementation piece; the time-integrator draft is paused
-for incremental review with the user.
+This was the first implementation piece; the local alpha=0.42 integrator draft
+remains paused for incremental review. Later on October 8, the user explicitly
+authorized completing a separate first graph directly. The
+[QCD spin-down campaign](../runs/adiabatic/qcd_spindown/README.md) now integrates
+the leading law for a 20-solar-mass BH, using fresh stationary inputs and
+explicit classical seeds. It does not supply the higher-order response terms
+derived below.
 
 ## 1. Fixed reference units and state
 

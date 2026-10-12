@@ -12,6 +12,7 @@ open caveats, and next steps. Entry points reviewed 2026-10-06:
 | [Adiabatic reproduction](adiabatic-repro.md) | Validation records and observable conventions |
 | [Multimode adiabatic design](multimode-adiabatic-design.md) | Sec. III reproduction (2211.01949): equations, decisions, component map, extension ideas |
 | [Coupled BH–cloud balance](coupled-bh-cloud-balance.md) | Fixed reference units, leading scalar-only coupled rates, metric work and angular response, and algebraic checks |
+| [QCD spin-down campaign](../runs/adiabatic/qcd_spindown/README.md) | First preliminary coupled BH/211/322 trajectory and comparison with linear nonrelativistic evolution |
 | [Piece 4 guide](multimode-piece4-guide.md) | Explainer for the driven $m = 0$ field: physics, equation, solve method, checks |
 | [Secondary campaign](../runs/adiabatic/multimode_secondary/README.md) | Secondary-cloud runs, results, and checks |
 | [Dolan reproduction](dolan-repro.md) | Current entry points and dated linear validation record |

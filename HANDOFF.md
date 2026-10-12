@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-10-08. This is the authoritative project status: what works,
+Updated 2026-10-12. This is the authoritative project status: what works,
 open caveats, and next steps. Campaign READMEs own exact commands, saved-result
 paths, and detailed validation records; design documents own equations and
 implementation decisions.
@@ -20,6 +20,44 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
 
 ## Where things stand
 
+- **QCD grid stopped before disconnect (October 12):** the requested 10x10 log
+  grid spans 2–100 solar masses and 1e-14–1e-11 eV, with the final exclusion
+  `alpha0 > 0.45`, leaving 83 cells (maximum 0.437617). The user selected a
+  10-million-year age cap. Inputs, shared-source hashes, scripts, and restart
+  instructions are in the [grid campaign](runs/adiabatic/qcd_grid_20261012/README.md).
+  Initial stationary checks at alpha=0.149663 and 0.437617 passed; the
+  alpha=0.0149663 check failed at an absolute shooting-residual floor. Array
+  26875559 was automatically canceled before starting any production cases.
+  The remaining diagnostic 26875867 was canceled at the user's disconnect
+  request. No survey jobs or automatic retries remain active. Do not resubmit
+  unchanged: the low-alpha conditioning and an end-to-end numerical cell need
+  checking first. Forty planned cells are explicitly labeled linear age
+  screens, not nonlinear simulations; only two screens have been run locally.
+  The new time driver reproduces the saved reference spin curve to 1.71e-8.
+- **First coupled QCD spin-down trajectory:** at the user's explicit request,
+  a preliminary run now evolves a 20-solar-mass BH from chi=0.99 with
+  `m_a=1e-12 eV`, using a nonlinear 211 primary, a 322 secondary on its averaged
+  background, and driven m=0,3 scalar channels. The QCD relation fixes
+  `f_a=5.7e18 GeV`; small classical seeds are specified in the
+  [campaign README](runs/adiabatic/qcd_spindown/README.md).
+  A fresh 21-point stationary track at alpha approximately 0.150–0.137
+  supplies the leading coupled balance. It reaches chi=0.75 in 33.245 days,
+  versus 29.789 days for two linear nonrelativistic clouds with the same seeds;
+  the one-year spins are 0.508953 and 0.509951. PNG/PDF plots, trajectory CSVs,
+  radial checks, and provenance are saved in that campaign. All 80 stationary
+  comparisons pass; time refinement changes spin by at most 1.15e-8.
+  Initial secondary horizon-flux radial sensitivity is 0.47%, while the
+  primary's is below 5.5e-7 relative. This is a
+  trajectory-specific interpolation with refreshed horizon factors, not a
+  general background table. GW losses, self-gravity, and the subleading metric
+  work/background angular response remain absent. The cloud reaches about
+  9.2% of the remaining BH mass; timing is preliminary under that approximation.
+  An October 12 field-amplitude audit restores `Phi=fa*phi` along this saved
+  trajectory: sampled primary `|Phi|/fa` grows from `5.38e-6` to `9.21e-4`
+  (171 times), or `3.06e13` to `5.25e15 GeV`. The cubic/mass ratio stays below
+  `1.42e-7`; comparison with the binding scale gives below `2.96e-5`.
+  Eight post-processing checks pass; the campaign README records the plot,
+  CSV, normalization, and limits of this primary-only amplitude diagnostic.
 - **Multimode adiabatic evolution:** all six Sec. III components are implemented
   at $M\mu = 0.42$ and $0.3$, $a/M = 0.99$: averaged primary background,
   secondary eigenproblem and energy, driven $m = 0$ and $m = 3$ fluxes, and
@@ -67,8 +105,8 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
   a changing-background occupation-conservation example. The latter exposes
   the metric-work term required beyond the leading approximation. Actual
   nonlinear metric work and cloud angular-momentum background derivatives
-  remain unevaluated; the four-variable RHS is a driver prototype, not a
-  time-integrated coupled trajectory. See the
+  remain unevaluated; that checkpoint checked instantaneous rates only.
+  The separate QCD campaign above now integrates the leading law. See the
   [checkpoint recipe and illustrative RHS](runs/adiabatic/background_continuation/README.md#coupled-balance-checkpoint--october-8-2026).
 - **Dolan time-domain work:** the coupled-tower solver, eigenvalue/Leaver
   comparison, and frequency-filter analysis have a
@@ -91,7 +129,7 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
   [campaign recipe and limits](runs/adiabatic/multimode_secondary/README.md#dilute-self-gravity-estimates--october-7-2026).
   This is an analytic-coefficient estimate, not the nonlinear frequency
   response or a bound on scalar flux errors. BH evolution remains separate.
-- **Extensions:** coupled black-hole mass/spin evolution, GW losses, self-gravity feedback,
+- **Extensions:** beyond the preliminary coupled trajectory above, GW losses, self-gravity feedback,
   mutual nonlinear cloud response, additional independent clouds, and a PDE
   handoff remain proposals. The [October 6 research note](docs/further_work_1006.md)
   discusses their ordering and scientific motivation.
@@ -140,10 +178,12 @@ scan, and convergence evidence. Use its averaged secondary results;
   draft to require small, explained implementation steps. Stationary-table
   job 26757461 was cancelled; `runs/adiabatic/coupled_local/` contains paused
   drafts, not a validated trajectory. Review the balance piece together before
-  adding state conversion and one time step. Subsequently build
-  a limited trajectory with refreshed stationary data, fixed reference units,
-  and specified physical seeds/$f_a$, monitoring small cloud mass and regular
-  response. The fixed outer amplitude used in the stationary check is not
+  resuming that incremental teaching track. Later on October 8 the user
+  explicitly authorized completing the separate QCD spin-down campaign directly;
+  its commented driver and Python integrator now provide a first limited
+  trajectory with refreshed stationary data, fixed reference units, and explicit
+  seeds/$f_a$. That exception does not remove the usual incremental workflow.
+  The fixed outer amplitude used in the earlier stationary check is not
   an evolution prescription. Beyond the leading approximation, evaluate
   metric work, background angular response, and consistent gravitational
   energy/boundary accounting as described in the balance note.

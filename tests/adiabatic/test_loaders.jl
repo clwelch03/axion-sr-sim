@@ -2,17 +2,19 @@ using Test
 
 # Isolated calling modules expose accidental dependencies hidden by Main's
 # already-loaded functions. Loading a model twice must not redefine methods.
+# Explicit target modules keep the editor from assigning shared source files
+# to the first test module that includes them, hiding them from other models.
 module CoreLoaderCheck
-include("../../src/adiabatic/core/load.jl")
+Base.include(@__MODULE__, joinpath(@__DIR__, "../../src/adiabatic/core/load.jl"))
 end
 module SingleLoaderCheck
-include("../../src/adiabatic/single_cloud/load.jl")
+Base.include(@__MODULE__, joinpath(@__DIR__, "../../src/adiabatic/single_cloud/load.jl"))
 end
 module MultiphaseLoaderCheck
-include("../../src/adiabatic/multiphase/load.jl")
+Base.include(@__MODULE__, joinpath(@__DIR__, "../../src/adiabatic/multiphase/load.jl"))
 end
 module FullLoaderCheck
-include("../../src/adiabatic/load.jl")
+Base.include(@__MODULE__, joinpath(@__DIR__, "../../src/adiabatic/load.jl"))
 end
 
 @testset "Model loader boundaries and repeated loading" begin

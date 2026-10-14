@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-10-12. This is the authoritative project status: what works,
+Updated 2026-10-14. This is the authoritative project status: what works,
 open caveats, and next steps. Campaign READMEs own exact commands, saved-result
 paths, and detailed validation records; design documents own equations and
 implementation decisions.
@@ -20,6 +20,51 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
 
 ## Where things stand
 
+- **Multiphase foundations (October 14):** independent-cloud labels, Fourier
+  component construction, single-component linear radial assembly, and
+  two-phase field reconstruction, projection, nonlinear-source evaluation, and
+  full radial RHS assembly are present in the opt-in multiphase library.
+  All 115 multiphase checks pass: 12 frequency/azimuthal-label
+  checks, 7 radial-operator checks, 8 reconstruction/reference-quadrature checks,
+  5 library-projector checks, 5 quartic-source checks, 12 single-cloud-limit checks,
+  14 quartic-table checks, 18 phase-origin checks, 13 cosine-convergence checks,
+  and 21 full-RHS checks.
+  The existing 10 loader checks also passed at
+  the linear-assembly checkpoint. The radial checks compare to the single-cloud
+  assembly and an analytic Schwarzschild m=0 result, and check signed-frequency/
+  azimuthal symmetry and angular ordering. The phase benchmark separates two
+  coefficients sharing l=m=3 to 3.11e-16 absolute error; an azimuth-only
+  projection returns their sum. The field now comes from the library's
+  `reconstruct_two_phase_field_at_radii`, which evaluates one radius per call;
+  projection is checked both with an explicit reference sum and with the library's
+  `project_two_phase_field`. Library checks also cover an absent component,
+  conjugate recovery, and an analytic sine field on unequal phase grids.
+  The source checks compare the two driven components to exact integrated
+  quartic formulas and verify angular-parity, absent-phase, and zero-field zeros.
+  With only q=(1,0) populated, the fundamental and generated third-harmonic
+  sources agree with the existing single-cloud implementation for quartic,
+  sextic, and cosine potentials; a q_2=2 output vanishes. The full quartic table,
+  independent and combined phase shifts, and phase-averaged potential invariance
+  now pass. A separate two-cloud cosine example converges under independent
+  polar/phase refinement: 32 nodes in each refined direction agree with a 64^3
+  reference to at most 1.24e-13 absolute source error. A warmed 32^3 evaluation
+  including table setup took about 0.020 seconds and allocated 4.98 MB on this
+  host (allocation total, not peak RSS); one real field occupies 256 KiB.
+  This establishes quadrature convergence for the tested fixed support, not
+  convergence of solved profiles or a universal grid choice.
+  The RHS is implemented in `profiles.jl`; all 21 checks in
+  `test_nonlinear_rhs.jl` are registered and pass against the actual library.
+  These cover the single-cloud limit for all potentials, ordering, state
+  preservation, dimensions, driven-source signs/scaling, and zero-field slopes.
+  The state stores all R values then all Q values,
+  ordered by component and then l; the source is computed once from all R.
+  Next connect this RHS to the shared radial integrator and check a short
+  integration and radial step refinement. No joint profile has been solved yet.
+  A positive-frequency
+  boundary wrapper is present; its prototype checks still need adding to the
+  repository suite. Joint profile solves and the action closure
+  remain pending. Run
+  `julia --project=. tests/adiabatic/multiphase/runtests.jl`.
 - **Adiabatic layout refactor (October 12):** branch
   `refactor/adiabatic-layout` groups source and tests by `core/`,
   `single_cloud/`, and `primary_secondary/`. `multiphase/` has a scope README

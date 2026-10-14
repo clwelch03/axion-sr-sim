@@ -1,9 +1,18 @@
-# Multiphase adiabatic evolution: implementation and organization plan
+# Multiphase adiabatic evolution: implementation plan
 
-Updated 2026-10-12. The model-based source reorganization is implemented on
-`refactor/adiabatic-layout`; the multiphase physics remains a development plan. The action-flux closure below still
-requires a derivation for our open Kerr problem. [HANDOFF.md](../HANDOFF.md)
-remains the authority on current capabilities.
+Updated 2026-10-14. Independent-cloud labels, Fourier component construction,
+single-component linear radial assembly, and two-phase field reconstruction,
+projection, and nonlinear-source evaluation
+are implemented. The opt-in loader loads `core/`, `components.jl`,
+`profiles.jl`, and `projection.jl`. A boundary wrapper is also present;
+its prototype checks still need to enter the repository test suite.
+The source passes exact quartic checks, phase-origin checks, single-cloud
+comparisons for all three potentials, and a separate cosine quadrature study.
+The full radial RHS is implemented and its 21 checks pass against the library.
+Short radial integration and step-refinement checks remain.
+Joint profile solves remain unimplemented.
+The action-flux closure below still requires a derivation for our open Kerr
+problem. [HANDOFF.md](../HANDOFF.md) remains the authority on current capabilities.
 
 ## Objective and initial scope
 
@@ -25,141 +34,26 @@ Sec. III reproduction and the original extension sketch. The
 [literature review](multimode-literature-review-2026-09-28.md) and
 [October 6 proposal](further_work_1006.md) supply research context.
 
-## Recommended repository organization
+## Working approach
 
-**Keep this repository, but organize `src/adiabatic/` around physical models
-before adding the new implementation.** Use a feature branch, preferably in
-a separate Git worktree. The intended source groups are `core/`,
-`single_cloud/`, `primary_secondary/`, and `multiphase/`.
+Work on `main` in the existing checkout, one small piece at a time.
+The assistant explains strategies and mathematical choices, and sometimes
+supplies small, already-run snippets; the user writes the library code.
+Each piece gets a cheap decisive check and discussion before proceeding, as in
+[CLAUDE.md](../CLAUDE.md).
 
-Before the October 12 refactor, the structure mixed two organizing principles: `stationary/`,
-`observables/`, and `amplitude_evolution/` name numerical tasks, whereas
-`multimode/` names a physical approximation. Understanding the
-single-cloud model required traversing several sibling folders, and some
-apparently general files assumed one fundamental frequency. The refactor
-separates those model assumptions from shared mathematics.
+Implement the new model under `src/adiabatic/multiphase/`, with matching tests
+under `tests/adiabatic/multiphase/`. Add `components.jl`, `projection.jl`,
+`profiles.jl`, `actions.jl`, `fluxes.jl`, and `evolution.jl` as their milestones
+are reached. Reuse `core/` and the existing Julia project; seed-generation and
+comparison drivers may explicitly load the other models. Keep the multiphase
+loader opt-in and existing models independent of it. The
+[source guide](../src/adiabatic/README.md) owns the current file map and commands.
 
-The organizing rule should be: **choose the physical model first; find its
-profiles, observables, and evolution together.** Keep only demonstrated shared
-building blocks in `core/`. These repository choices serve different purposes
-and can be used together:
-
-| Choice | Recommendation | Reason |
-|---|---|---|
-| New repository | Do not create one at this stage | The new method shares geometry, angular bases, potentials, radial operators, boundary series, Newton solves, dependencies, and reference results with this project. A separate repository would duplicate those components or force premature packaging. |
-| Feature branch | First use `refactor/adiabatic-layout`, then `feat/multiphase-foundations` from the validated layout | Separates changes to file ownership and imports from new physics. Merge validated increments instead of maintaining one indefinitely diverging research branch. |
-| Git worktree | Prefer a separate worktree while the current solver is also being developed or used | A worktree is another checkout of the same repository, on its own branch. It avoids switching the shared checkout underneath other work or run scripts. It is not a separate project or fork. |
-| Source folders | Use `core/`, `single_cloud/`, `primary_secondary/`, and `multiphase/` | Gives each approximation a readable home. `primary_secondary/` states the asymmetric approximation more precisely than `multimode/`; two mutually deforming clouds belong in `multiphase/`. |
-| New campaign folder | Create `runs/adiabatic/multiphase_two_cloud/` when the first solves are ready | Keeps new seeds, results, diagnostics, and provenance distinct from the established secondary campaign. |
-
-The layout refactor uses branch `refactor/adiabatic-layout` in the existing
-checkout; a second worktree was not created. Future implementation should
-start from a recorded baseline revision
-containing the required shared helpers. Existing uncommitted changes in another
-checkout do not automatically appear in a new worktree; incorporate only the
-changes actually needed, through explicit reviewable commits. Do not stash,
-discard, or move unrelated work merely to create the new checkout.
-
-A worktree isolates checked-out source files, but it does not automatically
-isolate external output paths. Give each campaign a distinct checkpoint prefix.
-Record the source revision and any uncommitted source changes for runs; use a
-stable source checkout or snapshot for long jobs. Follow the existing
-[campaign preservation rules](../runs/README.md).
-
-### Current layout and future additions
-
-The [source guide](../src/adiabatic/README.md) owns the current file map and
-commands. Source and tests now follow the same model groups:
-
-```text
-src/adiabatic/
-  README.md
-  load.jl                # implemented models, preserving the public entry point
-  core/                  # reusable geometry, operators, boundaries, numerics
-  single_cloud/          # profiles, observables, continuation, evolution, drivers
-  primary_secondary/     # existing asymmetric approximation and its drivers
-  multiphase/            # scope README and core-only loader; physics still planned
-tests/adiabatic/
-  runtests.jl
-  core/
-  single_cloud/
-  primary_secondary/
-```
-
-For the new physics, add `components.jl`, `projection.jl`, `profiles.jl`,
-`actions.jl`, `fluxes.jl`, and `evolution.jl` under `multiphase/` as the milestones
-are implemented, with matching tests and model-specific drivers. Create
-`runs/adiabatic/multiphase_two_cloud/` when physical runs are ready, using the
-existing campaign structure. No new physics stubs or campaign outputs are
-needed merely to reserve the model's home.
-
-Reuse the existing Julia project and dependencies. `single_cloud/` depends on
-`core/`; `primary_secondary/` depends on `core/` and the single-cloud machinery
-that constructs its primary. The multiphase library should depend on `core/`;
-its seed-generation and comparison drivers may explicitly use the other
-models. No existing model should depend on experimental multiphase code.
-
-Give each group a loader with an explicit dependency order and a strategy that
-avoids repeated includes. Preserve the root loader's existing public behavior
-during migration; keep the new multiphase loader opt-in until validated. A
-directory is an ownership boundary, not automatically a new Julia package or
-module. Namespace/package changes are a separate decision and need not accompany
-this reorganization.
-
-### Migration map from the previous layout
-
-The refactor extracted shared functions from mixed files. Moving all of
-`stationary/` into `core/` would have incorrectly classified the one-phase
-ansatz as general machinery. This table records the old ownership and its
-replacement; exact current filenames are in the source guide.
-
-| Previous location | Current ownership |
-|---|---|
-| `angular.jl`, `tortoise.jl`, `observables/physical_normalization.jl` | Shared `core/` basis, geometry, and units |
-| Potential functions at the start of `stationary/nonlinear.jl` | `core/potentials.jl` |
-| Field reconstruction, projection, and harmonic RHS in `stationary/nonlinear.jl` | `single_cloud/projection.jl` and profile assembly |
-| Explicit-frequency coefficients in `stationary/radial.jl`, boundary series and per-block boundary data | `core/` |
-| Assembly that assigns frequency from `m / fundamental_m` in radial and boundary routines | `single_cloud/` |
-| Generic RK integration and Newton routines in `stationary/integration.jl` and `stationary/matching.jl` | `core/integration.jl` and `core/newton.jl` |
-| Matching residuals, mode solves, and continuation predictors tied to the single-cloud ansatz | `single_cloud/profiles.jl` and `continuation.jl` |
-| `observables/energy.jl` | `single_cloud/observables.jl`; extract shared low-level currents only when another model needs them |
-| Generic residual/observable differentiation in `amplitude_evolution/branch_sensitivity.jl` | `core/sensitivity.jl` |
-| Remaining `amplitude_evolution/` interpolation, fitting, and amplitude evolution | `single_cloud/` |
-| Existing `multimode/` library and current `qcd_spindown.py` | `primary_secondary/` |
-| Existing global `drivers/` | Each model's `drivers/`; reusable solve/setup functions currently imported from drivers belong in that model's library |
-| `plot_profiles.py` and campaign-specific plotting | Single-cloud tooling or the owning campaign, according to actual reuse |
-
-The core must not select which clouds are populated, prescribe the
-primary/secondary approximation, or contain special cases for a particular
-evolution campaign. Keep generalization driven by real callers rather than
-creating a large framework in advance. Small files with a clear purpose remain
-useful; the aim is coherent ownership, not merging everything into giant files.
-
-### Layout migration validation
-
-1. Record a baseline and run the existing cheap checks. Inventory Julia include
-   paths, Python imports, campaign scripts, and documented commands that depend
-   on the old locations.
-2. Extract the genuinely shared routines, then move each model's code in
-   reviewable changes. Preserve function signatures, equations, normalization,
-   serialized data layouts, and numerical settings. Separate algorithm changes
-   from this refactor.
-3. Update loaders, tests, live callers, and documentation together. Use thin
-   compatibility entry points where old commands or imports need to remain
-   usable; compatibility files must forward to the single implementation. Check
-   Python package discovery when placing code in new subpackages. Preserve
-   historical provenance and frozen campaign records instead of rewriting them
-   as if the new paths had always existed.
-4. Check the existing unit suite and a cheap representative profile/flux/rate
-   calculation against the recorded baseline. Validate driver entry points and
-   Python imports as well as Julia loading; expensive convergence campaigns are
-   unnecessary for a behavior-preserving move unless discrepancies appear.
-5. Add a short root README and one per model, naming its physical approximation,
-   inputs, outputs, dependencies, and entry point. Merge the layout change before
-   adding new multiphase physics.
-
-Campaign directories and expensive saved results can stay at their current
-paths. A source reorganization does not require migrating numerical artifacts.
+Create `runs/adiabatic/multiphase_two_cloud/` when physical runs are ready.
+Follow the [campaign preservation rules](../runs/README.md), with distinct
+checkpoint prefixes and recorded source revisions and uncommitted changes.
+Use a stable source snapshot for long jobs.
 
 ## Notation and what is averaged
 
@@ -199,6 +93,52 @@ angular expansion with indices $l\geq |m_{\mathbf q}|$. Independent clouds,
 Fourier components, and angular basis functions are distinct objects. Driven
 components need not acquire independent populations when their response can
 be determined by the occupied clouds.
+
+### Independent clouds, driven components, and interaction channels
+
+The length of every $\mathbf q$ is **the number $K$ of independent cloud
+phases**, not the number of retained Fourier components or angular functions.
+For two independent clouds, all four components in the table below have
+two-entry vectors. Retaining another driven component adds another vector,
+not another entry to each vector. Adding a third independent cloud adds a
+third entry to every vector; existing components acquire a zero in that entry.
+
+For example, adding a $411$ cloud with its own amplitude and phase to $211$
+and $322$ makes $K=3$. Here the cloud labels denote the linear-limit quantum
+numbers $(n,l,m)$, with $n$ the principal quantum number; $K$ avoids confusing
+that quantum number with the number of clouds. Clouds can share $l,m$ and
+still have independent phases and radial profiles.
+
+A driven component is a sourced field response, not the interaction process
+itself. For the two-cloud ordering $(211,322)$, a cubic source contains
+
+$$
+\bigl(R_1e^{-i\psi_1}\bigr)^2
+\bigl(R_2^*e^{+i\psi_2}\bigr)
+=R_1^2R_2^*e^{-i(2\psi_1-\psi_2)},
+$$
+
+where $R_a$ denotes the complex spatial coefficient of cloud $a$. This product
+has $\mathbf q=(2,-1)$, frequency $2\omega_{211}-\omega_{322}$, and $m=0$.
+It supplies the driven field associated with the familiar transfer channel
+$211+211\rightarrow322+\mathrm{BH}$; BH denotes horizon absorption.
+Its profile must be solved, but its phase is fixed by the two cloud phases.
+
+If the $411$ population is also evolved independently, the proposed channel
+$211+322\rightarrow411+\mathrm{BH}$ instead has a BH-directed component
+with $\mathbf q=(1,1,-1)$ in cloud order $(211,322,411)$:
+
+$$
+\Omega_{\mathbf q}=\omega_{211}+\omega_{322}-\omega_{411},
+\qquad m_{\mathbf q}=1+2-1=2.
+$$
+
+This is phase and azimuthal bookkeeping, not a calculation of that channel's
+rate or proof that it matters. An interaction-generated bound population can
+still require an independent cloud variable; its origin does not make it a
+slaved response. Conversely, “driven” does not require propagation to infinity:
+a below-threshold component can carry horizon flux. Near bound resonances,
+whether a response can remain slaved needs the checks in milestone 6.
 
 ## Implementation milestones
 
@@ -255,12 +195,15 @@ only at matching approximation order. The shared representation and projector
 can be developed while this derivation is underway; the general production
 evolution must wait for a defensible closure.
 
-### 2. Introduce explicit component labels
+### 2. Component labels, radial equations, and boundary conditions
 
 Represent each independent cloud by its linear-limit quantum numbers and
 normalization convention. Represent each Fourier block by $\mathbf q$ and its
 retained $l$ values; derive its frequency and azimuthal integer from the cloud
-vectors.
+vectors. Start with a small representation containing `q` and `l_values`.
+Keep the cloud frequency vector separate from these labels because frequencies
+change along the nonlinear family. Require `length(q) == K` and distinct
+retained integer $l\geq|m_{\mathbf q}|$; group blocks by `q`, not by $m$.
 
 For the existing two-cloud example:
 
@@ -271,10 +214,15 @@ For the existing two-cloud example:
 | Driven dissipative component | $(2,-1)$ | $2\omega_1-\omega_2$ | 0 |
 | Driven radiative component | $(-1,2)$ | $2\omega_2-\omega_1$ | 3 |
 
-The assembled stationary code currently derives frequency from
-`frequency * m / fundamental_m`. Add explicit-frequency block assembly using
-the lower-level helpers in [radial.jl](../src/adiabatic/core/radial_operator.jl)
-and [boundaries.jl](../src/adiabatic/core/boundaries.jl). Define and check
+The single-cloud assembly (`linear_tortoise_rhs!` and `boundary_state` in
+[single_cloud/profiles.jl](../src/adiabatic/single_cloud/profiles.jl)) derives
+frequency from the harmonic multiple `m / fundamental_m`. The shared
+`radial_operator_coefficients` and `tortoise_operator_coefficients` in
+[core/radial_operator.jl](../src/adiabatic/core/radial_operator.jl), and
+`horizon_boundary_data` and `outer_boundary_data` in
+[core/boundaries.jl](../src/adiabatic/core/boundaries.jl), already accept the
+actual component frequency. Reuse them in new multiphase block assembly;
+the existing single-cloud assembly keeps its physical assumptions. Define and check
 the conventions for zero/signed $m$, negative-frequency conjugates, and
 bound/outgoing boundary selection. Do not silently merge distinct components
 merely because they have the same $m$.
@@ -282,29 +230,489 @@ merely because they have the same $m$.
 **Checkpoint:** reproduce existing radial operators and boundary states with
 the new representation, including the driven $m=0$ block.
 
+#### 2.1 The field represented by a component
+
+Use $x=\cos\theta$. Let $Y_{lm}(x)$ denote the real polar function normalized by
+
+$$
+\int_{-1}^{1}Y_{lm}(x)Y_{l'm}(x)\,dx=\delta_{ll'}.
+$$
+
+For signed $m$, choose $Y_{lm}=Y_{l,|m|}$ from the existing polar table. This
+fixes our basis convention; any alternative constant phase for negative $m$
+would have to be absorbed into the radial coefficients. There is no extra
+$1/\sqrt{2\pi}$ factor in these functions.
+
+For each retained phase vector, define its spatial coefficient
+
+$$
+F_{\mathbf q}(r,x)=\sum_{l\in L_{\mathbf q}}
+R_{l,\mathbf q}(r)Y_{l,m_{\mathbf q}}(x),
+$$
+
+where $L_{\mathbf q}$ is the chosen list of angular indices. The contribution
+to the real scalar field is
+$F_{\mathbf q}e^{-i\mathbf q\cdot\boldsymbol\psi}+\text{complex conjugate}$.
+Each $R_{l,\mathbf q}$ is an unrescaled radial profile: no factor of $1/r$ is
+included. Its value at one radius is distinct from a slow cloud coordinate
+$A_a$, and from a leading boundary-series coefficient.
+
+#### 2.2 The radial equation and the assembled matrix
+
+Work in units $M=1$. Write $a_{\rm BH}$ for the dimensionless Kerr spin (the
+code's `spin`) and $\alpha=M\mu$ for the scalar mass parameter. Define
+
+$$
+\Delta=r^2-2r+a_{\rm BH}^2,\qquad H=r^2+a_{\rm BH}^2,
+\qquad \frac{dr_*}{dr}=\frac{H}{\Delta}.
+$$
+
+For a fixed component, abbreviate $\Omega=\Omega_{\mathbf q}$ and
+$m=m_{\mathbf q}$. The spatial radial equation at frozen amplitudes is
+
+$$
+\frac{d}{dr}\left(\Delta\frac{dR_{l,\mathbf q}}{dr}\right)
++B_{l,\mathbf q}R_{l,\mathbf q}
++a_{\rm BH}^2(\Omega^2-\alpha^2)
+\sum_{l'}C^m_{ll'}R_{l',\mathbf q}
++N_{l,\mathbf q}=0,
+$$
+
+$$
+B_{l,\mathbf q}=
+\frac{[H\Omega-a_{\rm BH}m]^2}{\Delta}
++2a_{\rm BH}m\Omega-a_{\rm BH}^2\Omega^2
+-\alpha^2r^2-l(l+1),
+\qquad
+C^m_{ll'}=\int_{-1}^{1}Y_{lm}(x)x^2Y_{l'm}(x)\,dx.
+$$
+
+$N_{l,\mathbf q}$ is the nonlinear source defined in milestone 3. The
+linear terms mix angular indices within a fixed $\mathbf q$; the nonlinear
+source couples different $\mathbf q$ values. Assembling this spatial equation
+does not yet supply the slow-growth terms required by milestone 1.
+
+Collect the retained radial profiles into $\mathbf R_{\mathbf q}$ and define
+$\mathbf Q_{\mathbf q}=d\mathbf R_{\mathbf q}/dr_*$. Then
+
+$$
+\frac{d\mathbf R_{\mathbf q}}{dr_*}=\mathbf Q_{\mathbf q},\qquad
+\frac{d\mathbf Q_{\mathbf q}}{dr_*}
+=-p\mathbf Q_{\mathbf q}-V_{\mathbf q}\mathbf R_{\mathbf q}
+-s\mathbf N_{\mathbf q},
+$$
+
+$$
+s=\frac{\Delta}{H^2},\qquad p=2rs,\qquad
+(V_{\mathbf q})_{ll'}=
+s\left[B_{l,\mathbf q}\delta_{ll'}+
+a_{\rm BH}^2(\Omega^2-\alpha^2)C^m_{ll'}\right].
+$$
+
+An **operator** here is the rule taking profiles and their derivatives to
+the left-hand side of the radial equation. The implemented linear assembly
+returns $p$ and $V_{\mathbf q}$. Near the horizon, evaluate these through the
+existing regularized core helper, which cancels the apparent $1/\Delta$
+singularity analytically. Do not numerically form divergent $B$ and then
+multiply by a vanishing $s$.
+
+#### 2.3 Boundary series and their coefficients
+
+Let $r_\pm=1\pm\sqrt{1-a_{\rm BH}^2}$. At the horizon, use the ingoing series
+
+$$
+\mathbf R_{\mathbf q}(r)\simeq
+(r-r_+)^{\nu_H}\sum_{j=0}^{J_H}\mathbf b_{H,j}(r-r_+)^j,
+\qquad
+\nu_H=-i\frac{2r_+\Omega-a_{\rm BH}m}{r_+-r_-}.
+$$
+
+At large radius, use
+
+$$
+\mathbf R_{\mathbf q}(r)\simeq e^{ikr}r^{\nu_\infty}
+\sum_{j=0}^{J_\infty}\frac{\mathbf b_{\infty,j}}{r^j},
+\qquad
+\nu_\infty=-1+i\frac{2\Omega^2-\alpha^2}{k}.
+$$
+
+Here $J_H,J_\infty$ are series truncation orders. For real positive $\Omega$,
+choose $k=i\sqrt{\alpha^2-\Omega^2}$ below the mass threshold (decaying),
+or $k=\sqrt{\Omega^2-\alpha^2}$ above it (outgoing). The existing core helper
+defines the continuation for complex frequency. Exact $k=0$ requires a
+different expansion.
+
+The input `leading_coefficients` is $\mathbf b_{H,0}$ or
+$\mathbf b_{\infty,0}$, with one entry per retained $l$. Higher coefficients
+follow from the radial equation. Evaluate both the series and its tortoise
+derivative to obtain the boundary state $[\mathbf R;\mathbf Q]$.
+The current wrapper supports signed/zero $m$ and finite
+$\operatorname{Re}\Omega>0$; static and negative-frequency representatives
+remain outside its supported boundary convention.
+
+**Checks already used in prototypes:** compare linear and boundary assembly
+to the single-cloud implementation; compare $m=0$ to analytic expressions;
+permute angular indices and require the same permutation of states and both
+matrix axes. Preserve separate blocks when two components share $m$.
+
 ### 3. Generalize nonlinear projection
 
-Reconstruct the real field from the retained components on a polar/phase
-quadrature grid, evaluate the existing cosine/quartic/sextic potential
-functions, and project the nonlinear remainder onto each retained component.
-The current fixed-time azimuthal projection cannot distinguish every
-independent-frequency component. The new representation must preserve the
-existing factor-of-two and angular normalization conventions.
+**Purpose:** compute $N_{l,\mathbf q}$ from the joint real field. Projection
+means extracting the coefficient of a chosen phase and angular pattern.
+The real-field reconstruction convention, angular basis, and potential
+functions already have tests in the existing model. Reuse them. The new
+mathematics is the independent-phase average, which distinguishes components
+that a fixed-time azimuthal average combines.
 
-Start with two phase dimensions and a small explicitly chosen component set.
-Compare quartic projections against direct algebraic products. Then test the
-cosine potential and refine phase quadrature independently of the Fourier
-truncation and angular resolution. Measure sources in selected omitted
-components to guide expansion of the retained set.
+Start at one radius, with prescribed complex radial coefficients. No profile
+solve, boundary matching, or time evolution is needed to check this operation.
 
-**Checkpoint:** recover the single-phase projection, exact quartic selection
-rules and coefficients, and the known dilute driven sources. Verify that
-changing phase origins transforms coefficients consistently without changing
-averaged observables.
+#### 3.1 Retained components and real-field reconstruction
 
-Tensor phase grids grow rapidly with $K$. Measure the prototype's cost before
-choosing a more scalable projection method; do not promise arbitrary cloud
-counts from a two-phase implementation.
+Let $\mathcal Q$ be a finite set of nonzero integer phase vectors, containing
+at most one member of each conjugate pair $\{\mathbf q,-\mathbf q\}$.
+Together with the angular lists $L_{\mathbf q}$, it defines the truncation.
+At a fixed radius, reconstruct
+
+$$
+\Phi(x,\boldsymbol\psi)
+=\sum_{\mathbf q\in\mathcal Q}
+\left[F_{\mathbf q}(x)e^{-i\mathbf q\cdot\boldsymbol\psi}
++F_{\mathbf q}(x)^*e^{+i\mathbf q\cdot\boldsymbol\psi}\right]
+=2\operatorname{Re}\sum_{\mathbf q\in\mathcal Q}
+F_{\mathbf q}(x)e^{-i\mathbf q\cdot\boldsymbol\psi}.
+$$
+
+The factor of two supplies the conjugate partner; it must not appear a second
+time in the projector. In the signed polar convention of section 2.1,
+$F_{-\mathbf q}=F_{\mathbf q}^*$. A zero vector would be its own conjugate
+and needs a separate real coefficient; exclude it from this first prototype.
+A component with $m=0$ and nonzero $\mathbf q$, such as $(2,-1)$, uses the
+same formula and can oscillate in time: $m=0$ does not imply $\Omega=0$.
+
+The projector itself does not need numerical carrier frequencies. It uses
+the integer phase labels, the cloud azimuthal integers, and the radial
+coefficients. When using these components in the boundary problem, choose
+representatives compatible with its positive-frequency convention and detect
+any approach to zero frequency separately.
+
+#### 3.2 The continuous projector and its normalization
+
+Define the normalized average over independent phases by
+
+$$
+\langle G\rangle_\psi=
+\frac{1}{(2\pi)^K}\int_0^{2\pi}\!d\psi_1\cdots
+\int_0^{2\pi}\!d\psi_K\,G(\boldsymbol\psi).
+$$
+
+Integer Fourier patterns obey
+
+$$
+\left\langle e^{i(\mathbf q-\mathbf p)\cdot\boldsymbol\psi}
+\right\rangle_\psi=\delta_{\mathbf q,\mathbf p}.
+$$
+
+For a real polar/phase field $G$, define
+
+$$
+\mathcal P_{l,\mathbf q}[G]=
+\int_{-1}^{1}dx\,Y_{l,m_{\mathbf q}}(x)
+\left\langle e^{+i\mathbf q\cdot\boldsymbol\psi}
+G(x,\boldsymbol\psi)\right\rangle_\psi.
+$$
+
+Combining phase orthogonality with polar orthonormality gives
+$\mathcal P_{l,\mathbf q}[\Phi]=R_{l,\mathbf q}$ for retained entries, and
+zero for unpopulated entries. This fixes the sign and normalization of the
+new projector. There is no additional azimuthal integral or factor of $2\pi$
+in this coefficient extraction.
+
+This is an algebraic identity on the phase torus (the product of the phase
+circles). Interpreting a torus average as the appropriate dynamical average
+still requires the nonresonance and timescale checks in milestones 1 and 6.
+Distinct labels must not be assumed dynamically incoherent merely because
+this mathematical projection separates them.
+
+#### 3.3 The first decisive test: equal angular pattern, different phases
+
+Use cloud azimuthal integers $(m_1,m_2)=(1,2)$ and retain just
+
+$$
+\mathbf q_A=(3,0),\qquad \mathbf q_B=(-1,2),\qquad
+m_{\mathbf q_A}=m_{\mathbf q_B}=3,\qquad l_A=l_B=3.
+$$
+
+Choose complex radial coefficients $u=0.2+0.1i$ and $v=-0.07+0.04i$.
+Then
+
+$$
+\Phi=2Y_{33}(x)\operatorname{Re}
+\left[u e^{-3i\psi_1}+v e^{-i(-\psi_1+2\psi_2)}\right].
+$$
+
+The required results are
+
+$$
+\mathcal P_{3,\mathbf q_A}[\Phi]=u,\qquad
+\mathcal P_{3,\mathbf q_B}[\Phi]=v.
+$$
+
+If instead we set both temporal phase origins to zero and sample only the
+physical azimuth, then $\psi_1=-\varphi$, $\psi_2=-2\varphi$. Both factors
+become $e^{3i\varphi}$: azimuthal projection recovers $u+v$. This is precisely
+the distinction the existing one-phase reconstruction cannot supply.
+
+Use the existing polar tables and a modest, adequately resolved phase grid;
+16 polar nodes and $9\times9$ phase nodes suffice for this particular linear
+round trip. Require recovery to floating-point quadrature accuracy, including
+the imaginary parts. These are bookkeeping test coefficients, not a solved
+physical profile.
+
+**Library reconstruction and projector checked (October 13):**
+`tests/adiabatic/multiphase/test_phase_separation.jl` reconstructs the field
+using `reconstruct_two_phase_field_at_radii` (one radius per call), and
+evaluates the projection sums explicitly. All three separation checks pass:
+the two coefficients are recovered
+separately with maximum absolute error $3.11\times10^{-16}$, and the
+azimuth-only projection recovers their sum. Five additional checks cover
+unequal phase-grid sizes, the phase sign, an empty input field, and dimension
+mismatches. Five further checks exercise `project_two_phase_field`: recovery
+of both known coefficients, zero for an absent component, conjugate recovery
+at negative $\mathbf q$, and projection of an independently constructed sine
+field on unequal phase grids. Sections 3.1 and 3.2 now have tested library
+implementations using the discrete quadrature in section 3.6.
+
+#### 3.4 Evaluate the nonlinear remainder, then project it
+
+Let $U$ be the dimensionless potential, excluding its overall $\alpha^2$.
+Define $h(\Phi)=\Phi-U'(\Phi)$, so the existing potentials give
+
+$$
+h(\Phi)=
+\begin{cases}
+\Phi-\sin\Phi,&\text{cosine},\\
+\Phi^3/6,&\text{quartic},\\
+\Phi^3/6-\Phi^5/120,&\text{sextic}.
+\end{cases}
+$$
+
+The source in the radial equation is
+
+$$
+\boxed{N_{l,\mathbf q}(r)=
+\alpha^2\mathcal P_{l,\mathbf q}
+\left[(r^2+a_{\rm BH}^2x^2)h(\Phi)\right].}
+$$
+
+Evaluate $h$ on the **joint** field; applying it to each cloud separately
+loses the cross terms. Include the geometric factor inside the polar
+projection: it can mix angular indices. This source enters the radial
+equation with a plus sign, hence contributes $-sN_{l,\mathbf q}$ to
+$dQ_{l,\mathbf q}/dr_*$. Apply that tortoise factor once, after projection.
+
+The output component set may include selected labels absent from the input
+field. Their projected sources measure which omitted components are driven.
+This does not mean they have already acquired solved radial profiles.
+
+**Source checkpoint (October 14):** `nonlinear_two_phase_source` implements
+this expression. All five checks in
+`tests/adiabatic/multiphase/test_nonlinear_source.jl` pass against the library:
+the two integrated quartic formulas below, a parity-forbidden angular output,
+a phase label absent from the cubic convolution, and a zero field. The source
+is now connected to the tested radial RHS (section 3.8). Twelve additional checks compare the
+single-cloud limit for quartic, sextic, and cosine potentials: with only
+$R_{1,(1,0)}$ populated, fundamental and generated third-harmonic sources agree
+with the single-cloud implementation, the third harmonic is nonzero, and the
+$(l,\mathbf q)=(3,(-1,2))$ source vanishes. These comparisons use a fixed
+24-by-64-by-11 polar/phase grid, with $\psi_1=-\varphi$ to match the old
+azimuthal convention. Subsequent checks in `test_source_validation.jl` cover the
+complete quartic table, phase origins, and cosine quadrature as recorded below.
+
+#### 3.5 Exact quartic benchmarks before the cosine potential
+
+For the quartic potential, the nonlinear field is a finite Fourier
+convolution. Extend the input set by its conjugates to
+$\mathcal S=\mathcal Q\cup(-\mathcal Q)$. At each polar coordinate,
+
+$$
+\widehat h_{\mathbf q}(x)
+\equiv\left\langle e^{i\mathbf q\cdot\boldsymbol\psi}
+\frac{\Phi^3}{6}\right\rangle_\psi
+=\frac16\sum_{\substack{\mathbf p,\mathbf s,\mathbf t\in\mathcal S\\
+\mathbf p+\mathbf s+\mathbf t=\mathbf q}}
+F_{\mathbf p}(x)F_{\mathbf s}(x)F_{\mathbf t}(x).
+$$
+
+The sum is over ordered triples; their multiplicities determine the
+coefficients. It provides a reference independent of phase quadrature.
+In particular, let the input contain only the two fundamentals,
+$F_{(1,0)}=f_1(x)$ and $F_{(0,1)}=f_2(x)$. Selected exact outputs are:
+
+| Output label | Exact phase coefficient $\widehat h_{\mathbf q}$ |
+|---|---|
+| $(1,0)$ | $\tfrac12\lvert f_1\rvert^2f_1+\lvert f_2\rvert^2f_1$ |
+| $(0,1)$ | $\tfrac12\lvert f_2\rvert^2f_2+\lvert f_1\rvert^2f_2$ |
+| $(2,-1)$ | $\tfrac12 f_1^2f_2^*$ |
+| $(-1,2)$ | $\tfrac12 f_2^2f_1^*$ |
+| $(3,0)$ | $f_1^3/6$ |
+| $(0,3)$ | $f_2^3/6$ |
+| $(1,1)$ | $0$ |
+
+First check these phase coefficients, then integrate them against
+$\alpha^2Y_{l,m_{\mathbf q}}(r^2+a_{\rm BH}^2x^2)$ to check the complete
+radial source. For pure $211$/$322$ angular shapes, set
+$f_1=uY_{11}$ and $f_2=vY_{22}$; $u,v$ are local complex radial coefficients.
+Two fully integrated benchmarks in our polar normalization are
+
+$$
+N_{0,(2,-1)}=
+\alpha^2u^2v^*\frac{\sqrt{30}}{20}
+\left(r^2+\frac{a_{\rm BH}^2}{7}\right),
+$$
+
+$$
+N_{3,(-1,2)}=
+\alpha^2v^2u^*\frac{\sqrt{210}}{42}
+\left(r^2+\frac{a_{\rm BH}^2}{11}\right).
+$$
+
+These follow by integrating the explicit polar polynomials and square-root
+factors, and test the driven-source normalization. They test source terms,
+not the driven profiles or their fluxes. Also check an angular projection
+forbidden by polar parity, and a phase label absent from the convolution.
+
+**Checked (October 14):** all seven rows of the phase-coefficient table pass
+at every sampled polar node, and their integrated sources agree with the
+library (14 checks). The two fully analytic integrated benchmarks and forbidden
+outputs also pass in `test_nonlinear_source.jl`.
+
+#### 3.6 Discrete quadrature and aliasing
+
+For $K=2$, use Gauss–Legendre polar nodes $x_i$ with weights $w_i$ and uniform
+phase nodes $\psi_{a,j}=2\pi j/n_a$, $j=0,\ldots,n_a-1$. Here $n_a$ is a
+phase-grid size, not a cloud principal quantum number. Approximate
+
+$$
+\mathcal P_{l,\mathbf q}[G]\simeq
+\sum_i w_iY_{l,m_{\mathbf q}}(x_i)
+\frac{1}{n_1n_2}\sum_{j=0}^{n_1-1}\sum_{k=0}^{n_2-1}
+e^{i(q_1\psi_{1,j}+q_2\psi_{2,k})}G(x_i,\psi_{1,j},\psi_{2,k}).
+$$
+
+Discrete phase orthogonality distinguishes integer vectors only modulo the
+grid sizes. Frequencies separated by an integer multiple of $n_a$ in every
+phase direction are aliased. Derive the grid requirement from input and
+requested output supports, including the implicit conjugates.
+
+For a polynomial term of degree $d$, let
+$Q_a=\max_{\mathbf q\in\mathcal S}|q_a|$ and
+$T_a=\max_{\mathbf q\in\mathcal Q_{\rm out}}|q_a|$, where
+$\mathcal Q_{\rm out}$ is the set of requested output phase labels. A simple
+sufficient condition for alias-free extraction of those outputs is
+
+$$
+n_a>dQ_a+T_a\quad\text{for every phase direction }a.
+$$
+
+For reconstruction/projection on the same support this gives $n_a>2Q_a$.
+For a cubic remainder projected onto that support it gives $n_a>4Q_a$; for
+the quintic term, $n_a>6Q_a$. Requesting higher omitted components can require
+a larger grid. This bound concerns phase aliasing only; polar quadrature
+must be checked separately.
+
+The cosine remainder has unbounded Fourier support. Reuse its stable
+small-field evaluation and refine phase resolution until target sources
+converge. Vary $n_1$, $n_2$, and the polar node count independently while
+holding the retained component set fixed. Then vary the retained Fourier
+and angular sets separately. Quadrature convergence alone does not establish
+truncation convergence of a solved field.
+
+**Quadrature checkpoint (October 14):** `test_source_validation.jl` uses
+$R_{1,(1,0)}=2.3+0.7i$, $R_{2,(0,1)}=1.6-0.5i$, $r=8$, $a=0.7$, and
+$\alpha=0.2$. Seven requested outputs include both fundamentals, both driven
+components, both third harmonics, and $(l,\mathbf q)=(5,(1,0))$. Against a
+$64^3$ reference, varying one grid count while holding the others at 64 gives:
+
+| Refined direction | 8 nodes | 16 nodes | 32 nodes |
+|---|---:|---:|---:|
+| Polar | $6.33\times10^{-3}$ | $6.98\times10^{-12}$ | $8.28\times10^{-14}$ |
+| First phase | $7.39\times10^{-2}$ | $7.25\times10^{-7}$ | $9.62\times10^{-14}$ |
+| Second phase | $4.51\times10^{-2}$ | $3.79\times10^{-8}$ | $1.24\times10^{-13}$ |
+
+Entries are maximum absolute source errors over the seven outputs. The joint
+$32^3$ grid also agrees within $10^{-10}$. On this host a warmed evaluation
+including table setup took about 0.020 seconds and allocated 4.98 MB; one real
+field occupies 256 KiB. Allocated bytes are not peak process memory. These
+13 regression checks establish convergence for this fixed input/output support;
+grid adequacy and retained-support convergence must be revisited for solved fields.
+
+#### 3.7 Phase-origin and single-phase checks
+
+For a vector of phase shifts $\boldsymbol\delta$, transform the input by
+
+$$
+\widetilde R_{l,\mathbf q}=e^{-i\mathbf q\cdot\boldsymbol\delta}R_{l,\mathbf q}.
+$$
+
+This gives $\widetilde\Phi(\boldsymbol\psi)=
+\Phi(\boldsymbol\psi+\boldsymbol\delta)$, so the projected source must obey
+
+$$
+\widetilde N_{l,\mathbf q}=
+e^{-i\mathbf q\cdot\boldsymbol\delta}N_{l,\mathbf q}.
+$$
+
+Phase-averaged quantities such as $\langle U(\Phi)\rangle_\psi$ remain
+unchanged, up to quadrature error. Check shifts in both phase directions.
+
+For comparison to the established single-cloud projector, retain only
+$\mathbf q=(j,0)$ with positive integer $j$, and take $m_1=1$.
+At zero temporal phase, $\psi_1=-\varphi$, giving
+$e^{-ij\psi_1}=e^{+ij\varphi}$ as in the existing implementation. Map
+$R_{l,(j,0)}$ to its existing $(l,m=j)$ input and compare projected sources
+for all three potentials. The second phase average integrates a constant.
+This verifies compatibility with the old convention rather than requiring
+the old angular machinery to be rebuilt.
+
+**Checked (October 14):** for all three potentials, source covariance and
+phase-averaged potential invariance pass for shifts $(0.37,0)$, $(0,-0.53)$,
+and $(0.37,-0.53)$ (18 checks). The shifts are not integer grid translations.
+Potential invariance is tested at each polar node before polar integration.
+The single-cloud comparisons above also pass.
+
+#### 3.8 Order of implementation and acceptance
+
+1. Specify the retained input pairs and requested output labels; establish
+   polar and phase quadrature with the normalization above.
+2. Recover the two coefficients in the equal-$l,m$ test in section 3.3.
+3. Recover the quartic convolution coefficients and integrated driven-source
+   benchmarks in section 3.5, including forbidden outputs.
+4. Recover the single-phase sources and phase-origin covariance.
+5. Demonstrate separate polar/phase convergence for the cosine potential,
+   and measure selected omitted-component sources.
+6. Feed the source into $d\mathbf Q/dr_*=-p\mathbf Q-V\mathbf R-s\mathbf N$
+   with the same ordering as the linear block. Check the single-cloud limit
+   of the complete radial right-hand side.
+
+Each item is a small development step with an explicit expected result.
+Measure runtime and memory for the initial two-phase grid; its point count
+is $n_{\rm polar}n_1n_2$. Tensor phase grids grow rapidly with $K$, so defer
+a scalable many-cloud projector until this prototype's cost is known.
+Passing these checks establishes a nonlinear source evaluator, not a joint
+stationary solution, an action closure, or physical evolution.
+
+**RHS checkpoint (October 14):** the implemented `nonlinear_two_phase_rhs!` computes
+one joint source and assembles each linear component block in state order
+$[R_1,\ldots,R_n,Q_1,\ldots,Q_n]$. It passes 21 library checks in
+`test_nonlinear_rhs.jl`: full single-cloud RHS comparisons for all three
+potentials, component/angular permutations, state preservation, dimension
+checks, analytic driven-source signs and tortoise scaling, and a zero-field
+test with nonzero slopes. The function is in `profiles.jl`, and the tests are
+registered in the multiphase runner; all 115 checks pass. This completes the
+local source/RHS checkpoint. Next connect the RHS to the shared radial
+integrator and verify a short integration and radial step refinement, before
+attempting a joint boundary-matching solve.
 
 ### 4. Construct a jointly deformed two-cloud family
 
@@ -319,6 +727,34 @@ selected configurations and short continuation paths rather than a dense
 rectangular amplitude table. Include higher components according to an
 explicit truncation whose effects can be measured.
 
+Once milestone 1 has specified a consistent profile problem, its numerical
+matching part will compare inner and outer integrations at a common radius:
+
+$$
+\mathbf G_{\rm match}=
+\begin{pmatrix}
+\mathbf R_H(r_{*,\rm match})-\mathbf R_\infty(r_{*,\rm match})\\
+\mathbf Q_H(r_{*,\rm match})-\mathbf Q_\infty(r_{*,\rm match})
+\end{pmatrix}=0.
+$$
+
+Here the vectors concatenate all retained $(l,\mathbf q)$ entries in a fixed
+order. The inner and outer integrations use the joint nonlinear source,
+not separate per-cloud nonlinearities. The unknowns include free leading
+boundary coefficients and the carrier frequencies; any slow-growth or
+solvability variables must come from milestone 1. Convert complex residuals
+to real and imaginary parts for Newton differentiation, because reconstruction
+depends on both coefficients and their conjugates.
+
+Define the cloud normalization explicitly before counting unknowns. For
+example, if a selected fundamental outer coefficient defines $A_a$, choose
+that coefficient real and equal to $A_a$ and eliminate it from the free
+unknowns. This is a possible coordinate choice, not an identification of
+$A_a$ with cloud energy. Other normalization choices require their own
+constraints and derivatives. Matching the frozen spatial equation alone
+does not resolve the open-boundary solvability issue or prove that a real-
+frequency periodic family exists.
+
 **Checkpoint:** recover the primary-only limit and the corresponding
 small-secondary truncation, then demonstrate a converged change in the primary
 caused by the secondary. Compute total $E$ and $J$ from the joint field.
@@ -327,7 +763,7 @@ boundary, or Fourier convergence.
 
 ### 5. Compute actions, response derivatives, and slow evolution
 
-Extend [branch_sensitivity.jl](../src/adiabatic/core/sensitivity.jl)
+Extend [core/sensitivity.jl](../src/adiabatic/core/sensitivity.jl)
 from a scalar amplitude derivative to multiple amplitude directions. If
 $G(u,\mathbf A)=0$ is the discretized profile residual, with $u$ the vector of
 profile unknowns, differentiate it as
@@ -340,6 +776,42 @@ Reuse one Jacobian factorization for all amplitude directions. Propagate the
 response into the actions and other observables to obtain $D_{ab}$ and total
 derivatives. Cross-check selected derivatives with finite differences between
 independently corrected profile solutions.
+
+In particular, the action response must include both explicit and induced
+profile dependence:
+
+$$
+D_{ab}=\left.\frac{\partial I_a}{\partial A_b}\right|_u
++\sum_j\frac{\partial I_a}{\partial u_j}\frac{\partial u_j}{\partial A_b}.
+$$
+
+Apply the same chain rule to $E$ and $J$. On a family for which the milestone 1
+identities have been established, the independently evaluated derivatives
+should satisfy
+
+$$
+\frac{dE}{dA_b}=\sum_a\omega_aD_{ab},\qquad
+\frac{dJ}{dA_b}=\sum_a m_aD_{ab}.
+$$
+
+This explains the proposed closure's balance check: combining $D\dot{\mathbf A}
+=\mathbf S$ with these identities yields
+
+$$
+\dot E=-\sum_{\mathbf q}F_{E,\mathbf q},\qquad
+\dot J=-\sum_{\mathbf q}\frac{m_{\mathbf q}}{\Omega_{\mathbf q}}
+F_{E,\mathbf q}.
+$$
+
+These are consequences conditional on the action identities and proposed
+sources, not a derivation of them. Compute each channel's angular flux
+independently to check its ratio to energy flux. In the single-cloud limit,
+the same identities give the familiar rate
+$\dot A=-F_E/(dE/dA)$, with $F_E$ the total signed loss. For the dilute
+two-cloud channels, the proposed action source assigns changes proportional
+to $(-2,+1)$ for $\mathbf q=(2,-1)$ and $(+1,-2)$ for $\mathbf q=(-1,2)$,
+with proportionality factor $F_{E,\mathbf q}/\Omega_{\mathbf q}$ for each.
+These supply explicit comparison targets for the closure derivation.
 
 Evaluate channel-resolved boundary fluxes and integrate the resulting slow
 amplitude/action equations. Keep the profile solver separate from the time
@@ -383,12 +855,23 @@ evolutions to test it.
 
 ## First development increment and completion criteria
 
-The **behavior-preserving layout migration** above is complete; its validation
-is recorded in the project handoff. The first new-physics increment is **component representation plus the two-phase
-nonlinear projector**, alongside the written closure derivation. Its useful
+The first increment is **component representation plus the two-phase nonlinear
+projector**, alongside the written closure derivation. Its useful
 output is tested infrastructure and explicit conventions, without committing
 the joint solver to an unverified evolution law. Follow the incremental
 development conventions in [CLAUDE.md](../CLAUDE.md).
+
+The labels and linear radial assembly are present, with repository unit tests.
+The positive-frequency boundary wrapper is present; transfer its prototype
+checks into the test suite and run them against the actual implementation.
+The two-phase projector now passes the same-$l,m$ benchmark in section 3.3.
+Nonlinear-source evaluation now passes the quartic table, single-cloud limit,
+phase-origin, and fixed-support cosine convergence checks recorded in section 3.
+The full RHS also passes its library checks in section 3.8. Next verify a short
+radial integration and step refinement using the shared integrator.
+The closure derivation remains open; the
+milestone numbering does not require finishing it before these projection
+checks, but the joint solver and production evolution depend on it.
 
 The first physics result is a converged measurement of how a populated
 secondary reshapes the primary. The first result establishing the new closure
@@ -398,6 +881,6 @@ or a large amplitude grid.
 Keep derivations and final conventions in design documentation, checkpoint
 status in `HANDOFF.md`, and run commands, resolution studies, source revisions,
 inputs, and saved evidence in campaign READMEs. Submit expensive solves through
-Slurm under the existing project conventions. Merge each validated foundation
-in a focused change, keeping experimental drivers opt-in until their physical
-checks are complete.
+Slurm under the existing project conventions. Keep each validated foundation
+in a focused change on the agreed working branch, keeping experimental drivers
+opt-in until their physical checks are complete.

@@ -110,3 +110,60 @@ function nonlinear_two_phase_source(radial_values, radius, spin, alpha,
 
     return Dict(pair => alpha^2 * coefficient for (pair, coefficient) in projected)
 end
+
+"""
+    build_polar_theta_derivatives(polar_values, cosine_theta_nodes)
+
+Construct `partial_theta Phi` by replacing `Y_lm` with `partial_theta Y_lm`
+in the definition of `Phi`. Compute `partial_theta Y_lm` using the recurrence relation
+for associated Legendre polynomials. Gauss-Legendre nodes avoid poles.
+"""
+function build_polar_theta_derivatives(polar_values, cosine_theta_nodes)
+    all(x -> -1 < x < 1, cosine_theta_nodes) ||
+        throw(ArgumentError("require polar nodes strictly between -1 and 1"))
+    sine_theta = sqrt.(1 .- cosine_theta_nodes.^2)
+
+    return Dict((l, m) => begin
+        lower_term = l == m ? zero.(values) :
+            sqrt((2l + 1) * (l^2 - m^2) / (2l - 1)) .* polar_values[(l-1, m)]
+        (l .* cosine_theta_nodes .* values .- lower_term) ./ sine_theta
+    end for ((l, m), values) in polar_values)
+end
+
+"""
+    reconstruct_two_phase_field_derivatives(radial_values, tortoise_slopes,
+        tortoise_radius, spin, cloud_frequencies, cloud_m, polar_values,
+        grid, phase1_nodes, phase2_nodes)
+
+Calculate and return the combined field and each derivative term inside the
+stress-energy tensor of a two-field configuration. Uses `build_polar_theta_derivatives`
+to construct `partial_theta Phi` for brevity.
+"""
+function reconstruct_two_phase_field_derivatives(radial_values, tortoise_slopes,
+        tortoise_radius, spin, cloud_frequencies, cloud_m, polar_values,
+        grid, phase1_nodes, phase2_nodes)
+    length(cloud_frequencies) == length(cloud_m) == 2 ||
+        throw(DimensionMismatch("require two carrier frequencies and cloud m values"))
+    all(value -> value isa Real && isfinite(value), cloud_frequencies) ||
+        throw(ArgumentError("supply finite real carrier frequencies explicitly"))
+    keys(radial_values) == keys(tortoise_slopes) ||
+        throw(ArgumentError("profiles and slopes must have the same (l, q) keys"))
+
+    geometry = tortoise_geometry(tortoise_radius, spin)
+    time_values = Dict((l, q) => -im * sum(q .* cloud_frequencies) * value
+        for ((l, q), value) in radial_values)
+    azimuthal_values = Dict((l, q) => im * sum(q .* cloud_m) * value
+        for ((l, q), value) in radial_values)
+    radial_derivatives = Dict(pair => slope / geometry.dr_drstar
+        for (pair, slope) in tortoise_slopes)
+    polar_theta_derivatives = build_polar_theta_derivatives(polar_values, grid.cosine_theta_nodes)
+
+    reconstruct = (values, polar_table) -> reconstruct_two_phase_field_at_radii(
+        values, cloud_m, polar_table, phase1_nodes, phase2_nodes)
+
+    return (; field=reconstruct(radial_values, polar_values),
+        derivative_time=reconstruct(time_values, polar_values),
+        derivative_radius=reconstruct(radial_derivatives, polar_values),
+        derivative_theta=reconstruct(radial_values, polar_theta_derivatives),
+        derivative_azimuth=reconstruct(azimuthal_values, polar_values))
+end

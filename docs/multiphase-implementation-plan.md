@@ -1,6 +1,6 @@
 # Multiphase adiabatic evolution: implementation plan
 
-Updated 2026-10-14. Independent-cloud labels, Fourier component construction,
+Updated 2026-10-15. Independent-cloud labels, Fourier component construction,
 single-component linear radial assembly, and two-phase field reconstruction,
 projection, and nonlinear-source evaluation
 are implemented. The opt-in loader loads `core/`, `components.jl`,
@@ -9,8 +9,10 @@ its prototype checks still need to enter the repository test suite.
 The source passes exact quartic checks, phase-origin checks, single-cloud
 comparisons for all three potentials, and a separate cosine quadrature study.
 The full radial RHS is implemented and its 21 checks pass against the library.
-Short radial integration and step-refinement checks remain.
-Joint profile solves remain unimplemented.
+The matching residual and Newton wrapper are implemented; all 159 registered
+checks pass, including integration, step refinement, and 20 Newton checks.
+The library wrapper converges the four-component trial in three corrections.
+Physical profile-family convergence and evolution remain pending.
 The action-flux closure below still requires a derivation for our open Kerr
 problem. [HANDOFF.md](../HANDOFF.md) remains the authority on current capabilities.
 
@@ -143,6 +145,103 @@ whether a response can remain slaved needs the checks in milestone 6.
 ## Implementation milestones
 
 ### 1. Derive the closure and establish its approximation order
+
+**Two-cloud sequencing decision (October 15):** retain total energy and
+angular-momentum balance for the first mutually deformed two-cloud evolution
+at fixed BH parameters. The two positive outer normalizations $(A_1,A_2)$
+label the profile family; total phase-averaged $E$ and $J$ are computed from
+the joint field, including interaction terms at the chosen approximation order.
+They are outputs, not two additional independent evolution coordinates.
+Use the full profile response in
+
+$$
+\begin{pmatrix}
+\partial_{A_1}E & \partial_{A_2}E\\
+\partial_{A_1}J & \partial_{A_2}J
+\end{pmatrix}
+\begin{pmatrix}\dot A_1\\\dot A_2\end{pmatrix}
+=-\begin{pmatrix}F_E\\F_J\end{pmatrix}.
+$$
+
+This determines the rates only where the matrix is nonsingular and the
+two-amplitude adiabatic description is valid. Establish how slow growth enters
+the profile approximation before interpreting a matched family physically;
+switching to balance equations does not resolve that question. Phase actions
+remain a proposed later extension, to be derived before three-cloud evolution
+and checked independently against the two-cloud balance result.
+
+Keep the profile solver in `multiphase/profiles.jl`, with reconstruction and
+projection in `projection.jl` and labels in `components.jl`. Separate joint
+observables, profile responses, and the slow-time driver as those pieces are
+implemented. Begin with nearby corrected profiles and a short continuation
+path, rather than a dense two-dimensional table. Continuation can acquire its
+own `multiphase/continuation.jl` when needed; campaign scripts and evidence
+belong under `runs/adiabatic/multiphase_two_cloud/`.
+
+**Observables interface (October 15):** reconstruct the joint real field and
+its four Boyer-Lindquist coordinate derivatives, evaluate the scalar stress
+tensor, then obtain energy, angular momentum, and boundary currents by
+contraction and averaging. Separate analytic energy terms remain useful
+independent checks. The first derivative prototype uses explicitly supplied
+real carrier frequencies: its time derivative holds the radial profiles fixed
+and omits slow amplitude/profile response. It rejects complex trial frequencies
+rather than silently interpreting their imaginary parts. This is a frozen-field
+kinematic evaluator, not a resolution of the slow-growth approximation.
+Its 32 checks in `test_field_derivatives.jl` pass against the inserted helpers
+in `projection.jl`, including internal polar-derivative construction from
+`polar_values` and `grid`.
+The potential-energy helper is already
+inserted into `observables.jl` and passes its 10 checks when explicitly loaded;
+neither observables test file is registered yet.
+
+The next two candidates are `kerr_metric` and `scalar_stress_tensor`. Their
+115 checks are in `core/test_kerr_metric.jl` (86) and
+`multiphase/test_stress_tensor.jl` (29). Both helpers are inserted, and the
+115 checks pass against the actual library.
+Use signature $(-+++)$, coordinate order $(t,r,\theta,\varphi)$, and the
+normalized tensor $T_{\mu\nu}/F_a^2$. The metric helper accepts a tortoise
+position but returns Boyer-Lindquist components, matching the reconstructed
+radial derivative. Raising the first index supplies $-T^t{}_t$ and
+$T^t{}_\varphi$ for charge densities and $-T^r{}_t$ and $T^r{}_\varphi$ for
+outward currents. Include $\rho^2$, the $2\pi$ spatial azimuthal integral,
+and the independent-phase average in their angular integrals; multiply by
+$dr/dr_*$ only for charges per unit tortoise radius. These local contractions
+recover the existing single-cloud energy with real carriers to $3.1\times10^{-15}$
+relative error for all three potentials, analytic joint channel fluxes, and
+Schwarzschild angular momentum. Radial-integrated charges and physical
+endpoint/truncation convergence are separate next checkpoints.
+
+The inserted `two_phase_observables_at_radius` wraps these
+contractions in one polar/phase quadrature loop and passes 44 checks in
+`test_observables_at_radius.jl` against the actual library, with `observables.jl`
+loaded explicitly.
+Its four outputs are energy and angular momentum per unit tortoise radius,
+outward energy flux, and outward angular-momentum flux. The complete wrapper
+recovers single-cloud energy to $2.0\times10^{-15}$ relative error and the
+analytic joint-field currents, Schwarzschild angular momentum, and quartic
+interaction energy. It also passes phase-origin and local differentiation
+checks; the latter scales prescribed fields and does not compute the response
+of a matched profile to either cloud amplitude. Loader inclusion and test
+registration remain pending.
+
+The radial wrapper candidate `two_phase_integrated_observables` reuses
+`integrate_uniform` for both charges, permits either storage direction on each
+uniform branch, checks that the branches meet, and negates the inner outward
+currents to report horizon losses. All 49 checks in
+`test_integrated_observables.jl` pass: exact cubic E/J integrals, odd/even
+interval counts, reverse storage, single-cloud integrated energies for all
+potentials, endpoint signs, component ordering, and saved-history/input checks.
+The wrapper rejects nonfinite samples and nonfinite local observables.
+The radial wrapper is inserted; a user-requested refactor extracting top-level
+`ordered_radial_branch` and `integrate_two_phase_branch_observables` passes
+the same 49 checks and awaits insertion. It preserves the local
+`radial_energy_flux` and `radial_angular_momentum_flux` names, positive toward
+increasing radius. Test registration remains pending. These are finite-domain
+integrals; no boundary tail correction or physical-profile convergence is
+established. The saved-history compatibility trial is deliberately dilute
+after larger arbitrary boundary coefficients caused nonlinear growth and
+observable overflow on its short test domain. No amplitude-response solve
+has been implemented yet.
 
 For $K>2$, the total energy and angular-momentum balances supply only two
 constraints on $K$ amplitude rates. The missing information must come from
@@ -710,11 +809,56 @@ potentials, component/angular permutations, state preservation, dimension
 checks, analytic driven-source signs and tortoise scaling, and a zero-field
 test with nonzero slopes. The function is in `profiles.jl`, and the tests are
 registered in the multiphase runner; all 115 checks pass. This completes the
-local source/RHS checkpoint. Next connect the RHS to the shared radial
-integrator and verify a short integration and radial step refinement, before
-attempting a joint boundary-matching solve.
+local source/RHS checkpoint. The implemented matching residual below connects
+the RHS to the shared radial integrator and passes short integration and
+step-refinement checks. The implemented Newton wrapper now produces a matched trial.
 
 ### 4. Construct a jointly deformed two-cloud family
+
+**Numerical prototype (October 14):** follow the existing single-cloud matching
+structure, prescribing real positive outer coefficients for the two fundamental
+components. If $d$ is the number of retained $(l,\mathbf q)$ pairs, the trial
+unknowns are $d$ complex horizon coefficients, $d-2$ complex outer coefficients,
+and two complex trial frequencies: $4d$ real unknowns for $4d$ real profile/slope
+matching equations. For the minimal $211$, $322$, driven $m=0$, and driven $m=3$
+components with one angular term each, this is a 16-real-variable problem.
+The imaginary trial frequencies extend the existing numerical formulation;
+they do not by themselves establish nonlinear amplitude rates or the
+slow-growth approximation required by milestone 1. Start with nonzero secondary
+normalization so its frequency is identifiable.
+
+**Matching-residual checkpoint:** `two_phase_matching_residual` assembles each
+boundary in global [R; Q] order, integrates both sides, and returns their
+mismatch. The 24 registered checks in `test_matching_residual.jl` pass against the library:
+single-cloud histories for all potentials, saved/plain returns, joint component
+ordering, input validation, and short radial integration in both directions.
+For radial steps 0.4/0.2/0.1, successive endpoint differences shrink by factors
+17.60 outward and 14.28 inward, consistent with fourth-order RK4. These checks
+do not establish asymptotic-boundary accuracy or a physical matched profile.
+The function is in `profiles.jl`; with the Newton checks below, the full
+registered suite has 159 passing checks.
+
+**Newton-wrapper library checkpoint (October 15):** `solve_two_phase_mode` fixes the
+first retained l coefficient in each fundamental block to the corresponding
+positive real normalization. Its trial vector contains two complex frequencies,
+all horizon coefficients, and free outer coefficients. Coefficients and residuals
+are scaled by the smaller normalization. The two fundamentals remain bound;
+all retained component frequencies remain positive and retain their initial
+bound/outgoing classifications during Newton corrections.
+
+All 20 registered checks in `test_nonlinear_matching.jl` pass against the
+inserted library implementation, reproducing the October 14 candidate. At spin=0.99,
+alpha=0.42, normalizations $(10^{-4},10^{-5})$, the four-component quartic trial
+with l=(1,2,0,3), radial endpoints (-30,80), match=5, step=0.4, and quadrature
+8x9x9 converges in three corrections from scaled mismatch 13.3874 to
+$1.2248\times10^{-10}$. The resulting trial frequencies are approximately
+$0.408805528742+1.50386627\times10^{-7}i$ and
+$0.415628386519+6.37117738\times10^{-11}i$. Both driven outer coefficients
+are nonzero. The checks verify fixed normalizations, a freshly evaluated
+matching residual, input preservation, component reordering, and invalid inputs.
+This is a numerical matching test at modest resolution, not a validated physical
+family or nonlinear growth prescription. The wrapper is in `profiles.jl`, and
+its tests are registered in the multiphase runner.
 
 Seed the new calculation with a saved primary and a small secondary. Continue
 the secondary amplitude upward, solving for both fundamental profiles,
@@ -867,8 +1011,9 @@ checks into the test suite and run them against the actual implementation.
 The two-phase projector now passes the same-$l,m$ benchmark in section 3.3.
 Nonlinear-source evaluation now passes the quartic table, single-cloud limit,
 phase-origin, and fixed-support cosine convergence checks recorded in section 3.
-The full RHS also passes its library checks in section 3.8. Next verify a short
-radial integration and step refinement using the shared integrator.
+The full RHS, matching residual, and Newton wrapper pass their registered
+library checks. Next register the boundary-wrapper checks and establish
+matched-profile convergence before physical continuation, as described in section 4.
 The closure derivation remains open; the
 milestone numbering does not require finishing it before these projection
 checks, but the joint solver and production evolution depend on it.

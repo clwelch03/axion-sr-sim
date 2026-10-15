@@ -12,13 +12,16 @@ The diagrams follow the style of the older
 conventions come from the [multiphase implementation plan](multiphase-implementation-plan.md),
 especially sections 2.1–2.3, 3.1–3.4, 3.6, and 3.8.
 
-**Implementation status on October 14, 2026:** the shared radial integrator,
+**Implementation status on October 15, 2026:** the shared radial integrator,
 component operators, boundary wrapper, and two-phase nonlinear source exist.
 The assembly called `nonlinear_two_phase_rhs!` below is implemented in
 `multiphase/profiles.jl` and passes all 21 registered RHS checks against the
-library. Short radial integration and step-refinement checks are next.
-Joint profile matching and the slow evolution closure remain
-pending; [HANDOFF.md](../HANDOFF.md) owns current status.
+library. The matching residual is implemented and passes 24 registered checks,
+including short radial integration and step refinement. The inserted Newton wrapper
+passes 20 additional registered checks and converges a four-component trial;
+all 159 multiphase checks pass against the library. Physical convergence and
+the slow-growth profile formulation remain pending;
+[HANDOFF.md](../HANDOFF.md) owns current status.
 
 ## State and component ordering
 
@@ -234,7 +237,10 @@ profile only when its profile and slope entries are included in the state.
 
 The [RHS checks](../tests/adiabatic/multiphase/test_nonlinear_rhs.jl) now pass
 against the library: single-cloud agreement, ordering, unchanged input state,
-dimensions, and driven-source signs and scaling. A subsequent integrated check should
-refine the radial spacing while holding boundaries, retained components, and
-quadrature fixed. Fourth-order convergence of that radial integration is a
+dimensions, and driven-source signs and scaling. Registered checks in
+`test_matching_residual.jl` compare complete single-cloud integration histories
+and refine radial spacing for a fixed joint initial state in both directions,
+holding the retained components and quadrature fixed. They pass against
+`two_phase_matching_residual` in the library.
+Fourth-order convergence of that radial integration is a
 separate check from polar/phase resolution and retained-component convergence.

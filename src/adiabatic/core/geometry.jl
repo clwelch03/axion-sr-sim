@@ -126,3 +126,37 @@ function tortoise_geometry(tortoise_radius, spin)
     end
     error("tortoise inversion did not converge")
 end
+
+"""
+    kerr_metric(tortoise_radius, spin, cosine_theta)
+
+Returns the value of the Kerr metric at a given point. 
+"""
+function kerr_metric(tortoise_radius, spin, cosine_theta)
+    -1 < cosine_theta < 1 ||
+        throw(DomainError(cosine_theta, "require -1 < cos(theta) < 1"))
+
+    geometry = tortoise_geometry(tortoise_radius, spin)
+    radius, delta = geometry.radius, geometry.delta
+    sine_squared = 1 - cosine_theta^2
+    rho_squared = radius^2 + spin^2 * cosine_theta^2
+    azimuth_factor = geometry.radial_factor^2 - spin^2 * delta * sine_squared
+
+    metric = zeros(typeof(float(rho_squared)), 4, 4)
+    metric[1, 1] = -(delta - spin^2 * sine_squared) / rho_squared
+    metric[1, 4] = metric[4, 1] = -2spin * radius * sine_squared / rho_squared
+    metric[2, 2] = rho_squared / delta
+    metric[3, 3] = rho_squared
+    metric[4, 4] = azimuth_factor * sine_squared / rho_squared
+
+    inverse_metric = zero(metric)
+    inverse_metric[1, 1] = -azimuth_factor / (rho_squared * delta)
+    inverse_metric[1, 4] = inverse_metric[4, 1] =
+        -2spin * radius / (rho_squared * delta)
+    inverse_metric[2, 2] = delta / rho_squared
+    inverse_metric[3, 3] = 1 / rho_squared
+    inverse_metric[4, 4] = (delta - spin^2 * sine_squared) /
+        (rho_squared * delta * sine_squared)
+
+    return (; metric, inverse_metric)
+end

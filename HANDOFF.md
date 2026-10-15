@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-10-14. This is the authoritative project status: what works,
+Updated 2026-10-15. This is the authoritative project status: what works,
 open caveats, and next steps. Campaign READMEs own exact commands, saved-result
 paths, and detailed validation records; design documents own equations and
 implementation decisions.
@@ -20,15 +20,15 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
 
 ## Where things stand
 
-- **Multiphase foundations (October 14):** independent-cloud labels, Fourier
+- **Multiphase foundations (October 15):** independent-cloud labels, Fourier
   component construction, single-component linear radial assembly, and
   two-phase field reconstruction, projection, nonlinear-source evaluation, and
   full radial RHS assembly are present in the opt-in multiphase library.
-  All 115 multiphase checks pass: 12 frequency/azimuthal-label
+  All 159 multiphase checks pass: 12 frequency/azimuthal-label
   checks, 7 radial-operator checks, 8 reconstruction/reference-quadrature checks,
   5 library-projector checks, 5 quartic-source checks, 12 single-cloud-limit checks,
   14 quartic-table checks, 18 phase-origin checks, 13 cosine-convergence checks,
-  and 21 full-RHS checks.
+  21 full-RHS checks, 24 matching/integration checks, and 20 Newton matching checks.
   The existing 10 loader checks also passed at
   the linear-assembly checkpoint. The radial checks compare to the single-cloud
   assembly and an analytic Schwarzschild m=0 result, and check signed-frequency/
@@ -58,13 +58,113 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
   preservation, dimensions, driven-source signs/scaling, and zero-field slopes.
   The state stores all R values then all Q values,
   ordered by component and then l; the source is computed once from all R.
-  Next connect this RHS to the shared radial integrator and check a short
-  integration and radial step refinement. No joint profile has been solved yet.
+  The implemented `two_phase_matching_residual` now connects this RHS to the shared
+  integrator, assembles boundary blocks into global [R; Q] order, and returns
+  both profile and slope mismatches. All 24 registered checks in
+  `test_matching_residual.jl` pass against the library: full single-cloud integration histories for
+  all potentials, saved/plain output agreement, joint ordering, input checks,
+  and radial refinement in both directions (error-reduction ratios 17.60 and
+  14.28 for step sizes 0.4/0.2/0.1, consistent with fourth-order convergence).
+  The inserted `solve_two_phase_mode` passes 20 registered checks in
+  `test_nonlinear_matching.jl` against the actual library. It fixes the first retained
+  l coefficient in each fundamental q block, scales coefficients/residuals by
+  the smaller positive outer normalization, and solves for two complex trial
+  frequencies plus free boundary coefficients. Frequencies remain on their
+  initial positive-frequency bound/outgoing branches.
+  The four-component quartic trial at spin=0.99, alpha=0.42, outer normalizations
+  [1e-4,1e-5], l=[1,2,0,3], inner=-30, outer=80, match=5, radial step=0.4,
+  and quadrature 8x9x9 converges in 3 corrections (scaled residual 13.3874 ->
+  1.2248e-10). Both driven outer coefficients are nonzero. This is a matched
+  numerical prototype, not an endpoint/angular/radial convergence result or
+  a validated slow-growth prescription. The October 15 library run reproduces
+  the candidate result; the full multiphase suite passes all 159 checks.
   A positive-frequency
   boundary wrapper is present; its prototype checks still need adding to the
-  repository suite. Joint profile solves and the action closure
-  remain pending. Run
+  repository suite. A converged physical joint-profile family and the action closure
+  remain pending. The October 15 sequencing decision keeps total joint-field
+  E/J balance for the first two-cloud evolution at fixed BH parameters, with
+  full amplitude derivatives and matrix-conditioning checks. Phase actions
+  are deferred until the extension to three independent clouds; the profile
+  slow-growth approximation still needs to be established. Keep the profile
+  solver in `multiphase/`; next validate boundaries and matched-profile
+  convergence before physical continuation. Run
   `julia --project=. tests/adiabatic/multiphase/runtests.jl`.
+  The first observables increment is
+  `two_phase_potential_energy_density` for the joint potential contribution
+  per unit tortoise radius. Its 10 checks in `test_potential_energy.jl` pass
+  against the inserted helper, loaded explicitly: single-cloud agreement for all potentials,
+  phase-origin invariance, an analytic quartic interaction term, and zero/input
+  checks. The helper is in `multiphase/observables.jl` and awaits loader inclusion
+  and test registration; these checks are not part of the 159.
+  The complete local tensor-based observables candidate is described below.
+  This potential-only check requires no matched profile or
+  choice of time-derivative convention for complex trial frequencies.
+  The user selected a shared stress-tensor architecture instead of implementing
+  each energy contribution separately. Its first candidate helpers,
+  `build_polar_theta_derivatives` and `reconstruct_two_phase_field_derivatives`,
+  pass 32 checks in `test_field_derivatives.jl`. They reconstruct the real field
+  and its Boyer-Lindquist coordinate derivatives (t,r,theta,varphi), with
+  Q=dR/dr_* converted to dR/dr. Frozen-field time derivatives require explicitly
+  supplied finite real carrier frequencies; complex trial frequencies are
+  rejected, and slow amplitude/profile time derivatives are not included.
+  Angular derivatives agree with automatic differentiation; all four field
+  derivatives agree with an independently differentiated field to <4.5e-16.
+  Signed/zero m, repeated angular patterns across distinct q, multiple l in
+  one q, input preservation, and zero fields are checked. The helpers have
+  been inserted into `multiphase/projection.jl`, including the user-requested
+  interface that builds the polar derivative table inside reconstruction from
+  `grid`. All 32 checks pass against the actual library; registration is pending.
+  The derivative checks do not validate a slow-growth model.
+  Two further candidates, `kerr_metric` (for `core/geometry.jl`) and
+  `scalar_stress_tensor` (for `multiphase/observables.jl`), pass 115 checks:
+  86 metric checks in `core/test_kerr_metric.jl` and 29 tensor/contraction checks
+  in `multiphase/test_stress_tensor.jl`. The metric accepts r_* as its position
+  input but returns Boyer-Lindquist components in (t,r,theta,varphi) order,
+  with signature (-+++). The pointwise tensor returns T_mu_nu/Fa^2.
+  Raising its first index gives energy density -T^t_t, angular-momentum density
+  T^t_phi, and outward currents -T^r_t and T^r_phi. Test quadrature includes the
+  rho^2 spatial measure, 2pi azimuthal factor, phase average, and dr/dr_* only
+  for charge densities. Energy agrees with the single-cloud routine for real
+  carriers and all three potentials to 3.1e-15 relative error. Joint-field
+  fluxes and Schwarzschild angular momentum agree with analytic expressions.
+  `scalar_stress_tensor` and `kerr_metric` are now inserted; the 115 checks
+  pass against the actual library. Observables loader inclusion and test
+  registration remain pending. Local checks
+  do not establish radial-integrated charges, endpoint convergence, or evolution.
+  The inserted `two_phase_observables_at_radius` now passes all 44
+  checks in `test_observables_at_radius.jl` against the actual library. It returns energy and
+  angular momentum per unit tortoise radius plus both outward currents from
+  one quadrature loop. The single-cloud energy agrees to 2.0e-15 relative error
+  for three spins and all potentials. Checks also cover joint analytic fluxes,
+  Schwarzschild angular momentum, flux reversal, phase-origin invariance,
+  exact quartic cross energy, zero fields, input preservation/validation,
+  and automatic derivatives of a prescribed local field scaling against finite
+  differences. That last check is not a matched-profile amplitude response.
+  Observables loader inclusion and test registration remain pending.
+  All observables use explicit real carrier frequencies.
+  The `two_phase_integrated_observables` candidate passes 49 checks in
+  `test_integrated_observables.jl`. It accepts saved matching histories,
+  orients each branch toward increasing r_*, requires uniform spacing and a
+  common match position, reuses `integrate_uniform` for total E and J, and
+  returns horizon/outer energy and angular-momentum losses. Horizon losses
+  reverse the inward endpoint's outward-current sign. Checks recover exact
+  cubic E/J integrals, including odd interval counts and reversed storage,
+  the existing single-cloud integrated energy for all potentials, endpoint
+  signs, component reordering, and saved-history compatibility. Nonfinite
+  profile samples or local observables are rejected. The first short-domain
+  trial fixture overflowed the observables (finite profiles grew to 4.9e247);
+  reducing its boundary coefficients by 1e-8 gave a finite dilute fixture.
+  Manufactured snapshots and trial histories test bookkeeping, not physical
+  matching or convergence. The radial wrapper is now inserted into
+  `multiphase/observables.jl`; the local flux fields are named
+  `radial_energy_flux` and `radial_angular_momentum_flux` (positive toward
+  increasing radius). At the user's request, a tested refactor moves the
+  nested helpers to top-level `ordered_radial_branch` and
+  `integrate_two_phase_branch_observables`, passing their inputs explicitly.
+  All 49 checks pass with that refactor; user insertion of the refactor and
+  test registration remain pending. Outputs cover only the supplied
+  finite radial domain; tails and radial/boundary/truncation convergence remain
+  separate. Matched-profile amplitude responses are still unimplemented.
 - **Adiabatic layout refactor (October 12):** branch
   `refactor/adiabatic-layout` groups source and tests by `core/`,
   `single_cloud/`, and `primary_secondary/`. `multiphase/` has a scope README

@@ -13,6 +13,17 @@ The matching residual and Newton wrapper are implemented; all 159 registered
 checks pass, including integration, step refinement, and 20 Newton checks.
 The library wrapper converges the four-component trial in three corrections.
 Physical profile-family convergence and evolution remain pending.
+Joint-field stress-tensor observables, including finite-domain total E/J and
+signed boundary losses, are now implemented. The top-level radial integration
+helpers and explanatory comments are inserted. Observables library-loader inclusion
+remains pending. The observable/derivative tests are now registered with an
+explicit test-runner include, and the old `outward_*` test fields are renamed
+`radial_*`. The 159 existing multiphase checks and 164 added checks pass in
+separate invocations; all 336 core checks, including 86 metric checks, pass.
+The next requested increment is **direct two-amplitude implicit
+differentiation**, described in milestone 5. No such response solve has been
+implemented or validated yet. The user requested a documentation checkpoint
+before continuing that work.
 The action-flux closure below still requires a derivation for our open Kerr
 problem. [HANDOFF.md](../HANDOFF.md) remains the authority on current capabilities.
 
@@ -46,8 +57,9 @@ Each piece gets a cheap decisive check and discussion before proceeding, as in
 
 Implement the new model under `src/adiabatic/multiphase/`, with matching tests
 under `tests/adiabatic/multiphase/`. Add `components.jl`, `projection.jl`,
-`profiles.jl`, `actions.jl`, `fluxes.jl`, and `evolution.jl` as their milestones
-are reached. Reuse `core/` and the existing Julia project; seed-generation and
+`profiles.jl`, `observables.jl`, and later action/evolution helpers as their
+milestones are reached. Joint E/J and boundary fluxes currently share
+`observables.jl`. Reuse `core/` and the existing Julia project; seed-generation and
 comparison drivers may explicitly load the other models. Keep the multiphase
 loader opt-in and existing models independent of it. The
 [source guide](../src/adiabatic/README.md) owns the current file map and commands.
@@ -208,23 +220,27 @@ and the independent-phase average in their angular integrals; multiply by
 $dr/dr_*$ only for charges per unit tortoise radius. These local contractions
 recover the existing single-cloud energy with real carriers to $3.1\times10^{-15}$
 relative error for all three potentials, analytic joint channel fluxes, and
-Schwarzschild angular momentum. Radial-integrated charges and physical
-endpoint/truncation convergence are separate next checkpoints.
+Schwarzschild angular momentum. The integrated evaluator is now implemented
+as described below; physical endpoint/truncation convergence remains pending.
 
 The inserted `two_phase_observables_at_radius` wraps these
-contractions in one polar/phase quadrature loop and passes 44 checks in
+contractions in one polar/phase quadrature loop and passed 44 checks in
 `test_observables_at_radius.jl` against the actual library, with `observables.jl`
 loaded explicitly.
 Its four outputs are energy and angular momentum per unit tortoise radius,
-outward energy flux, and outward angular-momentum flux. The complete wrapper
+`radial_energy_flux`, and `radial_angular_momentum_flux`. Both currents are
+signed toward increasing radius; negative values describe inward transport.
+The complete wrapper
 recovers single-cloud energy to $2.0\times10^{-15}$ relative error and the
 analytic joint-field currents, Schwarzschild angular momentum, and quartic
 interaction energy. It also passes phase-origin and local differentiation
 checks; the latter scales prescribed fields and does not compute the response
 of a matched profile to either cloud amplitude. Loader inclusion and test
-registration remain pending.
+registration remain pending. That test file still uses the earlier
+`outward_*` names, so update those references before repeating the local
+checks against the current library. The quoted count is the earlier checkpoint.
 
-The radial wrapper candidate `two_phase_integrated_observables` reuses
+The inserted radial wrapper `two_phase_integrated_observables` reuses
 `integrate_uniform` for both charges, permits either storage direction on each
 uniform branch, checks that the branches meet, and negates the inner outward
 currents to report horizon losses. All 49 checks in
@@ -232,9 +248,12 @@ currents to report horizon losses. All 49 checks in
 interval counts, reverse storage, single-cloud integrated energies for all
 potentials, endpoint signs, component ordering, and saved-history/input checks.
 The wrapper rejects nonfinite samples and nonfinite local observables.
-The radial wrapper is inserted; a user-requested refactor extracting top-level
+The user-requested refactor extracting top-level
 `ordered_radial_branch` and `integrate_two_phase_branch_observables` passes
-the same 49 checks and awaits insertion. It preserves the local
+the same 49 checks and is now inserted, together with explanatory comments
+and a short radial-branch docstring. A branch here is a sequence of spatial
+profile samples from one radial integration, not an amplitude family or time
+series. It preserves the local
 `radial_energy_flux` and `radial_angular_momentum_flux` names, positive toward
 increasing radius. Test registration remains pending. These are finite-domain
 integrals; no boundary tail correction or physical-profile convergence is
@@ -905,7 +924,37 @@ caused by the secondary. Compute total $E$ and $J$ from the joint field.
 Agreement of Newton residuals alone does not establish radial, angular,
 boundary, or Fourier convergence.
 
-### 5. Compute actions, response derivatives, and slow evolution
+### 5. Compute amplitude responses and E/J evolution, then extend to actions
+
+**Current resume point (October 15):** go directly to implicit differentiation;
+do not first build a finite-difference response implementation. Use nearby
+independently corrected solutions to validate the implicit derivatives.
+`core/sensitivity.jl` currently supports only one real amplitude. The
+two-amplitude extension and its multiphase adapters have not been implemented.
+
+First expose reusable unpacking and the real-packed matching residual
+G(u,A1,A2), where u contains real and imaginary parts of the two trial
+frequencies and free boundary coefficients. Reconstruction uses conjugates,
+so this is a real derivative problem. Handle the existing normalization
+scaling consistently: the solver scales coefficients and residuals by
+`minimum(normalizations)`. Decide on a fixed reference scale or include all
+scale dependence before differentiating. Check ForwardDiff support through
+the boundary series and joint radial integration; do not differentiate the
+Newton iterations.
+
+For the immediate two-cloud implementation, propagate the state response into
+O=(E,J) with total derivative O_A + O_u u_A, including frequencies, fixed outer
+normalizations, and induced radial-profile changes. Keep the background,
+quadrature, radial grid, and retained components fixed. The observable adapter
+must explicitly choose real carriers from the complex matching frequencies.
+This computes a derivative of the discretized numerical family; it does not
+validate the slow-growth approximation or spatial convergence.
+
+After neighbor checks pass, assemble the 2x2 balance matrix in milestone 1,
+using horizon plus outer losses for each right-hand side, monitor conditioning,
+and develop a short slow-time trajectory. The action formulas and independent
+checks below describe the later extension, not a prerequisite for this first
+two-cloud E/J response implementation.
 
 Extend [core/sensitivity.jl](../src/adiabatic/core/sensitivity.jl)
 from a scalar amplitude derivative to multiple amplitude directions. If

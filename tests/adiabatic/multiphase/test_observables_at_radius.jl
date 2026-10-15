@@ -47,9 +47,9 @@ end
         expected_angular_flux = 4pi * geometry.radial_factor * sum(
             sum(q .* cloud_m) * imag(conj(value)*slopes[(l, q)])
             for ((l, q), value) in radial)
-        @test result.outward_energy_flux > 0
-        @test isapprox(result.outward_energy_flux, expected_energy_flux; rtol=2e-12)
-        @test isapprox(result.outward_angular_momentum_flux, expected_angular_flux; rtol=2e-12)
+        @test result.radial_energy_flux > 0
+        @test isapprox(result.radial_energy_flux, expected_energy_flux; rtol=2e-12)
+        @test isapprox(result.radial_angular_momentum_flux, expected_angular_flux; rtol=2e-12)
         if spin == 0.0
             expected_momentum = 4pi * geometry.radius^2 * sum(
                 sum(q .* frequencies) * sum(q .* cloud_m) * abs2(value)
@@ -60,8 +60,8 @@ end
     end
     baseline = evaluate(radial, slopes, 8.0, 0.7)
     inward = evaluate(radial, Dict(pair => -value for (pair, value) in slopes), 8.0, 0.7)
-    @test inward.outward_energy_flux ≈ -baseline.outward_energy_flux
-    @test inward.outward_angular_momentum_flux ≈ -baseline.outward_angular_momentum_flux
+    @test inward.radial_energy_flux ≈ -baseline.radial_energy_flux
+    @test inward.radial_angular_momentum_flux ≈ -baseline.radial_angular_momentum_flux
     @test inward.energy_per_tortoise_radius ≈ baseline.energy_per_tortoise_radius
 
     shifted = values -> Dict((l, q) => value*cis(-q[1]*0.37+q[2]*0.53)

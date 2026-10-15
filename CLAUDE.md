@@ -181,8 +181,10 @@ Start with [the adiabatic source guide](src/adiabatic/README.md). The layout is
 organized by physical approximation: `core/` supplies shared mathematics,
 `single_cloud/` owns a nonlinear cloud and its harmonics, and
 `primary_secondary/` owns the asymmetric two-cloud model and its evolution.
-`multiphase/` is reserved for the planned mutual-deformation extension; its
-loader currently exposes only core.
+`multiphase/` implements joint two-phase profile matching and observables;
+its opt-in loader exposes core, components, profiles, and projection, while
+observables still require an explicit include. Amplitude responses and slow
+evolution remain pending; see `HANDOFF.md` for the current resume point.
 
 `src/adiabatic/load.jl` loads the implemented models. Each group also has an
 idempotent `load.jl` for narrower dependencies. Reusable setup and solve

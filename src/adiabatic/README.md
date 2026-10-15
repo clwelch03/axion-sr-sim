@@ -8,7 +8,7 @@ observables, continuation, and slow evolution together.
 | [core](core/README.md) | Shared Kerr geometry, angular bases, potentials, explicit-frequency operators, boundary data, and numerical methods | `core/load.jl` |
 | [single_cloud](single_cloud/README.md) | One nonlinear cloud, including harmonics of its single fundamental phase | `single_cloud/load.jl` |
 | [primary_secondary](primary_secondary/README.md) | A nonlinear primary, a secondary on its averaged background, and driven radiation; no secondary deformation of the primary | `primary_secondary/load.jl` |
-| [multiphase](multiphase/README.md) | Cloud/component labels and linear radial assembly; no multiphase profile solver yet | `multiphase/load.jl` (opt-in) |
+| [multiphase](multiphase/README.md) | Joint two-phase profile matching and finite-domain E/J observables; amplitude responses and evolution pending | `multiphase/load.jl` (opt-in; observables still need an explicit include) |
 
 Run Julia from the repository root with `julia --project=.`. The existing
 `src/adiabatic/load.jl` entry point loads both implemented models. For a narrower

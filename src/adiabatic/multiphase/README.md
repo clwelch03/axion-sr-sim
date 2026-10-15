@@ -2,13 +2,17 @@
 
 This is the home for the proposed general multiphase model. The matching
 residual and Newton wrapper are implemented and tested against the library.
-No action closure or evolution is implemented yet.
+Joint-field local and integrated E/J observables are also implemented.
+Two-amplitude profile responses, action closure, and evolution are not yet
+implemented. The next requested step is direct implicit differentiation of
+the matching residual, followed by independently re-solved neighbor checks.
 
 `load.jl` loads `core/`, cloud/component labels in `components.jl`, linear
 operators, boundary assembly, and the full nonlinear radial RHS in `profiles.jl`,
 and two-phase field reconstruction, projection, and nonlinear-source evaluation
 in `projection.jl`, without importing the other models.
 The root adiabatic loader leaves this library opt-in.
+`observables.jl` currently requires an explicit include after this loader.
 
 Run the unit checks with
 `julia --project=. tests/adiabatic/multiphase/runtests.jl`.
@@ -42,6 +46,27 @@ Keep the profile solver here. The first two-cloud evolution will use total
 joint-field E/J balance at fixed BH parameters, including full profile-response
 derivatives. Phase actions are deferred to the extension to three independent
 clouds; a consistent slow-growth profile approximation remains required.
+
+`observables.jl` evaluates one scalar stress tensor from the joint field and
+its coordinate derivatives. `two_phase_observables_at_radius` returns E/J
+per unit tortoise radius and signed `radial_energy_flux` and
+`radial_angular_momentum_flux`, positive toward increasing radius.
+`two_phase_integrated_observables` integrates those densities over the supplied
+finite domain and returns horizon/outer losses, negating the inner currents.
+Its top-level helpers are `ordered_radial_branch` and
+`integrate_two_phase_branch_observables`. A radial branch means spatial
+profile samples, not time evolution or a family of amplitude values.
+
+These evaluators require real carrier frequencies and omit slow profile time
+derivatives; they do not interpret the matching solver's complex trial
+frequencies as a physical growth law. No tail correction or converged physical
+profile family is established. The 164 observable and field-derivative checks
+are now registered in the runner, with an explicit include of `observables.jl`;
+the local-observables test uses the current `radial_*` field names. All 159
+existing checks and the 164 added checks passed in separate October 15 runs
+(323 combined). Library-loader inclusion remains pending. See the
+[handoff](../../../HANDOFF.md#current-multiphase-checkpoint-and-resume-point-october-15)
+for the validation counts, integration gaps, and exact resume point.
 
 See the [radial RK4 design](../../../docs/multiphase-rk4-design.md) for diagrams
 of one radial step and the joint RHS, with state ordering and a

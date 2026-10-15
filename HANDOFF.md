@@ -20,6 +20,78 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
 
 ## Where things stand
 
+### Current multiphase checkpoint and resume point (October 15)
+
+The joint profile solver and finite-domain E/J observables are implemented.
+The next requested development step is **direct implicit differentiation with
+respect to both amplitudes**. The user approved that approach, then requested
+this documentation checkpoint before more implementation. No two-amplitude
+sensitivity code or matched-profile response validation has been completed.
+
+- Keep the model in `src/adiabatic/multiphase/`. The two positive real
+  amplitudes fix the first retained outer coefficient in q=(1,0) and q=(0,1).
+  E and J are outputs of the resulting joint field, not independent state
+  coordinates. Use their total flux balances for the first two-cloud evolution
+  on a fixed BH background; defer phase actions until the three-cloud extension.
+- `profiles.jl` supplies the joint RHS, matching residual, and
+  `solve_two_phase_mode`. `projection.jl` reconstructs the field and coordinate
+  derivatives. `observables.jl` supplies the shared scalar stress tensor,
+  `two_phase_observables_at_radius`, and `two_phase_integrated_observables`.
+  The top-level helpers `ordered_radial_branch` and
+  `integrate_two_phase_branch_observables` are now inserted; the integrated
+  evaluator has no nested helper. Explanatory comments and the requested
+  short `ordered_radial_branch` docstring are also present.
+- A radial branch here means profile samples from one spatial integration,
+  stored as `positions` and state columns `[R; Q]`, with Q=dR/dr_*.
+  It is not a time series or a continuation through amplitude space.
+  Local E/J densities are integrated over r_*; radial fluxes are evaluated at
+  the endpoints. `radial_energy_flux` and `radial_angular_momentum_flux` are
+  signed toward increasing radius, so horizon losses negate the inner current.
+- Observables require explicit real carrier frequencies and omit slow profile
+  time derivatives. Matching currently solves for complex trial frequencies.
+  An adapter using their real parts must make that choice explicit; it does
+  not establish the physical slow-growth approximation.
+- October 15 verification reran all 159 existing multiphase checks and all
+  164 observable/field-derivative checks successfully (323 combined, run in
+  separate invocations). The observable checks are now registered in the
+  multiphase runner, which explicitly includes `observables.jl`; the library
+  loader still omits it. The local-observables test now uses `radial_*` fields.
+  The 86 Kerr-metric checks are registered in the core runner; all 336 core
+  checks pass. These checks do not establish physical profile convergence.
+- The user reaffirmed the small, executed-snippet workflow. The first candidate
+  is a reusable trial unpacker with an explicit fixed coefficient scale and
+  storage promoted from both state and amplitudes. Its 13 isolated checks pass,
+  including component reordering, scale invariance, and ForwardDiff in either
+  argument. Six additional checks pass through the actual matching residual,
+  boundary series, and joint RK4 integration on the established test domain
+  (-30, 5, 80; step 0.4), including comparisons to centered partial differences.
+  These use a trial state, not a converged response family. Candidate code,
+  scripts, and logs are in ignored `recovery/adiabatic-response-20261015/`.
+  The unpacker has not been inserted into the library; the two-amplitude
+  implicit response solve remains pending.
+
+Resume with small, executed snippets under the existing teaching workflow:
+
+1. Expose reusable trial-state unpacking and a real matching residual
+   G(u,A), with u the real-packed frequencies and free boundary coefficients
+   and A=(A1,A2). Account consistently for the solver's coefficient/residual
+   scaling by `minimum(normalizations)`; decide whether to hold a reference
+   scale fixed for differentiation before implementing the adapter.
+2. Extend `core/sensitivity.jl` beyond its existing scalar-amplitude API:
+   solve G_u * u_A = -G_A using one Jacobian factorization for both columns.
+   Differentiate the matching equations, not the Newton iterations. Check
+   ForwardDiff support through boundaries and joint radial integration.
+3. Propagate the response into integrated observables O=(E,J), including
+   explicit amplitude dependence: dO/dA = O_A + O_u * u_A. Verify selected
+   columns against finite differences of independently re-solved neighboring
+   profiles, with fixed background, grids, and component support. Finite
+   differences are the validation check, not a prerequisite production method.
+4. Then assemble the 2x2 E/J balance matrix, monitor conditioning, and develop
+   a short slow-time evolution. Physical profile convergence, boundary tails,
+   and the slow-growth formulation remain separate required checks.
+
+The detailed implementation evidence and other project tracks follow.
+
 - **Multiphase foundations (October 15):** independent-cloud labels, Fourier
   component construction, single-component linear radial assembly, and
   two-phase field reconstruction, projection, nonlinear-source evaluation, and
@@ -161,14 +233,16 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
   increasing radius). At the user's request, a tested refactor moves the
   nested helpers to top-level `ordered_radial_branch` and
   `integrate_two_phase_branch_observables`, passing their inputs explicitly.
-  All 49 checks pass with that refactor; user insertion of the refactor and
-  test registration remain pending. Outputs cover only the supplied
+  All 49 checks passed with that refactor, which is now inserted; comments
+  and the radial-branch docstring are also present. Test registration remains
+  pending. Outputs cover only the supplied
   finite radial domain; tails and radial/boundary/truncation convergence remain
   separate. Matched-profile amplitude responses are still unimplemented.
 - **Adiabatic layout refactor (October 12):** branch
   `refactor/adiabatic-layout` groups source and tests by `core/`,
-  `single_cloud/`, and `primary_secondary/`. `multiphase/` has a scope README
-  and core-only loader; its physics is still unimplemented. Shared operators,
+  `single_cloud/`, and `primary_secondary/`. At that checkpoint `multiphase/`
+  had only a scope README and core-only loader; the October 15 work above
+  supersedes that historical status. Shared operators,
   potentials, Newton/integration routines, quadrature, and sensitivities were
   separated from single-cloud assembly. Reusable workflow functions now load
   from model libraries; model drivers contain command execution. The root
@@ -332,6 +406,10 @@ scan, and convergence evidence. Use its averaged secondary results;
 
 ## Next steps
 
+- **Active multiphase work:** implement the two-amplitude implicit response
+  and total E/J derivatives described in the resume point above, using small
+  tested snippets for the user to enter. Flux-field names and observable test
+  registration are reconciled; observables library-loader inclusion is pending.
 - **Coupled-BH preparation:** local primary continuation in alpha and spin
   now works at both dilute amplitude and $A_0\simeq2.052$; the secondary and
   driven channels are checked on the nonlinear backgrounds, with the targeted

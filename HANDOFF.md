@@ -22,73 +22,61 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
 
 ### Current multiphase checkpoint and resume point (October 15)
 
-The joint profile solver and finite-domain E/J observables are implemented.
-The next requested development step is **direct implicit differentiation with
-respect to both amplitudes**. The user approved that approach, then requested
-this documentation checkpoint before more implementation. No two-amplitude
-sensitivity code or matched-profile response validation has been completed.
+The joint profile solver, finite-domain E/J observables, two-amplitude implicit
+responses, and a short-evolution integrator are implemented. On October 15 the
+user authorized direct implementation of all three response/evolution steps,
+with readable comments and docstring skeletons left for them to complete.
+The matched-cloud derivative validation and short cosine evolution are complete;
+results, files, and commands are in the
+[joint two-cloud campaign](runs/adiabatic/multiphase_two_cloud/README.md).
 
-- Keep the model in `src/adiabatic/multiphase/`. The two positive real
-  amplitudes fix the first retained outer coefficient in q=(1,0) and q=(0,1).
-  E and J are outputs of the resulting joint field, not independent state
-  coordinates. Use their total flux balances for the first two-cloud evolution
-  on a fixed BH background; defer phase actions until the three-cloud extension.
-- `profiles.jl` supplies the joint RHS, matching residual, and
-  `solve_two_phase_mode`. `projection.jl` reconstructs the field and coordinate
-  derivatives. `observables.jl` supplies the shared scalar stress tensor,
-  `two_phase_observables_at_radius`, and `two_phase_integrated_observables`.
-  The top-level helpers `ordered_radial_branch` and
-  `integrate_two_phase_branch_observables` are now inserted; the integrated
-  evaluator has no nested helper. Explanatory comments and the requested
-  short `ordered_radial_branch` docstring are also present.
-- A radial branch here means profile samples from one spatial integration,
-  stored as `positions` and state columns `[R; Q]`, with Q=dR/dr_*.
-  It is not a time series or a continuation through amplitude space.
-  Local E/J densities are integrated over r_*; radial fluxes are evaluated at
-  the endpoints. `radial_energy_flux` and `radial_angular_momentum_flux` are
-  signed toward increasing radius, so horizon losses negate the inner current.
-- Observables require explicit real carrier frequencies and omit slow profile
-  time derivatives. Matching currently solves for complex trial frequencies.
-  An adapter using their real parts must make that choice explicit; it does
-  not establish the physical slow-growth approximation.
-- October 15 verification reran all 159 existing multiphase checks and all
-  164 observable/field-derivative checks successfully (323 combined, run in
-  separate invocations). The observable checks are now registered in the
-  multiphase runner, which explicitly includes `observables.jl`; the library
-  loader still omits it. The local-observables test now uses `radial_*` fields.
-  The 86 Kerr-metric checks are registered in the core runner; all 336 core
-  checks pass. These checks do not establish physical profile convergence.
-- The user reaffirmed the small, executed-snippet workflow. The first candidate
-  is a reusable trial unpacker with an explicit fixed coefficient scale and
-  storage promoted from both state and amplitudes. Its 13 isolated checks pass,
-  including component reordering, scale invariance, and ForwardDiff in either
-  argument. Six additional checks pass through the actual matching residual,
-  boundary series, and joint RK4 integration on the established test domain
-  (-30, 5, 80; step 0.4), including comparisons to centered partial differences.
-  These use a trial state, not a converged response family. Candidate code,
-  scripts, and logs are in ignored `recovery/adiabatic-response-20261015/`.
-  The unpacker has not been inserted into the library; the two-amplitude
-  implicit response solve remains pending.
+- `multiphase/load.jl` now includes observables, `response.jl`, and `evolution.jl`.
+  It remains opt-in; the other models do not import the joint model.
+- The two positive amplitudes fix the first retained outer coefficient in
+  q=(1,0) and q=(0,1). E and J remain outputs, not amplitude coordinates.
+  `unpack_two_phase_trial` is shared by the original solver and response code.
+- `response.jl` supplies a real-packed matching residual, a Newton corrector,
+  and total E/J derivatives. The coefficient/residual scale is fixed at the
+  reference amplitude rather than differentiated. `core/sensitivity.jl`
+  factors the state Jacobian once for both amplitude directions and applies
+  the full observable chain rule. Existing scalar-amplitude APIs remain intact.
+- The observable adapter explicitly takes real parts of the complex matching
+  frequencies as carriers, omitting slow profile time derivatives. This
+  specifies the numerical family; it does not validate the physical
+  slow-growth approximation. Charges are integrated over the supplied finite
+  radial domain without tail corrections. Horizon losses negate inner currents.
+- `evolution.jl` solves the 2x2 E/J balance system, reports a dimensionless
+  condition number after row/column scaling, and rejects ill-conditioned
+  matrices. Explicit midpoint steps evolve log amplitudes. Every stage is
+  independently Newton-corrected from an implicit-response predictor.
+  Independently accumulated boundary losses supply numerical charge budgets.
+- All 985 Julia unit checks passed in Slurm: 13 loader, 350 core, 243
+  single-cloud, 16 primary/secondary, and 363 multiphase. These include 14
+  vector-response, 13 unpacking, 8 balance/scaling, and 19 midpoint/budget
+  checks. The campaign then validates both E/J response columns against
+  independently corrected neighbors at 1% and 0.5% offsets, checks fixed-scale
+  invariance, and compares 4-step and 8-step cosine trajectories.
+- Completed pilot job 26978242 uses snapshot `response_20261015_v2`, matching
+  tolerance 1e-9, and prefix `cosine_pilot_20261015_v2`. Both derivative columns
+  agree with independently corrected neighbors to at worst 9.50e-9 relative
+  in E/J and 2.07e-9 in the state response. Changing the fixed coefficient scale
+  by seven preserves the E/J derivatives.
+- Four-step and eight-step cosine trajectories reach t/M=199406.6212.
+  A1 grows 3.04542%, A2 grows 0.00126903%. Endpoint amplitudes differ by at most
+  7.06e-11 relative when halving dt. Eight-step budget errors are 4.84e-10 of
+  initial E and 2.46e-10 of initial J (2.08e-6 and 1.88e-6 of their respective
+  accumulated changes), improving by a factor of four from the coarse run.
+  The scaled balance condition stays between 1140 and 1211; saved endpoint
+  matching residuals are below 1.97e-10. These are finite-grid numerical checks.
+- The preceding job 26977745 passed all 985 unit checks, then stopped in a
+  linear seed solve at residual 1.26e-10 above its requested 1e-11 tolerance.
+  The corrected pilot uses the established 1e-9 matching tolerance. Both source
+  snapshots and logs are preserved; see the campaign README for exact recipes.
 
-Resume with small, executed snippets under the existing teaching workflow:
-
-1. Expose reusable trial-state unpacking and a real matching residual
-   G(u,A), with u the real-packed frequencies and free boundary coefficients
-   and A=(A1,A2). Account consistently for the solver's coefficient/residual
-   scaling by `minimum(normalizations)`; decide whether to hold a reference
-   scale fixed for differentiation before implementing the adapter.
-2. Extend `core/sensitivity.jl` beyond its existing scalar-amplitude API:
-   solve G_u * u_A = -G_A using one Jacobian factorization for both columns.
-   Differentiate the matching equations, not the Newton iterations. Check
-   ForwardDiff support through boundaries and joint radial integration.
-3. Propagate the response into integrated observables O=(E,J), including
-   explicit amplitude dependence: dO/dA = O_A + O_u * u_A. Verify selected
-   columns against finite differences of independently re-solved neighboring
-   profiles, with fixed background, grids, and component support. Finite
-   differences are the validation check, not a prerequisite production method.
-4. Then assemble the 2x2 E/J balance matrix, monitor conditioning, and develop
-   a short slow-time evolution. Physical profile convergence, boundary tails,
-   and the slow-growth formulation remain separate required checks.
+The next scientific checkpoints remain spatial and retained-support
+convergence, finite-boundary/tail sensitivity, and a consistent slow-growth
+formulation. An accurate numerical E/J budget alone does not establish these.
+Phase actions remain deferred to the three-independent-cloud extension.
 
 The detailed implementation evidence and other project tracks follow.
 
@@ -149,7 +137,7 @@ The detailed implementation evidence and other project tracks follow.
   1.2248e-10). Both driven outer coefficients are nonzero. This is a matched
   numerical prototype, not an endpoint/angular/radial convergence result or
   a validated slow-growth prescription. The October 15 library run reproduces
-  the candidate result; the full multiphase suite passes all 159 checks.
+  the candidate result; all 159 foundation checks pass (now part of the larger suite).
   A positive-frequency
   boundary wrapper is present; its prototype checks still need adding to the
   repository suite. A converged physical joint-profile family and the action closure
@@ -166,8 +154,8 @@ The detailed implementation evidence and other project tracks follow.
   per unit tortoise radius. Its 10 checks in `test_potential_energy.jl` pass
   against the inserted helper, loaded explicitly: single-cloud agreement for all potentials,
   phase-origin invariance, an analytic quartic interaction term, and zero/input
-  checks. The helper is in `multiphase/observables.jl` and awaits loader inclusion
-  and test registration; these checks are not part of the 159.
+  checks. The helper is in `multiphase/observables.jl`; loader inclusion and test
+  registration are now complete. These checks are additional to the original 159.
   The complete local tensor-based observables candidate is described below.
   This potential-only check requires no matched profile or
   choice of time-derivative convention for complex trial frequencies.
@@ -185,7 +173,7 @@ The detailed implementation evidence and other project tracks follow.
   one q, input preservation, and zero fields are checked. The helpers have
   been inserted into `multiphase/projection.jl`, including the user-requested
   interface that builds the polar derivative table inside reconstruction from
-  `grid`. All 32 checks pass against the actual library; registration is pending.
+  `grid`. All 32 checks pass and are registered in the suite.
   The derivative checks do not validate a slow-growth model.
   Two further candidates, `kerr_metric` (for `core/geometry.jl`) and
   `scalar_stress_tensor` (for `multiphase/observables.jl`), pass 115 checks:
@@ -200,8 +188,8 @@ The detailed implementation evidence and other project tracks follow.
   carriers and all three potentials to 3.1e-15 relative error. Joint-field
   fluxes and Schwarzschild angular momentum agree with analytic expressions.
   `scalar_stress_tensor` and `kerr_metric` are now inserted; the 115 checks
-  pass against the actual library. Observables loader inclusion and test
-  registration remain pending. Local checks
+  pass against the actual library and are registered. Observables load through
+  the multiphase loader. Local checks
   do not establish radial-integrated charges, endpoint convergence, or evolution.
   The inserted `two_phase_observables_at_radius` now passes all 44
   checks in `test_observables_at_radius.jl` against the actual library. It returns energy and
@@ -212,7 +200,7 @@ The detailed implementation evidence and other project tracks follow.
   exact quartic cross energy, zero fields, input preservation/validation,
   and automatic derivatives of a prescribed local field scaling against finite
   differences. That last check is not a matched-profile amplitude response.
-  Observables loader inclusion and test registration remain pending.
+  Observables loader inclusion and test registration are now complete.
   All observables use explicit real carrier frequencies.
   The `two_phase_integrated_observables` candidate passes 49 checks in
   `test_integrated_observables.jl`. It accepts saved matching histories,
@@ -234,10 +222,11 @@ The detailed implementation evidence and other project tracks follow.
   nested helpers to top-level `ordered_radial_branch` and
   `integrate_two_phase_branch_observables`, passing their inputs explicitly.
   All 49 checks passed with that refactor, which is now inserted; comments
-  and the radial-branch docstring are also present. Test registration remains
-  pending. Outputs cover only the supplied
+  and the radial-branch docstring are also present. The tests are registered.
+  Outputs cover only the supplied
   finite radial domain; tails and radial/boundary/truncation convergence remain
-  separate. Matched-profile amplitude responses are still unimplemented.
+  separate. Matched-profile amplitude responses are implemented as described
+  in the current checkpoint above.
 - **Adiabatic layout refactor (October 12):** branch
   `refactor/adiabatic-layout` groups source and tests by `core/`,
   `single_cloud/`, and `primary_secondary/`. At that checkpoint `multiphase/`
@@ -406,10 +395,10 @@ scan, and convergence evidence. Use its averaged secondary results;
 
 ## Next steps
 
-- **Active multiphase work:** implement the two-amplitude implicit response
-  and total E/J derivatives described in the resume point above, using small
-  tested snippets for the user to enter. Flux-field names and observable test
-  registration are reconciled; observables library-loader inclusion is pending.
+- **Active multiphase work:** the response, neighbor checks, and short cosine
+  evolution are complete. Next assess radial/domain/support convergence and
+  the physical slow-growth closure before interpreting a long trajectory.
+  The campaign preserves both time resolutions and all accepted endpoint data.
 - **Coupled-BH preparation:** local primary continuation in alpha and spin
   now works at both dilute amplitude and $A_0\simeq2.052$; the secondary and
   driven channels are checked on the nonlinear backgrounds, with the targeted

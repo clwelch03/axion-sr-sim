@@ -1,31 +1,23 @@
 # Multiphase adiabatic evolution: implementation plan
 
-Updated 2026-10-15. Independent-cloud labels, Fourier component construction,
-single-component linear radial assembly, and two-phase field reconstruction,
-projection, and nonlinear-source evaluation
-are implemented. The opt-in loader loads `core/`, `components.jl`,
-`profiles.jl`, and `projection.jl`. A boundary wrapper is also present;
-its prototype checks still need to enter the repository test suite.
-The source passes exact quartic checks, phase-origin checks, single-cloud
-comparisons for all three potentials, and a separate cosine quadrature study.
-The full radial RHS is implemented and its 21 checks pass against the library.
-The matching residual and Newton wrapper are implemented; all 159 registered
-checks pass, including integration, step refinement, and 20 Newton checks.
-The library wrapper converges the four-component trial in three corrections.
-Physical profile-family convergence and evolution remain pending.
-Joint-field stress-tensor observables, including finite-domain total E/J and
-signed boundary losses, are now implemented. The top-level radial integration
-helpers and explanatory comments are inserted. Observables library-loader inclusion
-remains pending. The observable/derivative tests are now registered with an
-explicit test-runner include, and the old `outward_*` test fields are renamed
-`radial_*`. The 159 existing multiphase checks and 164 added checks pass in
-separate invocations; all 336 core checks, including 86 metric checks, pass.
-The next requested increment is **direct two-amplitude implicit
-differentiation**, described in milestone 5. No such response solve has been
-implemented or validated yet. The user requested a documentation checkpoint
-before continuing that work.
-The action-flux closure below still requires a derivation for our open Kerr
-problem. [HANDOFF.md](../HANDOFF.md) remains the authority on current capabilities.
+Updated 2026-10-15. The joint matching solver and finite-domain E/J observables
+are implemented. The opt-in loader now includes observables, implicit
+amplitude responses, and short E/J-balanced evolution. The user authorized
+direct implementation of milestones 5's response, neighbor checks, and short
+evolution, with explanatory comments and docstring skeletons.
+
+The response uses a fixed reference coefficient scale and real-packed trial
+coordinates. It factors one matching Jacobian for both amplitude directions,
+then differentiates the observables along the induced profile changes.
+Analytic vector-response and midpoint-evolution checks pass. The frozen-source
+matched-cloud campaign completed both neighbor validations and 4/8-step cosine
+trajectories. E/J derivatives agree with neighbors within 9.50e-9 relative;
+charge-budget errors decrease fourfold when dt is halved. See
+[the campaign record](../runs/adiabatic/multiphase_two_cloud/README.md).
+
+The physical slow-growth approximation, profile/domain/support convergence,
+and the later action-flux closure remain separate open questions.
+[HANDOFF.md](../HANDOFF.md) remains the authority on current capabilities.
 
 ## Objective and initial scope
 
@@ -50,10 +42,10 @@ Sec. III reproduction and the original extension sketch. The
 ## Working approach
 
 Work on `main` in the existing checkout, one small piece at a time.
-The assistant explains strategies and mathematical choices, and sometimes
-supplies small, already-run snippets; the user writes the library code.
-Each piece gets a cheap decisive check and discussion before proceeding, as in
-[CLAUDE.md](../CLAUDE.md).
+The default teaching workflow uses small, already-run snippets. For the
+October 15 response/evolution increment, the user explicitly authorized direct
+library implementation, with readable comments and docstring skeletons.
+Each piece still gets a decisive check, as in [CLAUDE.md](../CLAUDE.md).
 
 Implement the new model under `src/adiabatic/multiphase/`, with matching tests
 under `tests/adiabatic/multiphase/`. Add `components.jl`, `projection.jl`,
@@ -204,7 +196,7 @@ in `projection.jl`, including internal polar-derivative construction from
 `polar_values` and `grid`.
 The potential-energy helper is already
 inserted into `observables.jl` and passes its 10 checks when explicitly loaded;
-neither observables test file is registered yet.
+the observable and derivative tests are now registered.
 
 The next two candidates are `kerr_metric` and `scalar_stress_tensor`. Their
 115 checks are in `core/test_kerr_metric.jl` (86) and
@@ -236,9 +228,8 @@ analytic joint-field currents, Schwarzschild angular momentum, and quartic
 interaction energy. It also passes phase-origin and local differentiation
 checks; the latter scales prescribed fields and does not compute the response
 of a matched profile to either cloud amplitude. Loader inclusion and test
-registration remain pending. That test file still uses the earlier
-`outward_*` names, so update those references before repeating the local
-checks against the current library. The quoted count is the earlier checkpoint.
+registration are complete; the test now uses the current `radial_*` field
+names and passes against the library.
 
 The inserted radial wrapper `two_phase_integrated_observables` reuses
 `integrate_uniform` for both charges, permits either storage direction on each
@@ -255,12 +246,12 @@ and a short radial-branch docstring. A branch here is a sequence of spatial
 profile samples from one radial integration, not an amplitude family or time
 series. It preserves the local
 `radial_energy_flux` and `radial_angular_momentum_flux` names, positive toward
-increasing radius. Test registration remains pending. These are finite-domain
+increasing radius. The tests are now registered. These are finite-domain
 integrals; no boundary tail correction or physical-profile convergence is
 established. The saved-history compatibility trial is deliberately dilute
 after larger arbitrary boundary coefficients caused nonlinear growth and
-observable overflow on its short test domain. No amplitude-response solve
-has been implemented yet.
+observable overflow on its short test domain. The amplitude-response solve
+is now implemented separately in `response.jl`, as described in milestone 5.
 
 For $K>2$, the total energy and angular-momentum balances supply only two
 constraints on $K$ amplitude rates. The missing information must come from
@@ -926,11 +917,14 @@ boundary, or Fourier convergence.
 
 ### 5. Compute amplitude responses and E/J evolution, then extend to actions
 
-**Current resume point (October 15):** go directly to implicit differentiation;
-do not first build a finite-difference response implementation. Use nearby
-independently corrected solutions to validate the implicit derivatives.
-`core/sensitivity.jl` currently supports only one real amplitude. The
-two-amplitude extension and its multiphase adapters have not been implemented.
+**Current implementation (October 15):** the vector-amplitude extension of
+`core/sensitivity.jl` and the multiphase adapters in `response.jl` are present.
+Production derivatives use implicit differentiation; independently corrected
+neighbors provide validation. `evolution.jl` supplies the scaled E/J balance
+solve and midpoint evolution with corrected profiles at every stage. The
+matched-cloud validation campaign completed the neighbor checks and 4/8-step
+cosine trajectories; its results and limits are recorded separately. The equations below describe the implemented approach
+and the later extension to actions.
 
 First expose reusable unpacking and the real-packed matching residual
 G(u,A1,A2), where u contains real and imaginary parts of the two trial

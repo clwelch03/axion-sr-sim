@@ -196,6 +196,39 @@ function two_phase_matching_residual(cloud_frequencies, horizon_coefficients,
 end
 
 """
+    unpack_two_phase_trial(state, normalizations, components; coefficient_scale)
+
+TODO: describe the trial ordering, fixed outer coefficients, and reference scale.
+"""
+function unpack_two_phase_trial(state, normalizations, components; coefficient_scale)
+    length(normalizations) == 2 ||
+        throw(DimensionMismatch("require two normalizations"))
+    all(value -> value isa Real && isfinite(value) && value > 0, normalizations) ||
+        throw(ArgumentError("require positive finite real normalizations"))
+    coefficient_scale isa Real && isfinite(coefficient_scale) && coefficient_scale > 0 ||
+        throw(ArgumentError("require a positive finite real coefficient scale"))
+
+    pairs = [(l, component.q) for component in components for l in component.l_values]
+    count = length(pairs)
+    length(state) == 2count ||
+        throw(DimensionMismatch("require two frequencies and all free coefficients"))
+    fixed = [findfirst(pair -> pair[2] == q, pairs) for q in ((1, 0), (0, 1))]
+    any(isnothing, fixed) && throw(ArgumentError("require both fundamental components"))
+    fixed = Int.(fixed)
+    free = setdiff(1:count, fixed)
+
+    # Promote both arguments: amplitude differentiation also needs dual-valued
+    # boundary storage when the trial state itself contains ordinary numbers.
+    value_type = promote_type(eltype(state), eltype(normalizations), typeof(coefficient_scale))
+    frequencies = value_type.(state[1:2])
+    horizon = coefficient_scale .* value_type.(state[3:count+2])
+    outer = zeros(value_type, count)
+    outer[fixed] .= normalizations
+    outer[free] .= coefficient_scale .* state[count+3:end]
+    return frequencies, horizon, outer
+end
+
+"""
     solve_two_phase_mode(frequency_guess, normalizations, spin, alpha,
         components, cloud_m, couplings, polar_values, grid, phase1_nodes,
         phase2_nodes; horizon_guess, outer_guess, kwargs...)
@@ -240,13 +273,8 @@ function solve_two_phase_mode(frequency_guess, normalizations, spin, alpha,
 
     # Newton's vector contains frequencies, scaled horizon coefficients, then
     # scaled free outer coefficients. Reinsert the two fixed outer coefficients.
-    function unpack_trial(state)
-        horizon = scale .* state[3:count+2]
-        outer = zeros(eltype(state), count)
-        outer[fixed] .= normalizations
-        outer[free] .= scale .* state[count+3:end]
-        return state[1:2], horizon, outer
-    end
+    unpack_trial = state -> unpack_two_phase_trial(
+        state, normalizations, components; coefficient_scale=scale)
     initial = complex.(vcat(frequency_guess, horizon_guess ./ scale, outer_guess[free] ./ scale))
 
     initial_bound = [real(sum(component.q .* frequency_guess)) < alpha for component in components]

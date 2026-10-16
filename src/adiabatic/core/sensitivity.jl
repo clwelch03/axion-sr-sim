@@ -1,4 +1,62 @@
 using ForwardDiff
+using LinearAlgebra: factorize, cond, norm
+
+"""
+    implicit_branch_response(residual, state, amplitudes)
+
+TODO: describe the response columns, linear solve, and diagnostic normalization.
+"""
+function implicit_branch_response(residual, state::AbstractVector{<:Real},
+        amplitudes::AbstractVector{<:Real})
+    isempty(state) || isempty(amplitudes) ?
+        throw(ArgumentError("state and amplitudes must be nonempty")) : nothing
+    state_jacobian = ForwardDiff.jacobian(
+        trial_state -> residual(trial_state, amplitudes), state)
+    amplitude_jacobian = ForwardDiff.jacobian(
+        trial_amplitudes -> residual(state, trial_amplitudes), amplitudes)
+    size(state_jacobian) == (length(state), length(state)) ||
+        throw(DimensionMismatch("require a square matching Jacobian"))
+    all(isfinite, state_jacobian) && all(isfinite, amplitude_jacobian) ||
+        error("nonfinite matching derivatives")
+
+    # Each right-hand-side column changes one amplitude. One factorization
+    # solves all columns; we never differentiate the Newton iterations.
+    factorization = factorize(state_jacobian)
+    state_derivative = -(factorization \ amplitude_jacobian)
+    all(isfinite, state_derivative) || error("nonfinite profile response")
+    linear_error = state_jacobian * state_derivative + amplitude_jacobian
+    linear_scale = norm(state_jacobian) * norm(state_derivative) + norm(amplitude_jacobian)
+    response_residual = norm(linear_error) / max(linear_scale, eps(Float64))
+    return (; state_derivative, state_jacobian, amplitude_jacobian,
+        state_jacobian_condition=cond(state_jacobian), response_residual)
+end
+
+"""
+    implicit_branch_derivative(residual, state, amplitudes::AbstractVector)
+
+TODO: describe the matrix-valued extension of the scalar-amplitude method.
+"""
+function implicit_branch_derivative(residual, state::AbstractVector{<:Real},
+        amplitudes::AbstractVector{<:Real})
+    return implicit_branch_response(residual, state, amplitudes).state_derivative
+end
+
+"""
+    implicit_observable_derivatives(residual, observables, state, amplitudes::AbstractVector)
+
+TODO: describe total derivatives, matrix ordering, and returned diagnostics.
+"""
+function implicit_observable_derivatives(residual, observables,
+        state::AbstractVector{<:Real}, amplitudes::AbstractVector{<:Real})
+    response = implicit_branch_response(residual, state, amplitudes)
+    # Move the state and the explicit amplitudes together. This evaluates
+    # O_A + O_u*u_A in just the amplitude directions, rather than building O_u.
+    observable_derivatives = ForwardDiff.jacobian(
+        offsets -> observables(state + response.state_derivative * offsets,
+            amplitudes + offsets), zero.(amplitudes))
+    all(isfinite, observable_derivatives) || error("nonfinite observable response")
+    return (; response..., observable_derivatives)
+end
 
 """
     implicit_branch_derivative(residual, state, amplitude)

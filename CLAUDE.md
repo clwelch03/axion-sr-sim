@@ -76,6 +76,9 @@ to numerical methods, and is using this reproduction to learn the method.
 - The user types library code from pasted snippets; paste only code that has
   been run. Claude may write drivers, scripts, and runs. The user's October 5
   request to write the piece 6 library directly was a task-specific exception.
+  On October 15 the user also authorized direct implementation of the joint
+  two-amplitude response, E/J derivatives, and a short evolution, with readable
+  code, moderate explanatory comments, and docstring skeletons for them to fill in.
 - Do not hand back a finished module. Do not silently lift code. Do not skip the
   hard part to get a fast result.
 - Each step gets a cheap decisive checkpoint before moving on (see above).
@@ -182,9 +185,9 @@ organized by physical approximation: `core/` supplies shared mathematics,
 `single_cloud/` owns a nonlinear cloud and its harmonics, and
 `primary_secondary/` owns the asymmetric two-cloud model and its evolution.
 `multiphase/` implements joint two-phase profile matching and observables;
-its opt-in loader exposes core, components, profiles, and projection, while
-observables still require an explicit include. Amplitude responses and slow
-evolution remain pending; see `HANDOFF.md` for the current resume point.
+its opt-in loader exposes core, components, profiles, projection, observables,
+implicit two-amplitude responses, and short E/J-balanced evolution. See
+`HANDOFF.md` for validation status and the remaining physical checks.
 
 `src/adiabatic/load.jl` loads the implemented models. Each group also has an
 idempotent `load.jl` for narrower dependencies. Reusable setup and solve

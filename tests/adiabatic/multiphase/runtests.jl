@@ -9,10 +9,10 @@ include("test_nonlinear_rhs.jl")
 include("test_matching_residual.jl")
 include("test_nonlinear_matching.jl")
 
-# Observables remain explicitly loaded until the library loader checkpoint.
-include(joinpath(@__DIR__, "../../../src/adiabatic/multiphase/observables.jl"))
 include("test_potential_energy.jl")
 include("test_field_derivatives.jl")
 include("test_stress_tensor.jl")
 include("test_observables_at_radius.jl")
 include("test_integrated_observables.jl")
+include("test_response_coordinates.jl")
+include("test_evolution.jl")

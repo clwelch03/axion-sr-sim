@@ -5,5 +5,5 @@
 *.png
 *.pdf
 *.tmp
-# New scratch experiments; existing CSV/JLS reference results remain tracked.
+# New scratch experiments; CSV/JLS files are ignored by the root .gitignore.
 work/

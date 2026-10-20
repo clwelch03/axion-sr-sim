@@ -1,2 +1,0 @@
-label,amplitude,target_amplitude,amplitude_gain,elapsed,gain_per_minute,accepted,rejected,total_corrections,energy,omega_real,omega_imag,total_flux,residual,status
-cubic_h0025_1e10,5.7,5.7,0.11623982016427448,227.26914310455322,0.030687796480351758,4,0,16,1245.3558568188457,0.38038450747354136,1.2359049048337183e-6,-0.0029066096292163814,2.9026705235117788e-11,target_reached

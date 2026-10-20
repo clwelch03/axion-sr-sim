@@ -37,11 +37,12 @@ an existing campaign; use a new directory for a distinct configuration study.
 
 ## Version control and preservation
 
-Track recipes, configuration, summaries, and selected reference tables and seeds.
-Existing tracked CSV/JLS results are retained in this reorganization. Large Dolan
-NPZ files, Slurm logs, and generated figures remain ignored. Temporary writes and
-new scratch experiments under a campaign's `work/` directory are ignored. Do not
-blanket-ignore or remove existing checkpoints: some are expensive restart inputs.
+Track recipes, source configuration, and written summaries. All CSV tables and
+JLS checkpoints, including reference results, grids, and seeds, remain local and
+are excluded from Git tracking by the root `.gitignore`. Preserve these files
+on disk: some are expensive restart inputs. Large Dolan NPZ files, Slurm logs,
+and generated figures remain ignored. Temporary writes and new scratch
+experiments under a campaign's `work/` directory are also ignored.
 
 ## Layout migration, 2026-09-24
 

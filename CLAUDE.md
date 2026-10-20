@@ -212,6 +212,7 @@ See `runs/README.md` for the index, migration map, and preservation policy.
 
 Campaign `scripts/` directories contain recipes; `results/` (or Dolan's
 `peak/` and `sweep/`) contain numerical outputs; `seeds/` holds preserved inputs;
-`logs/` holds Slurm output. Existing CSV/JLS reference results remain tracked.
+`logs/` holds Slurm output. All CSV/JLS files, including reference results,
+remain local and are excluded from Git tracking by the root `.gitignore`.
 Large NPZ files, logs, figures, temporary writes, and new `work/` scratch
 experiments are ignored. Keep campaign READMEs and recipes current.

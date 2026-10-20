@@ -196,35 +196,55 @@ function two_phase_matching_residual(cloud_frequencies, horizon_coefficients,
 end
 
 """
-    unpack_two_phase_trial(state, normalizations, components; coefficient_scale)
+    unpack_two_phase_trial(frequency_and_boundary_guess, cloud_amplitudes,
+        fourier_components; coefficient_scale)
 
-TODO: describe the trial ordering, fixed outer coefficients, and reference scale.
+Organize a candidate solution into frequencies, horizon boundary coefficients,
+and outer boundary coefficients.
+
+The guess contains, in order:
+- Two cloud frequencies.
+- All horizon boundary coefficients, divided by coefficient_scale.
+- The free outer boundary coefficients, divided by coefficient_scale.
+
+Multiply the stored boundary coefficients by coefficient_scale to recover their
+physical values. Insert the two prescribed cloud_amplitudes into the outer
+coefficient array, at the first retained angular harmonic of each fundamental
+component, q=(1,0) and q=(0,1).
+
+For this example with |211>, |322>, and two driven components (2w_1 - w_2) and
+(2w_2 - w_1) we have eight boundary coefficients, two of which (the outer parent cloud
+coefficients) we prescribe as A_1 and A_2. Thus we would return
+
+frequencies          = [ω1, ω2]
+horizon_coefficients = [h1, h2, h3, h4]
+outer_coefficients   = [A1, A2, b3, b4]
 """
-function unpack_two_phase_trial(state, normalizations, components; coefficient_scale)
-    length(normalizations) == 2 ||
+function unpack_two_phase_trial(frequency_and_boundary_guess, cloud_amplitudes, fourier_components; coefficient_scale)
+    length(cloud_amplitudes) == 2 ||
         throw(DimensionMismatch("require two normalizations"))
-    all(value -> value isa Real && isfinite(value) && value > 0, normalizations) ||
+    all(value -> value isa Real && isfinite(value) && value > 0, cloud_amplitudes) ||
         throw(ArgumentError("require positive finite real normalizations"))
     coefficient_scale isa Real && isfinite(coefficient_scale) && coefficient_scale > 0 ||
         throw(ArgumentError("require a positive finite real coefficient scale"))
 
-    pairs = [(l, component.q) for component in components for l in component.l_values]
-    count = length(pairs)
-    length(state) == 2count ||
+    radial_mode_labels = [(l, component.q) for component in fourier_components for l in component.l_values]
+    num_radial_modes = length(radial_mode_labels)
+    length(frequency_and_boundary_guess) ==  2 * num_radial_modes ||
         throw(DimensionMismatch("require two frequencies and all free coefficients"))
-    fixed = [findfirst(pair -> pair[2] == q, pairs) for q in ((1, 0), (0, 1))]
+    fixed = [findfirst(pair -> pair[2] == q, radial_mode_labels) for q in ((1, 0), (0, 1))]
     any(isnothing, fixed) && throw(ArgumentError("require both fundamental components"))
     fixed = Int.(fixed)
-    free = setdiff(1:count, fixed)
+    free = setdiff(1:num_radial_modes, fixed)
 
     # Promote both arguments: amplitude differentiation also needs dual-valued
     # boundary storage when the trial state itself contains ordinary numbers.
-    value_type = promote_type(eltype(state), eltype(normalizations), typeof(coefficient_scale))
-    frequencies = value_type.(state[1:2])
-    horizon = coefficient_scale .* value_type.(state[3:count+2])
+    value_type = promote_type(eltype(frequency_and_boundary_guess), eltype(cloud_amplitudes), typeof(coefficient_scale))
+    frequencies = value_type.(frequency_and_boundary_guess[1:2])
+    horizon = coefficient_scale .* value_type.(frequency_and_boundary_guess[3:count+2])
     outer = zeros(value_type, count)
-    outer[fixed] .= normalizations
-    outer[free] .= coefficient_scale .* state[count+3:end]
+    outer[fixed] .= cloud_amplitudes
+    outer[free] .= coefficient_scale .* frequency_and_boundary_guess[count+3:end]
     return frequencies, horizon, outer
 end
 

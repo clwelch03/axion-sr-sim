@@ -191,10 +191,55 @@ function main(prefix)
             horizon = ComplexF64[amplitudes[1]*first_mode.horizon_amplitudes[1],
                 amplitudes[2]*second_mode.horizon_amplitudes[1], 0, 0]
             outer = ComplexF64[amplitudes; 0; 0]
-            problem = two_phase_response_problem(frequencies, amplitudes, spin, alpha,
-                components, cloud_m, couplings, polar, grid,
-                grid.azimuth_nodes, grid.azimuth_nodes; potential=:cosine, options...)
-            guess = pack_two_phase_solution((; frequencies, horizon_coefficients=horizon,
+            # Set up the fixed response settings alongside the reference profile.
+            length(frequencies) == length(amplitudes) == length(cloud_m) == 2 ||
+                throw(DimensionMismatch("require two independent clouds"))
+            integration = (; options..., horizon_order=3, outer_order=7)
+            all(isfinite, (integration.inner, integration.match, integration.outer, integration.step)) &&
+                integration.inner < integration.match < integration.outer && integration.step > 0 ||
+                throw(ArgumentError("require ordered endpoints and a positive finite radial step"))
+
+            # Fix the first outer coefficient of each fundamental component.
+            # All others are free, including additional fundamental angular harmonics.
+            radial_mode_labels = [(l, component.q) for component in components for l in component.l_values]
+            fixed_outer_coefficient_indices = [findfirst(pair -> pair[2] == q, radial_mode_labels)
+                for q in ((1, 0), (0, 1))]
+            any(isnothing, fixed_outer_coefficient_indices) &&
+                throw(ArgumentError("require both fundamental components"))
+            free_outer_coefficient_indices = setdiff(1:length(radial_mode_labels),
+                Int.(fixed_outer_coefficient_indices))
+
+            coefficient_scale = minimum(amplitudes)
+            check_cloud_amplitudes_and_coefficient_scale_validity(amplitudes, coefficient_scale)
+
+            # Record the decaying/outgoing branch at the outer boundary for each component.
+            ω1, ω2 = real.(frequencies)
+            component_frequencies = [component.q[1] * ω1 + component.q[2] * ω2
+                for component in components]
+            initial_bound = component_frequencies .< alpha
+            problem = TwoPhaseResponseProblem(;
+                # Background and retained modes
+                spin,
+                alpha,
+                components,
+                cloud_m,
+                # Angular projection and phase sampling
+                couplings,
+                polar_values = polar,
+                grid,
+                phase1_nodes = grid.azimuth_nodes,
+                phase2_nodes = grid.azimuth_nodes,
+                # Potential and fixed coefficient/residual scale
+                potential = :cosine,
+                coefficient_scale,
+                free_outer_coefficient_indices,
+                # Boundary branches and radial integration settings
+                initial_bound,
+                integration,
+            )
+            two_phase_trial_admissible(pack_complex(frequencies), problem) ||
+                throw(ArgumentError("reference frequencies are outside the supported boundary branches"))
+            guess = pack_two_phase_profile((; frequencies, horizon_coefficients=horizon,
                 outer_coefficients=outer), problem)
             initial = two_phase_evolution_sample(problem, amplitudes, guess; tolerance=1e-9)
             save_checkpoint(initial_path, (problem, initial))
@@ -207,7 +252,22 @@ function main(prefix)
         # and their derivatives unchanged. It may change the raw Newton condition.
         scale_path = prefix * "-scale-check.jls"
         if !isfile(scale_path)
-            scaled_problem = merge(problem, (; coefficient_scale=7problem.coefficient_scale))
+            scaled_problem = TwoPhaseResponseProblem(;
+                spin = problem.spin,
+                alpha = problem.alpha,
+                components = problem.components,
+                cloud_m = problem.cloud_m,
+                couplings = problem.couplings,
+                polar_values = problem.polar_values,
+                grid = problem.grid,
+                phase1_nodes = problem.phase1_nodes,
+                phase2_nodes = problem.phase2_nodes,
+                potential = problem.potential,
+                coefficient_scale = 7problem.coefficient_scale,
+                free_outer_coefficient_indices = problem.free_outer_coefficient_indices,
+                initial_bound = problem.initial_bound,
+                integration = problem.integration,
+            )
             trial = unpack_complex(initial.solution.state)
             trial[3:end] ./= 7
             scaled_solution = correct_two_phase_profile(scaled_problem,
@@ -243,5 +303,7 @@ function main(prefix)
     end
 end
 
-length(ARGS) == 1 || error("usage: response_and_evolution.jl OUTPUT_PREFIX")
-main(abspath(only(ARGS)))
+if abspath(PROGRAM_FILE) == abspath(@__FILE__)
+    length(ARGS) == 1 || error("usage: response_and_evolution.jl OUTPUT_PREFIX")
+    main(abspath(only(ARGS)))
+end

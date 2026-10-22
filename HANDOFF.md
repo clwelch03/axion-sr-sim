@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-10-15. This is the authoritative project status: what works,
+Updated 2026-10-21. This is the authoritative project status: what works,
 open caveats, and next steps. Campaign READMEs own exact commands, saved-result
 paths, and detailed validation records; design documents own equations and
 implementation decisions.
@@ -19,6 +19,88 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
 `docs/papers/`, not the arXiv HTML.
 
 ## Where things stand
+
+### Resume here: multiphase organization refactor (October 21)
+
+The physical-profile and solver-coordinate migration is complete for this pass.
+The user authorized the solver migration and the remaining annotation, test,
+driver, naming, and documentation cleanup. The broader docstring overhaul is
+unfinished. Ordinarily the user prefers to make library edits themselves with
+small guided steps; this task-specific authorization does not replace that
+preference. Preserve the user's learning-map checkboxes.
+
+Current interfaces and responsibilities:
+
+- `TwoPhaseProblem` stores fixed settings; `TwoPhaseProfile` stores complex
+  frequencies and physical boundary coefficients. Neither stores sampled
+  radial functions. Both are defined in `profiles.jl`.
+- `pack_two_phase_profile` and `unpack_two_phase_profile` convert between a
+  physical profile and 4N real coordinates (2N complex unknowns). Frequencies
+  are unscaled; boundary coefficients use the fixed problem scale. The two
+  prescribed amplitudes are separate inputs to unpacking. Numeric promotion
+  preserves derivatives from either the packed state or amplitudes.
+- `two_phase_matching_residual(profile, problem; save_radial_result=false)`
+  evaluates physical matching, including reduced single-cloud component sets.
+  Saving returns `from_horizon`, `from_outer`, and `residual`. The integration
+  calls translate the flag to the core keyword `save_profile`.
+- `solve_two_phase_mode` constructs a problem and packs its complex Newton
+  candidates before unpacking profiles. Integration defaults, the Newton
+  backend, scaling, admissibility behavior, and return fields are preserved.
+- Response residuals and observables use the same unpacker and matching
+  interface. `two_phase_trial_matching` and `unpack_two_phase_trial` are removed.
+  Library and live-driver definitions accepting a problem now annotate it as
+  `TwoPhaseProblem`; physical profile arguments use `TwoPhaseProfile`.
+- `two_phase_integrated_observables` calls its integration bundle
+  `radial_matching_result`; this bundle is not a `TwoPhaseProfile`.
+- The unpacker, standalone solver, and live response/evolution driver use
+  `two_phase_coefficient_indices`. Preserve the descriptive field names
+  `fixed_outer_coefficient_indices` and `free_outer_coefficient_indices`.
+  The driver's admissibility check now receives its already-packed guess
+  directly.
+- `radial.jl` contains `component_tortoise_operator`, `component_boundary_state`,
+  and `nonlinear_two_phase_rhs!`. Keep these helpers independent of the profile
+  types. The opt-in loader includes this file before `profiles.jl`.
+
+Validation against the edited working tree:
+
+- All **97 focused checks** passed in a fresh Julia process: 24 physical
+  matching checks, 49 integrated-observables checks, and 24 coordinate checks.
+  They cover single-cloud limits for three potentials, ordering with unequal
+  angular blocks, radial RK4 refinement, saved versus plain residuals,
+  manufactured charges, boundary signs, packing/scaling, exact Jacobians with
+  respect to state and amplitudes, and invalid inputs. Command:
+
+  ```bash
+  julia --startup-file=no --project=. -e 'using Test; include("src/adiabatic/multiphase/load.jl"); include("tests/adiabatic/multiphase/test_matching_residual.jl"); include("tests/adiabatic/multiphase/test_integrated_observables.jl"); include("tests/adiabatic/multiphase/test_response_coordinates.jl")'
+  ```
+
+- The preceding solver migration passed all **20 nonlinear matching checks**,
+  including a reordered-component solve. Newton took three iterations to a
+  scaled residual norm of approximately 1.22e-10 on the test's modest grid.
+- The live response/evolution driver loaded without running its campaign;
+  two setup checks confirmed the prescribed and free coefficient indices.
+- These are algorithm/interface checks, not physical spatial convergence.
+  The full suite and campaign were not rerun; saved campaign results below
+  remain historical evidence for their frozen source.
+
+Deferred work and known caveats:
+
+- Continue the user's docstring walkthrough using the
+  [learning map](docs/multiphase-learning-map.md). The
+  [organization proposal](docs/multiphase-profile-organization.md) includes
+  later work beyond this completed interface migration.
+- Boundary-assembly cleanup and making the corrector return
+  `TwoPhaseMatchedSolution` remain deferred. The corrector still returns a
+  named tuple with packed state, amplitudes, and diagnostics.
+- Resolve admissibility semantics before sharing predicates: the standalone
+  solver rejects nonpositive component frequencies and exact thresholds;
+  the response predicate checks fundamental bounds and branch classification.
+- `two_cloud_balance_rates` returns `log_rates`, `scaled_condition`, and
+  `balance_residual`, but `test_evolution.jl` still expects `amplitude_rates`.
+  That pre-existing mismatch is outside this pass and remains unresolved.
+- Preserve existing working-tree changes, frozen source snapshots, and saved
+  results. Saved objects require explicit compatibility review before reuse
+  with new interfaces; do not resume a historical campaign under edited source.
 
 ### Current multiphase checkpoint and resume point (October 15)
 

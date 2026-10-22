@@ -174,16 +174,17 @@ function integrate_two_phase_branch_observables(branch, pairs, spin, alpha,
 end
 
 """
-    two_phase_integrated_observables(profiles, spin, alpha,
+    two_phase_integrated_observables(radial_matching_result, spin, alpha,
         cloud_frequencies, components, cloud_m, polar_values, grid,
         phase1_nodes, phase2_nodes; potential=:cosine)
 
-Combine the two profile series from two_phase_matching_residual(save_profile=true).
+Combine the two radial integration results returned by
+two_phase_matching_residual(profile, problem; save_radial_result=true).
 Return total E, J over their finite radial domain and signed losses at both
 boundaries. The caller is responsible for profile convergence and any tails
 outside the retained domain; this function only checks the integration layout.
 """
-function two_phase_integrated_observables(profiles, spin, alpha,
+function two_phase_integrated_observables(radial_matching_result, spin, alpha,
         cloud_frequencies, components, cloud_m, polar_values, grid,
         phase1_nodes, phase2_nodes; potential=:cosine)
     # Match the solver's row order: component first, then retained l within it.
@@ -191,8 +192,8 @@ function two_phase_integrated_observables(profiles, spin, alpha,
     count = length(pairs)
     count > 0 || throw(ArgumentError("require at least one retained pair"))
 
-    inner = ordered_radial_branch(profiles.from_horizon, count)
-    outer = ordered_radial_branch(profiles.from_outer, count)
+    inner = ordered_radial_branch(radial_matching_result.from_horizon, count)
+    outer = ordered_radial_branch(radial_matching_result.from_outer, count)
     # The intervals touch at the match point. Integrating each interval once
     # gives the full domain even though both profile series store that endpoint.
     isapprox(last(inner.positions), first(outer.positions); rtol=0, atol=1e-12) ||

@@ -129,7 +129,7 @@ end
 
 TODO: describe profile correction, response evaluation, and total boundary losses.
 """
-function two_phase_evolution_sample(problem, amplitudes, state_guess;
+function two_phase_evolution_sample(problem::TwoPhaseProblem, amplitudes, state_guess;
         tolerance=1e-9, max_iterations=12, max_condition=1e10)
     solution = correct_two_phase_profile(problem, amplitudes, state_guess;
         tolerance, max_iterations)

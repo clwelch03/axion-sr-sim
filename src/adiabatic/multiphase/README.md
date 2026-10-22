@@ -9,7 +9,8 @@ neighbor checks, and the 4/8-step cosine evolution pilot pass. General
 action closure remains deferred to three independent clouds.
 
 `load.jl` loads `core/`, cloud/component labels in `components.jl`, linear
-operators, boundary assembly, and the full nonlinear radial RHS in `profiles.jl`,
+operators, boundary states, and the full nonlinear radial RHS in `radial.jl`,
+profile types, coordinate conversions, and matching in `profiles.jl`,
 and two-phase field reconstruction, projection, and nonlinear-source evaluation
 in `projection.jl`, without importing the other models.
 The root adiabatic loader leaves this library opt-in.
@@ -33,7 +34,7 @@ phase-origin covariance and averaged-potential invariance, and independent
 polar/phase convergence for a fixed two-cloud cosine example. All 159 original
 foundation checks pass within the expanded 363-check multiphase suite. This does not establish profile or retained-support convergence.
 
-`nonlinear_two_phase_rhs!` is implemented in `profiles.jl`; its 21 checks in
+`nonlinear_two_phase_rhs!` is implemented in `radial.jl`; its 21 checks in
 `test_nonlinear_rhs.jl` are registered and pass against the library.
 The implemented `two_phase_matching_residual` passes 24 registered checks in
 `test_matching_residual.jl`, including integration histories and radial
@@ -79,9 +80,12 @@ additional closure equations.
 
 ## Implicit response and short evolution
 
-`two_phase_response_problem` fixes the background, component support, grids,
-boundary branches, and coefficient scale. `pack_two_phase_solution` converts a
-matched solution to real Newton coordinates. `two_phase_real_residual` exposes
+The response/evolution driver directly constructs a `TwoPhaseProblem` containing the
+fixed background, component support, grids, boundary branches, and coefficient
+scale. `pack_two_phase_profile` converts a physical `TwoPhaseProfile` to
+real Newton coordinates; `unpack_two_phase_profile` reconstructs it from those
+coordinates, prescribed amplitudes, and the problem. Physical matching accepts
+`(profile, problem; save_radial_result=false)`. `two_phase_real_residual` exposes
 both amplitudes explicitly; `correct_two_phase_profile` corrects a trial at
 fixed amplitudes. `two_phase_profile_response` differentiates the matching
 system and then total E/J, including changes in profiles and frequencies.
@@ -100,4 +104,7 @@ The completed pilot reaches t/M=199406.62 with amplitude changes of +3.04542%
 and +0.00126903%. Neighbor E/J derivatives agree within 9.50e-9 relative;
 charge-budget errors improve fourfold when the time step is halved. This tests
 the discretized finite-domain family, not spatial convergence or the physical
-slow-growth closure. The full Julia unit suite passes all 985 checks.
+slow-growth closure. The historical pilot source passed all 985 Julia unit checks. For validation
+of the edited October 21 interfaces, see the current handoff; the full suite
+has not been rerun and a pre-existing evolution-test return-field mismatch
+remains unresolved.

@@ -38,10 +38,17 @@ include(joinpath(@__DIR__, "../../../src/adiabatic/single_cloud/load.jl"))
     @test solution.iterations > 0
     @test solution.scaled_residual_norm < 1e-8
     @test frequency_guess == original[1] && horizon == original[2] && outer == original[3]
-    checked = two_phase_matching_residual(solution.frequencies,
-        solution.horizon_coefficients, solution.outer_coefficients, spin, alpha,
-        components, cloud_m, couplings, polar, grid, grid.azimuth_nodes,
-        grid.azimuth_nodes; potential=:quartic, options...)
+    (; free_outer_coefficient_indices) = two_phase_coefficient_indices(components)
+    problem = TwoPhaseProblem(; spin, alpha, components, cloud_m, couplings,
+        polar_values=polar, grid, phase1_nodes=grid.azimuth_nodes,
+        phase2_nodes=grid.azimuth_nodes, potential=:quartic,
+        coefficient_scale=minimum(normalizations), free_outer_coefficient_indices,
+        initial_bound=BitVector([real(sum(component.q .* frequency_guess)) < alpha
+            for component in components]),
+        integration=(; horizon_order=3, outer_order=7, options...))
+    profile = TwoPhaseProfile(solution.frequencies,
+        solution.horizon_coefficients, solution.outer_coefficients)
+    checked = two_phase_matching_residual(profile, problem)
     @test norm(checked)/minimum(normalizations) < 1e-8
     @test isapprox(solution.residual, checked; atol=1e-18, rtol=1e-8)
     @test isapprox(solution.residual_norm, minimum(normalizations)*solution.scaled_residual_norm)

@@ -14,11 +14,18 @@ include(joinpath(@__DIR__, "../../../src/adiabatic/single_cloud/load.jl"))
     horizon = ComplexF64[1e-4+2e-5im, -2e-6+1e-6im, 1e-6-1e-7im]
     outer = ComplexF64[1e-5, 2e-7+1e-7im, -1e-7+2e-7im]
     options = (; inner=-10.0, match=5.0, outer=30.0, step=0.4)
+    profile = TwoPhaseProfile(frequencies, horizon, outer)
     for potential in (:quartic, :sextic, :cosine)
-        result = two_phase_matching_residual(frequencies, horizon, outer,
-            0.7, 0.42, components, cloud_m, couplings, polar, grid,
-            -grid.azimuth_nodes, 2pi .* (0:4) ./ 5; potential, options...,
-            save_profile=true)
+        # Physical matching does not use solver-coordinate indices or scaling,
+        # and must also support a component set without the second fundamental.
+        problem = TwoPhaseProblem(; spin=0.7, alpha=0.42, components, cloud_m,
+            couplings, polar_values=polar, grid, phase1_nodes=-grid.azimuth_nodes,
+            phase2_nodes=2pi .* (0:4) ./ 5, potential, coefficient_scale=1.0,
+            free_outer_coefficient_indices=Int[],
+            initial_bound=BitVector([real(sum(component.q .* frequencies)) < 0.42
+                for component in components]),
+            integration=(; horizon_order=3, outer_order=7, options...))
+        result = two_phase_matching_residual(profile, problem; save_radial_result=true)
         reference = nonlinear_matching_residual(frequencies[1], horizon, outer,
             0.7, 0.42, modes, couplings, polar, azimuthal, grid;
             potential, options..., save_profile=true)
@@ -28,9 +35,7 @@ include(joinpath(@__DIR__, "../../../src/adiabatic/single_cloud/load.jl"))
         @test isapprox(result.from_outer.states, reference.from_outer.states;
             atol=1e-12, rtol=1e-11)
         @test isapprox(result.residual, reference.residual; atol=1e-12, rtol=1e-11)
-        plain = two_phase_matching_residual(frequencies, horizon, outer,
-            0.7, 0.42, components, cloud_m, couplings, polar, grid,
-            -grid.azimuth_nodes, 2pi .* (0:4) ./ 5; potential, options...)
+        plain = two_phase_matching_residual(profile, problem)
         @test plain == result.residual
     end
 end
@@ -49,10 +54,21 @@ end
     outer = ComplexF64[1e-5, 2e-7+1e-7im, 2e-6, 0, 0]
     horizon_original, outer_original = copy(horizon), copy(outer)
     options = (; inner=-10.0, match=5.0, outer=30.0, step=0.4, potential=:quartic)
-    evaluate = (cs, hs, bs; kwargs...) -> two_phase_matching_residual(
-        frequencies, hs, bs, 0.7, 0.42, cs, cloud_m, couplings,
-        polar, grid, phase1, phase2; kwargs...)
-    result = evaluate(components, horizon, outer; options..., save_profile=true)
+    function evaluate(trial_components, horizon_coefficients, outer_coefficients;
+            potential=:quartic, save_radial_result=false, integration_options...)
+        # These tests exercise physical matching, including invalid component
+        # sets; leave the unused solver-coordinate indices empty.
+        problem = TwoPhaseProblem(; spin=0.7, alpha=0.42, components=trial_components,
+            cloud_m, couplings, polar_values=polar, grid, phase1_nodes=phase1,
+            phase2_nodes=phase2, potential, coefficient_scale=1.0,
+            free_outer_coefficient_indices=Int[],
+            initial_bound=BitVector([real(sum(component.q .* frequencies)) < 0.42
+                for component in trial_components]),
+            integration=(; step=0.4, horizon_order=3, outer_order=7, integration_options...))
+        profile = TwoPhaseProfile(frequencies, horizon_coefficients, outer_coefficients)
+        return two_phase_matching_residual(profile, problem; save_radial_result)
+    end
+    result = evaluate(components, horizon, outer; options..., save_radial_result=true)
     @test all(isfinite, result.residual)
     @test length(result.residual) == 10
     @test horizon == horizon_original && outer == outer_original

@@ -35,7 +35,7 @@ end
 
 TODO: describe independently corrected neighbors and derivative comparisons.
 """
-function validate_neighbors(problem, initial, prefix)
+function validate_neighbors(problem::TwoPhaseProblem, initial, prefix)
     path = prefix * "-neighbors.csv"
     marker = prefix * "-neighbors.jls"
     isfile(marker) && return deserialize(marker)
@@ -113,7 +113,7 @@ end
 
 TODO: describe accepted-endpoint checkpoints and continuation after interruption.
 """
-function run_trajectory(problem, initial, prefix, final_time, step_count)
+function run_trajectory(problem::TwoPhaseProblem, initial, prefix, final_time, step_count)
     path = prefix * "-steps$(step_count)"
     if isfile(path * ".jls")
         history = deserialize(path * ".jls")
@@ -201,13 +201,7 @@ function main(prefix)
 
             # Fix the first outer coefficient of each fundamental component.
             # All others are free, including additional fundamental angular harmonics.
-            radial_mode_labels = [(l, component.q) for component in components for l in component.l_values]
-            fixed_outer_coefficient_indices = [findfirst(pair -> pair[2] == q, radial_mode_labels)
-                for q in ((1, 0), (0, 1))]
-            any(isnothing, fixed_outer_coefficient_indices) &&
-                throw(ArgumentError("require both fundamental components"))
-            free_outer_coefficient_indices = setdiff(1:length(radial_mode_labels),
-                Int.(fixed_outer_coefficient_indices))
+            (; free_outer_coefficient_indices) = two_phase_coefficient_indices(components)
 
             coefficient_scale = minimum(amplitudes)
             check_cloud_amplitudes_and_coefficient_scale_validity(amplitudes, coefficient_scale)
@@ -217,7 +211,7 @@ function main(prefix)
             component_frequencies = [component.q[1] * ω1 + component.q[2] * ω2
                 for component in components]
             initial_bound = component_frequencies .< alpha
-            problem = TwoPhaseResponseProblem(;
+            problem = TwoPhaseProblem(;
                 # Background and retained modes
                 spin,
                 alpha,
@@ -237,10 +231,10 @@ function main(prefix)
                 initial_bound,
                 integration,
             )
-            two_phase_trial_admissible(pack_complex(frequencies), problem) ||
+            profile = TwoPhaseProfile(frequencies, horizon, outer)
+            guess = pack_two_phase_profile(profile, problem)
+            two_phase_profile_admissible(guess, problem) ||
                 throw(ArgumentError("reference frequencies are outside the supported boundary branches"))
-            guess = pack_two_phase_profile((; frequencies, horizon_coefficients=horizon,
-                outer_coefficients=outer), problem)
             initial = two_phase_evolution_sample(problem, amplitudes, guess; tolerance=1e-9)
             save_checkpoint(initial_path, (problem, initial))
         end
@@ -252,7 +246,7 @@ function main(prefix)
         # and their derivatives unchanged. It may change the raw Newton condition.
         scale_path = prefix * "-scale-check.jls"
         if !isfile(scale_path)
-            scaled_problem = TwoPhaseResponseProblem(;
+            scaled_problem = TwoPhaseProblem(;
                 spin = problem.spin,
                 alpha = problem.alpha,
                 components = problem.components,

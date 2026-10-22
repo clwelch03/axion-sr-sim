@@ -1,0 +1,51 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath, amssymb}
+\usepackage{braket}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\bibliographystyle{unsrt}
+\usepackage[colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue]{hyperref}
+\newcommand{\CW}[1]{ \textcolor{cyan}{(TODO: #1)} }
+
+\newcommand{\Msun}{M_\odot}
+\newcommand{\Rsun}{R_\odot}
+\newcommand{\dGamma}{\Delta\Gamma}
+
+\title{Multiphase Adiabatic Evolution of Axion Cloud}
+\author{Catherine Welch}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Multiphase Formalism}
+In general, the axion field around a black hole contains components with many different phases. In undertaking the adiabatic approximation it is important that we separate these components out. For a piece of the field with frequency $\omega$, azimuthal number $m$, and azimuthal coordinate $\varphi$, its oscillatory factor is\footnote{The below definition neglects the fact that $\omega$ can change over time. Later on we'll use the more accurate definition of $\psi \equiv \vartheta - m\varphi, \vartheta = \int_0^t \omega(\mathbf{A}(t'))dt'$.}
+\begin{equation}
+    e^{-i\psi}, \quad \psi \equiv \omega t - m \varphi.
+\end{equation}
+Let us consider a field comprising $K$ independently oscillating bound axion modes $\ket{nlm}$, as well as the products of their possible interactions. We have one phase $\psi_i$ and one amplitude $A_i$\footnote{Defined through the asymptotic normalization of its fundamental radial profile; see Equation 20 of \cite{Omiya_2022} for details.} for each bound mode present in the cloud; we arrange these in vectors $\boldsymbol{\psi}, \mathbf{A}$. Axion-axion interactions source field components whose phases are integer combinations of the various $\psi$, which we separate by Fourier expansion of the field in $\psi$. We label each Fourier component by an integer vector $\mathbf{q} \equiv (q_1,\ldots,q_K)$. A component has an overall phase factor $e^{-i(\omega_\mathbf{q} t - m_\mathbf{q} \varphi)} = e^{-i\mathbf{q}\cdot\boldsymbol{\psi}}$, where $\omega_\mathbf{q} \equiv \mathbf{q} \cdot \boldsymbol{\omega}$ and $m_\mathbf{q} \equiv \mathbf{q} \cdot \mathbf{m}$. Since interactions can drive responses at different angular quantum numbers, each component also has an angular expansion with allowed indices $l \geq |m_\mathbf{q}|$. (In practice, we will truncate the set $L_\mathbf{q}$ for computability.)
+
+To write the field in terms of these components, we must introduce spatial profiles:
+\begin{equation}
+    F_\mathbf{q}(r,\theta;\mathbf{A}) = \sum_{l \in L_\mathbf{q}} \tilde{R}_{l,\mathbf{q}}(r;\mathbf{A}) \bar{Y}_{l,|m_\mathbf{q}|}(\cos\theta),
+\end{equation}
+where $L_\mathbf{q}$ is the set of retained angular indices, $\tilde{R}_{l,\mathbf{q}}$ is a complex radial profile determined by the coupled field equations, and $\bar{Y}_{l,m}$ is the polar part of the corresponding spherical harmonic (with azimuthal dependence removed). With all that defined, our field can be expanded as
+\begin{equation}
+    \Phi = \sum_{\mathbf{q}} F_\mathbf{q}(r,\theta;\mathbf{A}) e^{-i \mathbf{q}\cdot\boldsymbol{\psi}} + \text{c.c.}
+\end{equation}
+Note that the sum over $q$ considers only one of the two members of each complex conjugate pair $(\mathbf{q}, -\mathbf{q})$.
+
+\subsection{Approximations}
+The above formalism depends on two main approximations. First, in the adiabatic approximation, the radial profiles $F$ vary slowly compared to the oscillatory phases, so we neglect their time derivatives at leading order in the field equation. This is really the whole point of the adiabatic method~\cite{Omiya_2022,Omiya_2023}. Second, we truncate both the number of Fourier components and the angular expansion of each spatial profile. At present (2026-10-20) we work with the components $\{(1,0), (0,1), (2,-1), (-1,2)\}$ and only keep the leading $l$ for each. Once this toy model works, we'll add more Fourier components --- namely \(\{(3,0), (2,1), (1,2), (0,3)\}\); \cite{Omiya_2023} suggests these ought to have little effect in the perturbative regime, but who knows? Convergence under the inclusion of higher angular harmonics also remains untested.
+
+Beyond these two there's the larger issue of higher modes. Once the above truncations have been characterized, and we're comfortable with all the interesting stuff that we can glean from the two-mode formulation, we'll want to start adding other bound states. But I'm getting ahead of myself now :)
+
+\CW{TODO: explain radial equation solving/matching}
+\vfill
+\pagebreak
+\bibliography{refs}
+\end{document}
+

@@ -102,6 +102,53 @@ Deferred work and known caveats:
   results. Saved objects require explicit compatibility review before reuse
   with new interfaces; do not resume a historical campaign under edited source.
 
+### Current long-evolution checkpoint (October 19)
+
+The "Review adiabatic workplan" chat ended while preparing a primary-amplitude
+doubling run, after the user narrowed the scope to one trajectory and a linear
+growth comparison. No job had been submitted. This has now been continued as
+Slurm job **27100648**, submitted to `lr7`, with frozen snapshot
+`multiphase_two_cloud/work/doubling_20261019_v2` and result prefix
+`cosine_doubling_20261019_v2`. It completed successfully in 17m52s, reaching
+the target at `t/M=4607986.0447`. The secondary grew 0.029340%. The primary
+endpoint is 0.016464% above the linear exponential and 0.010753% below the
+exponential using its initial E/J rate. Relative energy/angular-momentum
+budget errors are 1.958e-7/9.954e-8 of their initial charges.
+
+The user subsequently requested joint/linear/Omiya comparison curves with
+matching initial amplitudes. The saved Figure 6 coefficient table does not
+cover this dilute amplitude range. Job **27103035** computes a small branch
+using the existing nonlinear-primary/linear-secondary solvers, on the joint
+pilot's domain and retained support, with primary/secondary radial steps
+0.1/0.2. It completed in 1m01s using snapshot `omiya_comparison_20261019_v2`;
+the driver passes 18 analytic normalization/time checks. Time-step halving
+and branch-table thinning change amplitudes by at most 4.66e-15/4.11e-14.
+The joint endpoint is 0.0167171% higher in A1 and 0.0000539919% lower in A2
+than the Omiya reference. The comparison plot now contains joint, linear,
+and Omiya curves, with actual ratio axes near one (no offsets/subtractions).
+The matched Omiya primary energy remains below 0.001 Fa^2 M; this pilot has
+not reached the paper's strongly nonlinear cloud energies. See the
+[comparison record](runs/adiabatic/multiphase_two_cloud/README.md#omiya-approximation-comparison-october-19).
+
+The driver reuses the October 15 pilot's initial joint profile and stops when
+the measured primary amplitude reaches `2e-4` from `1e-4`; the secondary starts
+at `1e-5`. The initial-rate doubling estimate is `t/M=4.607271e6`, with 64
+nominal steps and corrected, checkpointed endpoints. It runs one trajectory,
+then plots both clouds against independently solved linear eigenmode growth
+on the same grid and the initial E/J growth rates held constant. The preceding attempt passed all 47 balance/midpoint/target checks, then
+failed before evolution because the linear-reference solver received unsupported
+boundary-order keywords. The corrected driver passes only supported radial
+settings and checks that the boundary orders agree. Both attempts are preserved. See the
+[campaign record](runs/adiabatic/multiphase_two_cloud/README.md#october-19-primary-amplitude-doubling)
+for the exact recipe, outputs, and restart constraints.
+
+The immediate plan is to measure the departure from exponential growth, then
+test selected profiles for spatial/domain/support sensitivity at that effect's
+scale. A longer run does not by itself establish appreciable mutual cloud
+deformation. The next physics milestone remains a converged effect of a populated
+secondary on the primary, with a justified slow-growth formulation. Actions
+for three clouds and BH/GW/self-gravity extensions remain subsequent work.
+
 ### Current multiphase checkpoint and resume point (October 15)
 
 The joint profile solver, finite-domain E/J observables, two-amplitude implicit
@@ -478,8 +525,9 @@ scan, and convergence evidence. Use its averaged secondary results;
 ## Next steps
 
 - **Active multiphase work:** the response, neighbor checks, and short cosine
-  evolution are complete. Next assess radial/domain/support convergence and
-  the physical slow-growth closure before interpreting a long trajectory.
+  evolution are complete. The October 19 single doubling run is now underway;
+  inspect its exponential comparisons, then assess radial/domain/support
+  convergence and the physical slow-growth closure before interpreting it.
   The campaign preserves both time resolutions and all accepted endpoint data.
 - **Coupled-BH preparation:** local primary continuation in alpha and spin
   now works at both dilute amplitude and $A_0\simeq2.052$; the secondary and

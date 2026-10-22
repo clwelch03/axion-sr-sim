@@ -1,6 +1,6 @@
 # Multiphase adiabatic evolution: implementation plan
 
-Updated 2026-10-15. The joint matching solver and finite-domain E/J observables
+Updated 2026-10-19. The joint matching solver and finite-domain E/J observables
 are implemented. The opt-in loader now includes observables, implicit
 amplitude responses, and short E/J-balanced evolution. The user authorized
 direct implementation of milestones 5's response, neighbor checks, and short
@@ -18,6 +18,48 @@ charge-budget errors decrease fourfold when dt is halved. See
 The physical slow-growth approximation, profile/domain/support convergence,
 and the later action-flux closure remain separate open questions.
 [HANDOFF.md](../HANDOFF.md) remains the authority on current capabilities.
+
+## Current physics sequence (October 19)
+
+The user requested continuation of the long two-cloud evolution and a review
+of the physics milestones. One primary-amplitude doubling trajectory completed
+as job **27100648**, from `(A1,A2)=(1e-4,1e-5)` to measured `A1=2e-4` on the
+existing fixed-background, four-component family at t/M=4607986.0447.
+The primary endpoint is 0.016464% above the linear exponential and 0.010753%
+below its initial-rate exponential. The user next requested an Omiya-approximation
+comparison with matching initial amplitudes; job 27103035 completed the missing
+dilute branch using the existing primary/secondary solvers. The joint primary
+endpoint is 0.0167171% above the Omiya reference, whose primary energy remains
+below 0.001 Fa^2 M. Matching alpha and spin alone does not select the strong
+self-interaction regime; the present cloud populations remain dilute. See the
+[campaign record](../runs/adiabatic/multiphase_two_cloud/README.md#omiya-approximation-comparison-october-19).
+
+The intended scientific progression is:
+
+1. **Find the departure from linear two-cloud growth.** Compare the completed
+   run with the Omiya approximation and examine rate/frequency changes. A doubled primary does not
+   guarantee appreciable secondary backreaction; the initial pilot barely
+   changed the secondary amplitude.
+2. **Demonstrate mutual nonlinear deformation (milestone 4).** Recover the
+   established small-secondary approximation on compatible truncations, then
+   increase the secondary normalization at a fixed primary normalization and
+   measure its effect on the primary profile and frequency. Use that evidence
+   to select a further evolution probing changed transfer/growth behavior.
+   Spatial and component checks support the measured effect; they are not
+   the scientific objective themselves. No additional campaign is submitted
+   by this planning update.
+3. **Derive the slow-growth and mode-resolved evolution law (milestones 1/5).**
+   Specify how modulation and open-boundary fluxes enter the joint profile
+   approximation. Derive the proposed phase actions and their sources, and
+   compare their two-cloud rates independently with E/J balance. The present
+   E/J integrator implements two rate equations, but does not complete this
+   derivation.
+4. **Add a third independently evolving cloud (milestone 6).** Total E/J
+   balance alone supplies only two equations for three amplitude rates. After
+   establishing the extra mode-resolved information, recover dilute transfer
+   benchmarks, then study nonlinear competition and check whether slow
+   resonant phases must also be evolved. BH evolution, GW losses, and
+   self-gravity are subsequent extensions of this fixed-background program.
 
 ## Objective and initial scope
 

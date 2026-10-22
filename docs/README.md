@@ -7,6 +7,7 @@ open caveats, and next steps. Entry points reviewed 2026-10-12:
 |---|---|
 | [Project README](../README.md) | Scope, environment setup, and quickstart |
 | [Working conventions](../CLAUDE.md) | Development workflow, commands, and module map |
+| [Codex chat recovery](codex-chat-recovery.md) | Pull missing chats and messages into the current node at the start of a session |
 | [Project handoff](../HANDOFF.md) | Authoritative project status and next steps |
 | [Adiabatic design](adiabatic-design.md) | Equations, conventions, and implementation structure |
 | [Adiabatic source guide](../src/adiabatic/README.md) | Physical-model folders, dependency boundaries, loaders, and current commands |

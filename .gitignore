@@ -2,6 +2,8 @@
 # same convention applied to heavy run artifacts.
 __pycache__/
 *.pyc
+# Private chat snapshots and recovery receipts.
+/recovery/chat-retrieval/
 # Keep data tables and Julia checkpoints local, including reference results.
 *.csv
 *.jls

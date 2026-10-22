@@ -19,6 +19,10 @@ guides and dated notes preserve validation evidence. Historical next-step
 lists are records of their dates. Update the handoff when a checkpoint changes
 and the relevant campaign README when its inputs, outputs, or recipes change.
 
+For missing Codex chats after switching nodes, follow
+[the chat recovery guide](docs/codex-chat-recovery.md). Run the retrieval utility
+at the start of the new session; it does not depend on a clean previous shutdown.
+
 Reference PDFs are in `docs/papers/`. Cite equation numbers from those PDFs,
 not from arXiv HTML (the numbers can differ).
 

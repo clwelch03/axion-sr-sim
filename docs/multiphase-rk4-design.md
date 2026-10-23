@@ -117,10 +117,10 @@ flowchart TD
     INPUT["Stage input<br/>position = r* and state = [R; Q]"]
     UNPACK["Unpack profiles and slopes<br/>Map R entries to keys (l, q)"]
     GEOMETRY["tortoise_geometry<br/>Find r, Delta, and r^2 + spin^2"]
-    FIELD["reconstruct_two_phase_field_at_radii<br/>Joint real field Phi on polar and two-phase nodes"]
+    FIELD["reconstruct_two_phase_field_at_radius<br/>Joint real field Phi on polar and two-phase nodes"]
     REMAINDER["potential_remainder<br/>Evaluate h(Phi) = Phi - Uprime(Phi) on the joint field"]
     WEIGHT["Multiply by (r^2 + spin^2*x^2)<br/>x = cos(theta)"]
-    PROJECT["project_two_phase_field<br/>Polar integral and normalized two-phase average"]
+    PROJECT["two_phase_field_component_coefficients<br/>Polar integral and normalized two-phase average"]
     SOURCE["Multiply by alpha^2<br/>Gather N in the state ordering"]
     LINEAR["component_tortoise_operator for each q<br/>Use its frequency, m, and ordered angular indices<br/>Return p and V_q"]
     SLOPE["For each component<br/>dQ/dr* = -p Q - V_q R - s N<br/>s = Delta / (r^2 + spin^2)^2"]
@@ -208,8 +208,8 @@ regularization described in plan section 2.2.
 | Component frequency and azimuthal integer | [`component_frequency_and_m`](../src/adiabatic/multiphase/components.jl) | 2 |
 | Linear matrix and slope coefficient | [`component_tortoise_operator`](../src/adiabatic/multiphase/profiles.jl) | 2.2 |
 | Endpoint profiles and slopes | [`component_boundary_state`](../src/adiabatic/multiphase/profiles.jl) | 2.3 |
-| Real field reconstruction | [`reconstruct_two_phase_field_at_radii`](../src/adiabatic/multiphase/projection.jl) | 3.1 |
-| Angular and phase projection | [`project_two_phase_field`](../src/adiabatic/multiphase/projection.jl) | 3.2 and 3.6 |
+| Real field reconstruction | [`reconstruct_two_phase_field_at_radius`](../src/adiabatic/multiphase/projection.jl) | 3.1 |
+| Angular and phase projection | [`two_phase_field_component_coefficients`](../src/adiabatic/multiphase/projection.jl) | 3.2 and 3.6 |
 | Complete joint nonlinear source | [`nonlinear_two_phase_source`](../src/adiabatic/multiphase/projection.jl) | 3.4 |
 | Full derivative assembly | [`nonlinear_two_phase_rhs!`](../src/adiabatic/multiphase/profiles.jl) | 3.8, item 6 |
 | Four-stage radial advance | [`integrate_radial`](../src/adiabatic/core/integration.jl) | Shared integrator for the radial equations in 2.2 and the planned matching in 4 |

@@ -37,7 +37,7 @@ end
     result = reconstruct(radial_values, slopes)
     geometry = tortoise_geometry(position, spin)
     @test size(result.field) == (8, 9, 11)
-    @test result.field == reconstruct_two_phase_field_at_radii(radial_values,
+    @test result.field == reconstruct_two_phase_field_at_radius(radial_values,
         cloud_m, polar, phase1_nodes, phase2_nodes)
 
     # Differentiate an independently written real field in physical coordinates.

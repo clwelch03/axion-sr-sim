@@ -13,7 +13,7 @@
     radial_values = Dict((3, (3, 0)) => first_coefficient,
                          (3, (-1, 2)) => second_coefficient)
     polar_table = build_polar_values(3, grid.cosine_theta_nodes)
-    field = reconstruct_two_phase_field_at_radii(radial_values, [1, 2],
+    field = reconstruct_two_phase_field_at_radius(radial_values, [1, 2],
         polar_table, phase_nodes, phase_nodes)
 
     recovered = ComplexF64[]
@@ -29,7 +29,7 @@
     end
 
     # Request both populated patterns, an absent pattern, and a conjugate.
-    projected = project_two_phase_field(field,
+    projected = two_phase_field_component_coefficients(field,
         [(3, (3, 0)), (3, (-1, 2)), (1, (1, 0)), (3, (-3, 0))],
         [1, 2], polar_table, grid.polar_weights, phase_nodes, phase_nodes)
     @test isapprox(projected[(3, (3, 0))], first_coefficient; atol=1e-13, rtol=0)
@@ -58,7 +58,7 @@ end
     phase1_nodes = grid.azimuth_nodes
     phase2_nodes = 2pi .* (0:10) ./ 11
 
-    field = reconstruct_two_phase_field_at_radii(Dict((1, (1, 0)) => 1im),
+    field = reconstruct_two_phase_field_at_radius(Dict((1, (1, 0)) => 1im),
         [1, 2], polar_table, phase1_nodes, phase2_nodes)
     # 2Re[i exp(-i psi1)] = 2sin(psi1), independently of psi2.
     expected = [2polar*sin(phase1) for polar in polar_table[(1, 1)],
@@ -67,13 +67,13 @@ end
     @test field ≈ expected
     # Project the analytic field directly: test the sign and normalization on
     # unequal phase grids independently of the reconstruction implementation.
-    projected = project_two_phase_field(expected, [(1, (1, 0))], [1, 2],
+    projected = two_phase_field_component_coefficients(expected, [(1, (1, 0))], [1, 2],
         polar_table, grid.polar_weights, phase1_nodes, phase2_nodes)
     @test isapprox(projected[(1, (1, 0))], 1im; atol=1e-13, rtol=0)
-    @test all(iszero, reconstruct_two_phase_field_at_radii(Dict(), [1, 2],
+    @test all(iszero, reconstruct_two_phase_field_at_radius(Dict(), [1, 2],
         polar_table, phase1_nodes, phase2_nodes))
-    @test_throws DimensionMismatch reconstruct_two_phase_field_at_radii(
+    @test_throws DimensionMismatch reconstruct_two_phase_field_at_radius(
         Dict(), [1], polar_table, phase1_nodes, phase2_nodes)
-    @test_throws DimensionMismatch reconstruct_two_phase_field_at_radii(
+    @test_throws DimensionMismatch reconstruct_two_phase_field_at_radius(
         Dict((1, (1,)) => 1), [1, 2], polar_table, phase1_nodes, phase2_nodes)
 end

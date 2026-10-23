@@ -350,3 +350,209 @@ The previous plot and CSV are preserved under the doubling prefix's
    of this effect; use the result to choose further continuation amplitudes.
    Phase-action closure for a third independent cloud, evolving BH parameters,
    self-gravity, and GW losses remain later work.
+
+## Direct Fig. 7 profile attempt (October 23)
+
+Prepared `scripts/direct_profile.jl` for one joint cosine solve at alpha=0.3,
+spin=0.99, seeded from point 72 of the saved Omiya primary/secondary branches.
+That reference has E1=E2=650.541911489 Fa^2 M, A1=0.03639048035337356, and
+A2=0.0001089605834119252. The joint solve fixes those outer coefficients;
+it does **not** constrain the joint cloud energies to equal the reference.
+There is no amplitude scan or time evolution.
+
+The retained components are q=(1,0) with l=[1,3,5], q=(3,0) with l=[3,5],
+q=(5,0) with l=[5], q=(0,1) with l=[2,4,6], q=(2,-1) with l=[0,2,4], and
+q=(-1,2) with l=[3,5]. The primary and secondary boundary guesses are copied
+from their saved solutions, with the secondary scaled by A2; the two driven
+blocks start at zero and are solved for jointly. Radial settings are
+(-100,300), match=5, step=0.1, boundary orders 3/7; quadrature is 16x31x31.
+This is a preliminary retained-support calculation, not a convergence result.
+
+The scaled matching tolerance is explicitly 1e-5, with at most 12 Newton
+iterations and no automatic relaxation or continuation. The saved reference
+secondary has a residual floor of a few 1e-6 per unit outer coefficient.
+The Slurm script allocates four hours; this is a cap, not a runtime estimate.
+
+Prepare a fresh named snapshot, then submit from the repository root:
+
+```bash
+python3 runs/adiabatic/multiphase_two_cloud/scripts/prepare_direct_profile.py direct_fig7_20261023_v1
+sbatch runs/adiabatic/multiphase_two_cloud/scripts/submit_direct_profile.sh \
+    "$PWD/runs/adiabatic/multiphase_two_cloud/work/direct_fig7_20261023_v1" \
+    "$PWD/runs/adiabatic/multiphase_two_cloud/results/direct_fig7_20261023_v1"
+```
+
+The preparation copies and hashes the three reference inputs along with the
+source. It does not submit a job. Check input selection, coefficient mapping,
+packing, and boundary assembly without integrating:
+
+```bash
+julia --startup-file=no --project=. runs/adiabatic/multiphase_two_cloud/scripts/direct_profile.jl \
+    --check runs/adiabatic/multimode_secondary/results
+```
+
+These input checks passed. No target joint solve has been run by this preparation.
+The output prefix owns `-input.jls`, a successful `-solution.jls` with full radial
+histories, and `-profiles.csv` with complex/absolute R11 and R22 on both branches.
+A failed attempt records `-failure.txt`; existing prefixes are never overwritten.
+The log is `logs/direct-profile-JOBID.out`. A successful solve supplies the two
+new profile curves; the final comparison still needs explicit normalization
+labels and numerical-convergence checks.
+
+The live driver was subsequently rebuilt with the user as sequential commented
+sections. Running it without arguments now performs setup checks only; the
+`--check INPUT_DIRECTORY` and `INPUT_DIRECTORY OUTPUT_PREFIX` interfaces remain
+available. The latter runs one Newton solve and saves the input, complete
+solution, and profile CSV. The `direct_fig7_20261023_v1` snapshot preserves the
+earlier draft, so create a fresh snapshot name to run the rebuilt driver.
+
+Submission **27241322** failed after four seconds, before Julia started: the
+shell received whitespace as its snapshot-directory argument and `cd` failed.
+The submitted command referred to v1. The wrapper now checks its argument count
+and directory explicitly. Snapshot `direct_fig7_20261023_v2` preserves the rebuilt
+driver and the same reference inputs for the next attempt; preparing it did not
+submit another job.
+
+Submission **27241421** uses v2. Snapshot verification and setup passed; its
+initial scaled matching residual was **1.9064826994960344e9**, first observed
+after about ten minutes of elapsed job time. This is the initial mismatch,
+not an accepted correction or a converged result.
+
+The live driver now times every residual evaluation and flushes each message.
+Messages distinguish the initial evaluation, ForwardDiff evaluations used to
+build each Jacobian, trial residuals, and accepted Newton iterates. Each finished
+evaluation reports its duration and scaled residual norm. The driver also
+announces input saving and the final integration for radial output. It uses the
+same residual, admissibility check, and Newton settings as
+`correct_two_phase_profile`; only the driver adds the logging. A single
+integration can still take minutes between its start and finish messages.
+Already-running jobs and the v1/v2 snapshots keep their original logging.
+Setup checks and 17 focused logging checks passed: scalar and 56-variable
+analytic problems followed exactly the same residual-evaluation sequence and
+returned the same Newton result with and without logging, including damped
+trials and multiple ForwardDiff passes; evaluation errors still propagated.
+These checks do not run or validate the target physical solve. Prepare a new
+snapshot to use the extra logging; job 27241421 was not restarted.
+
+Submission **27241725** runs the added logging from the verified 193-file
+snapshot `work/direct_fig7_20261023_v3`, using the submit wrapper inside that
+snapshot. Its output prefix is `results/direct_fig7_20261023_v3` and its log is
+`logs/direct-profile-27241725.out`. Slurm reported RUNNING after submission.
+The physical inputs, numerical settings, and four-hour limit are unchanged;
+job 27241421 was left running with its separate v2 outputs.
+
+Job 27241725 reported the initial residual after **537.04 seconds** of evaluation,
+again `1.9064826994960344e9`, and began its first Jacobian evaluation at 537.73 s
+on the matching timer. This is consistent with the substantially larger source
+calculation: the earlier pilot used 4 radial functions, an 8x9x9 grid, and 276
+RK4 steps across both branches; this attempt uses 14, 16x31x31, and 4000.
+The projection-loop work count per residual increases by about 1204 times.
+
+A small warmed-source timing check is preserved in
+`work/measure_direct_profile_source_20261023.jl`. It uses the v3 source and
+synthetic coefficients at one radius, not a physical solution or a full solve.
+Median times over five samples on the interactive host were 0.493 ms at the
+old dimensions and 33.244 ms at the current dimensions; multiplying by RK4
+stage counts estimates 0.544 s and 531.903 s of source work per residual.
+With 12 derivative directions, the current source took 42.711 ms. The installed
+ForwardDiff selects width 12 for 56 unknowns, giving five residual passes per
+Jacobian; a source-only extrapolation is 683.379 s per pass and 3416.896 s per
+Jacobian. Actual derivative integrations and Newton convergence remain to be
+measured; these timings are estimates, not a promised completion time. Live
+Slurm accounting showed CPU time close to elapsed time for both jobs, with
+less than 1 GB reported peak resident memory at that check.
+
+The first actual ForwardDiff residual pass then finished in **832.78 s**;
+pass 2 began at 1370.69 s on the matching timer. Its unchanged residual is
+expected because derivative passes evaluate at the same Newton state. Five
+passes at this observed cost would take about 69 minutes for the Jacobian,
+before any trial residual evaluations. Later passes may be faster after
+compilation; no Newton correction had yet been accepted at this checkpoint.
+
+Pass 2 completed in **839.90 s**, and pass 3 began at 2210.59 s. The first two
+passes therefore have comparable costs; the long wait is not just compilation.
+
+### Source performance investigation (October 23)
+
+At the user's request, standalone alternatives were tested in
+`work/cached_source_experiment_20261023.jl`, loading the frozen v3 library.
+No production library or running snapshot was modified. All **91 checks**
+passed: source agreement on two grids (including unequal, shifted phase grids),
+dilute and nonlinear amplitudes, all three potentials, analytic quartic source
+coefficients, mixed/empty reconstruction inputs, and derivatives with respect
+to all coefficient components, radius, spin, and alpha.
+
+The reconstruction's runtime field-type selection prevents efficient
+specialization of its inner loop. A separate helper receiving the allocated
+field array preserves the existing type-selection procedure and gave exactly
+equal source values and Jacobians in the checked cases. Precomputing real and
+imaginary angular/phase basis matrices was also tested; the cached version's
+source Jacobians agreed to about 1.4e-15 relative error, with 3.69 MB of cache
+storage. These are discrete source checks, not full radial or profile solves.
+
+Latest warmed medians over five samples at the target dimensions, with one
+BLAS thread on the interactive host:
+
+| Source evaluation | Original | Reconstruction helper | Cached basis |
+|---|---:|---:|---:|
+| Ordinary coefficients | 27.545 ms | 10.299 ms | 0.892 ms |
+| 12 derivative directions | 64.142 ms | 19.174 ms | 20.813 ms |
+| Ordinary allocated bytes/call | 14,040,840 | 376,360 | 616,888 |
+| Derivative allocated bytes/call | 80,486,344 | 4,819,680 | 8,005,472 |
+
+The small helper split was the initial suggested implementation step: it improves
+the expensive derivative source by about 3.3 times in this sample without
+changing arithmetic order. Ordinary cached-source speedups varied from about
+31 to 42 times across samples, but derivative speedups were only about 3 times;
+those ordinary timings must not be presented as whole-solve speedups. Library
+integration and a full matching comparison remain to be done together.
+
+The user then requested an order-of-magnitude improvement. A second standalone
+experiment, `work/batched_source_experiment_20261023.jl`, caches the combined
+real basis and compares two derivative strategies. Packing automatic
+derivative directions into BLAS matrix columns helps, but the larger gain comes
+from forming the local source Jacobian with respect to the 28 real field
+coefficients once, then applying it to every incoming direction. Scalar
+automatic differentiation of `potential_remainder` preserves its small-field
+polynomial branch. Background derivatives with respect to radius, spin, and
+alpha are included in the experiment as well.
+
+All 84 grouped checks passed for source values and Jacobians on both grids,
+two amplitudes, all three potentials, and chunk widths 12 and 31. Twelve
+additional assertions compared arbitrary incoming directions at widths 12,
+28, and 56. Warmed five-sample medians on the same interactive host, using
+one BLAS thread, were:
+
+| Source evaluation | Original | Batched basis products | Local source Jacobian |
+|---|---:|---:|---:|
+| Ordinary | 32.008 ms | 0.872 ms | Uses ordinary cached path |
+| 12 derivative directions | 44.970 ms | 4.614 ms | 3.301 ms |
+| 28 derivative directions | 85.584 ms | 12.270 ms | 4.026 ms |
+| 56 derivative directions | 176.087 ms | 29.012 ms | 3.378 ms |
+
+The current five width-12 passes require about 224.851 ms of source work per
+radial stage in this benchmark. One width-56 local-Jacobian pass requires
+3.378 ms: about **66.6 times faster for that source work**. This is not yet a
+measurement of the full matching Jacobian or Newton solve. It keeps the same
+angular quadrature, retained modes, and potential; no library or running
+snapshot has been changed.
+
+The follow-up `work/short_radial_jacobian_experiment_20261023.jl` loads the
+saved v3 input and compares derivatives through the actual boundary helpers,
+linear radial operators, and RK4 integration, with the candidate source and
+width 56 versus the original source and width 12. Each branch covers only
+0.2 in tortoise radius from its actual endpoint, using the target step limit.
+The endpoint difference is a numerical test observable, not the physical
+matching residual. All **58 checks** passed, including separate comparisons
+of all 56 Jacobian columns at relative tolerance 1e-9. Combined with the 96
+source checks, this gives 154 passing assertions for the second experiment.
+
+Warmed five-sample medians were **5.849 s** for the original short radial
+Jacobian and **0.105 s** for the candidate: **55.8 times faster**. Allocations
+fell from about 8.06 GB to 111 MB per Jacobian (cumulative allocated bytes,
+not peak resident memory). This establishes a substantial speedup through
+the short integration pipeline, not the full radial domain or Newton solve.
+The source tests include nonlinear fields; the short endpoint test uses the
+saved starting profile, whose boundary fields are dilute. Full-domain
+matching accuracy, runtime, and Newton convergence still need validation
+before adopting this prototype in the library.

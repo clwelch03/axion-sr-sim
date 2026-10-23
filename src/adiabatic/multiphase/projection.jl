@@ -1,5 +1,5 @@
 """
-    reconstruct_two_phase_field_at_radii(radial_values, cloud_m, polar_values,
+    reconstruct_two_phase_field_at_radius(radial_values, cloud_m, polar_values,
                                         phase1_nodes, phase2_nodes)
 
 Reconstruct the real field at one radius for two independent cloud phases.
@@ -11,18 +11,18 @@ cloud azimuthal integers.
 Return a real array with axes (polar node, first phase, second phase), using
 2*real(sum(R_lq * Y_l,abs(m_q) * exp(-im*q⋅psi))).
 """
-function reconstruct_two_phase_field_at_radii(radial_values, cloud_m, polar_values,
+function reconstruct_two_phase_field_at_radius(radial_field_values, cloud_m_vec, polar_field_values,
                                      phase1_nodes, phase2_nodes)
-    length(cloud_m) == 2 || throw(DimensionMismatch("require two cloud m values"))
+    length(cloud_m_vec) == 2 || throw(DimensionMismatch("require two cloud m values"))
     field_type = promote_type(Float64,
-        (typeof(real(value)) for value in values(radial_values))...)
-    field = zeros(field_type, length(first(values(polar_values))),
+        (typeof(real(value)) for value in values(radial_field_values))...)
+    field = zeros(field_type, length(first(values(polar_field_values))),
         length(phase1_nodes), length(phase2_nodes))
 
-    for ((l, q), radial_value) in radial_values
+    for ((l, q), radial_value) in radial_field_values
         length(q) == 2 || throw(DimensionMismatch("require two entries in q"))
-        m = sum(q .* cloud_m)
-        polar = polar_values[(l, abs(m))]
+        m = sum(q .* cloud_m_vec)
+        polar = polar_field_values[(l, abs(m))]
         for j in eachindex(phase1_nodes), k in eachindex(phase2_nodes)
             phase_factor = cis(-q[1]*phase1_nodes[j] - q[2]*phase2_nodes[k])
             for i in eachindex(polar)
@@ -34,7 +34,7 @@ function reconstruct_two_phase_field_at_radii(radial_values, cloud_m, polar_valu
 end
 
 """
-    project_two_phase_field(field, output_pairs, cloud_m, polar_values,
+    two_phase_field_component_coefficients(field, output_pairs, cloud_m, polar_values,
                             polar_weights, phase1_nodes, phase2_nodes)
 
 Extract coefficients of requested `(l, q)` angular/phase patterns at one radius.
@@ -47,30 +47,35 @@ abs(m_q) * exp(+im*q⋅psi) over all grid nodes, weighted by the polar quadratur
 weights and divided by the number of phase pairs. Return the resulting coefficients
 in a dictionary keyed by the requested `(l, q)` pairs without an extra factor of 2.
 """
-function project_two_phase_field(field, output_pairs, cloud_m, polar_values,
+function two_phase_field_component_coefficients(field, output_pairs, cloud_m, polar_values,
                                  polar_weights, phase1_nodes, phase2_nodes)
+    # Check input validity
     length(cloud_m) == 2 || throw(DimensionMismatch("require two cloud m values"))
     !isempty(polar_weights) && !isempty(phase1_nodes) && !isempty(phase2_nodes) ||
         throw(ArgumentError("quadrature grids must be nonempty"))
     size(field) == (length(polar_weights), length(phase1_nodes), length(phase2_nodes)) ||
         throw(DimensionMismatch("field axes must match the quadrature grids"))
-    # Uniform phase quadrature is an average: divide by the number of phase pairs.
+
+    # Total number of phase pairs we average over
     phase_count = length(phase1_nodes) * length(phase2_nodes)
 
-    # Each requested (l, q) becomes one dictionary entry; the begin block computes its value.
-    return Dict((l, q) => begin
-        length(q) == 2 || throw(DimensionMismatch("require two entries in q"))
+    # Calculate the coefficient for one (l, q) pair
+    function component_coefficient(l, q)
+        length(q) == 2 ||
+            throw(DimensionMismatch("require two entries in q"))
+
         m = sum(q .* cloud_m)
         polar = polar_values[(l, abs(m))]
         length(polar) == length(polar_weights) ||
             throw(DimensionMismatch("polar table and weights must match"))
-        # i labels cos(theta), j and k the two independent phases: field[i,j,k] is G_ijk.
-        # Weights times Y integrate the polar dependence; exp(+i q⋅psi) selects q.
+
         sum(polar_weights[i] * polar[i] * field[i, j, k] *
             cis(q[1]*phase1_nodes[j] + q[2]*phase2_nodes[k])
             for i in eachindex(polar_weights), j in eachindex(phase1_nodes),
                 k in eachindex(phase2_nodes)) / phase_count
-    end for (l, q) in output_pairs)
+    end
+
+    return Dict((l, q) => component_coefficient(l, q) for (l, q) in output_pairs)
 end
 
 """
@@ -94,7 +99,7 @@ that minus sign and tortoise factor are not included here.
 function nonlinear_two_phase_source(radial_values, radius, spin, alpha,
                                     output_pairs, cloud_m, polar_values, grid,
                                     phase1_nodes, phase2_nodes; potential=:cosine)
-    field = reconstruct_two_phase_field_at_radii(radial_values, cloud_m,
+    field = reconstruct_two_phase_field_at_radius(radial_values, cloud_m,
         polar_values, phase1_nodes, phase2_nodes)
 
     # Evaluate h on the total field so interactions between clouds are retained.
@@ -104,7 +109,7 @@ function nonlinear_two_phase_source(radial_values, radius, spin, alpha,
     geometry_factor = reshape(radius^2 .+ spin^2 .* grid.cosine_theta_nodes.^2,
         :, 1, 1)
 
-    projected = project_two_phase_field(geometry_factor .* remainder,
+    projected = two_phase_field_component_coefficients(geometry_factor .* remainder,
         output_pairs, cloud_m, polar_values, grid.polar_weights,
         phase1_nodes, phase2_nodes)
 
@@ -158,7 +163,7 @@ function reconstruct_two_phase_field_derivatives(radial_values, tortoise_slopes,
         for (pair, slope) in tortoise_slopes)
     polar_theta_derivatives = build_polar_theta_derivatives(polar_values, grid.cosine_theta_nodes)
 
-    reconstruct = (values, polar_table) -> reconstruct_two_phase_field_at_radii(
+    reconstruct = (values, polar_table) -> reconstruct_two_phase_field_at_radius(
         values, cloud_m, polar_table, phase1_nodes, phase2_nodes)
 
     return (; field=reconstruct(radial_values, polar_values),

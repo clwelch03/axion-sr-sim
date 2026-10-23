@@ -17,7 +17,7 @@
         (6, (0, 3)) => second_pattern.^3/6,
         (3, (1, 1)) => zero.(first_pattern),
     )
-    field = reconstruct_two_phase_field_at_radii(radial, [1, 2], polar, phase1, phase2)
+    field = reconstruct_two_phase_field_at_radius(radial, [1, 2], polar, phase1, phase2)
     remainder = potential_remainder.(field, Ref(:quartic))
     radius, spin, alpha = 8.0, 0.7, 0.2
     source = nonlinear_two_phase_source(radial, radius, spin, alpha, keys(expected),
@@ -82,7 +82,7 @@ end
     radial = Dict((1, (1, 0)) => 0.9 + 0.3im, (2, (0, 1)) => 0.4 - 0.2im)
     outputs = [(1, (1, 0)), (2, (0, 1)), (0, (2, -1)),
                (3, (-1, 2)), (3, (3, 0)), (6, (0, 3))]
-    field = reconstruct_two_phase_field_at_radii(radial, [1, 2], polar, phase1, phase2)
+    field = reconstruct_two_phase_field_at_radius(radial, [1, 2], polar, phase1, phase2)
     for potential in (:quartic, :sextic, :cosine)
         source = nonlinear_two_phase_source(radial, 8.0, 0.7, 0.2, outputs,
             [1, 2], polar, grid, phase1, phase2; potential)
@@ -97,7 +97,7 @@ end
             @test isapprox([shifted_source[pair] for pair in outputs],
                 [source[(l, q)] * cis(-sum(q .* shift)) for (l, q) in outputs];
                 atol=1e-12, rtol=1e-12)
-            shifted_field = reconstruct_two_phase_field_at_radii(
+            shifted_field = reconstruct_two_phase_field_at_radius(
                 shifted_radial, [1, 2], polar, phase1, phase2)
             shifted_average = sum(potential_value.(shifted_field, Ref(potential)); dims=(2, 3)) /
                 (length(phase1)*length(phase2))

@@ -22,8 +22,8 @@ The radial and source tests load the single-cloud library for comparison only. C
 checks validate label bookkeeping and linear assembly, not profile convergence.
 An explicit two-phase quadrature benchmark checks library reconstruction by
 separating equal-angular-pattern components. The function
-`reconstruct_two_phase_field_at_radii` evaluates one radius per call.
-The reusable `project_two_phase_field` passes coefficient recovery, absent-component,
+`reconstruct_two_phase_field_at_radius` evaluates one radius per call.
+The reusable `two_phase_field_component_coefficients` passes coefficient recovery, absent-component,
 conjugate, and analytic sine-field checks. `nonlinear_two_phase_source` passes
 five quartic checks: two exact driven-source formulas, two forbidden outputs,
 and a zero field. Sources also agree with the single-cloud implementation for

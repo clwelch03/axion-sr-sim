@@ -10,7 +10,7 @@ function two_phase_potential_energy_density(radial_values, tortoise_radius,
         throw(ArgumentError("phase grids must be nonempty")) : nothing
 
     geometry = tortoise_geometry(tortoise_radius, spin)
-    field = reconstruct_two_phase_field_at_radii(radial_values, cloud_m,
+    field = reconstruct_two_phase_field_at_radius(radial_values, cloud_m,
         polar_values, phase1_nodes, phase2_nodes)
 
     # Average U of the joint field, so interactions between components are included.

@@ -3,9 +3,10 @@
 Use this checklist to understand how the joint two-cloud calculation fits
 together, then work through its functions one at a time. It covers all 32
 top-level functions and three structs in `src/adiabatic/multiphase/` as of
-October 21, 2026. The diagrams describe the current implementation; the
-[organization proposal](multiphase-profile-organization.md) describes later
-interface changes. [HANDOFF.md](../HANDOFF.md) records implementation progress.
+October 22, 2026. The diagrams describe the current implementation; the
+[organization proposal](multiphase-profile-organization.md) records the
+completed profile/coordinate migration and deferred interface changes.
+[HANDOFF.md](../HANDOFF.md) records implementation progress.
 
 Check a box when you can explain the function's inputs, output, role in the
 calculation, and a useful check of its behavior. Write or revise its docstring
@@ -58,28 +59,29 @@ samples.
 
 ## Function checklist in reading order
 
-The groups follow the calculation's ingredients. Start with the current
-coordinate cleanup in group 2, then trace one trial through groups 3 and 4.
-Return to group 1 whenever a component label needs clarification.
+The groups follow the calculation's ingredients. Groups 1 and 2 and the
+matching-residual interface in group 4 are checked off. Resume inside that
+matching call with `component_boundary_state`, then follow radial integration
+into the linear operator and the joint nonlinear source in groups 3 and 4.
 
 ### 1 Labels and retained components
 
 Source: [components.jl](../src/adiabatic/multiphase/components.jl).
 Check: [test_components.jl](../tests/adiabatic/multiphase/test_components.jl).
 
-- [ ] `cloud_label` — record a cloud's linear-limit quantum numbers.
-- [ ] `fourier_component` — define a retained phase combination and its angular harmonics.
-- [ ] `component_frequency_and_m` — calculate a component's frequency and azimuthal number from its phase label and the independent clouds.
+- [X] `cloud_label` — record a cloud's linear-limit quantum numbers.
+- [X] `fourier_component` — define a retained phase combination and its angular harmonics.
+- [X] `component_frequency_and_m` — calculate a component's frequency and azimuthal number from its phase label and the independent clouds.
 
 ### 2 Physical profiles and solver coordinates
 
 Source: [profiles.jl](../src/adiabatic/multiphase/profiles.jl).
 Check: [test_response_coordinates.jl](../tests/adiabatic/multiphase/test_response_coordinates.jl).
 
-- ~~[X] `two_phase_coefficient_indices` — locate prescribed outer coefficients in cloud order and the remaining free coefficients in flattened mode order.~~
-- ~~[X] `check_cloud_amplitudes_and_coefficient_scale_validity` — validate the two prescribed amplitudes and fixed numerical scale.~~
-- [] `pack_two_phase_profile` — select unknowns, scale boundary coefficients, and pack real parts followed by imaginary parts.
-- [ ] `unpack_two_phase_profile` — unpack real solver coordinates into a physical `TwoPhaseProfile`, restoring coefficient scale and inserting prescribed amplitudes.
+- [X] `two_phase_coefficient_indices` — locate prescribed outer coefficients in cloud order and the remaining free coefficients in flattened mode order.
+- [X] `check_cloud_amplitudes_and_coefficient_scale_validity` — validate the two prescribed amplitudes and fixed numerical scale.
+- [X] `pack_two_phase_profile` — select unknowns, scale boundary coefficients, and pack real parts followed by imaginary parts.
+- [X] `unpack_two_phase_profile` — unpack real solver coordinates into a physical `TwoPhaseProfile`, restoring coefficient scale and inserting prescribed amplitudes.
 
 ### 3 Reconstructing the field and its nonlinear source
 
@@ -88,9 +90,9 @@ Checks: [test_phase_separation.jl](../tests/adiabatic/multiphase/test_phase_sepa
 [test_nonlinear_source.jl](../tests/adiabatic/multiphase/test_nonlinear_source.jl),
 and [test_source_validation.jl](../tests/adiabatic/multiphase/test_source_validation.jl).
 
-- [ ] `reconstruct_two_phase_field_at_radii` — reconstruct the joint real field on polar and phase nodes at one radius, despite the plural name.
-- [ ] `project_two_phase_field` — extract requested angular and phase coefficients from a sampled field.
-- [ ] `nonlinear_two_phase_source` — evaluate the nonlinear remainder of the joint field and project it onto retained or requested components.
+- [X] `reconstruct_two_phase_field_at_radius` — reconstruct the joint real field on polar and phase nodes at one radius.
+- [X] `two_phase_field_component_coefficients` — extract requested angular and phase coefficients from a sampled field.
+- [X] `nonlinear_two_phase_source` — evaluate the nonlinear remainder of the joint field and project it onto retained or requested components.
 
 ### 4 Radial equations and matching a trial
 
@@ -104,7 +106,7 @@ and [test_nonlinear_matching.jl](../tests/adiabatic/multiphase/test_nonlinear_ma
 - [ ] `component_tortoise_operator` — assemble one component's linear radial operator, including mixing between its angular harmonics.
 - [ ] `component_boundary_state` — turn leading boundary coefficients into endpoint values and tortoise slopes.
 - [ ] `nonlinear_two_phase_rhs!` — combine linear operators and the joint nonlinear source to fill the radial derivatives.
-- [ ] `two_phase_matching_residual` — integrate from both boundaries and compare at the matching radius; optionally return both radial histories.
+- [X] `two_phase_matching_residual` — integrate from both boundaries and compare at the matching radius; optionally return both radial histories.
 - [ ] `solve_two_phase_mode` — solve matching at two prescribed amplitudes using the standalone complex-coordinate interface to real Newton iteration.
 
 Read the existing [radial RK4 design](multiphase-rk4-design.md) for the four
@@ -197,8 +199,8 @@ flowchart TD
     end
     subgraph projection["projection.jl"]
         source["nonlinear_two_phase_source"]
-        reconstruct["reconstruct_two_phase_field_at_radii"]
-        project["project_two_phase_field"]
+        reconstruct["reconstruct_two_phase_field_at_radius"]
+        project["two_phase_field_component_coefficients"]
         polar["build_polar_theta_derivatives"]
         derivatives["reconstruct_two_phase_field_derivatives"]
     end
@@ -302,6 +304,13 @@ call order: function bodies can refer to functions defined by a later include.
 
 ## Current place to resume
 
+Progress through October 21, recorded October 22: your eight checked functions
+cover the three label helpers, the four profile-coordinate helpers, and
+`two_phase_matching_residual`. Its check records the physical matching
+interface and orchestration; the boundary, radial-operator, and nonlinear-source
+helpers it calls remain separate walkthrough items. The three object boxes
+remain unmarked pending your own review.
+
 The profile-coordinate migration is complete for this pass. Packing and
 unpacking use `TwoPhaseProfile` and `TwoPhaseProblem`; physical matching takes
 those objects directly. Both solver routes use the common unpacker, and the
@@ -309,12 +318,56 @@ live driver uses the shared coefficient-index helper. The old tuple unpacker
 and packed matching wrapper are removed. The corrected driver passes its
 already-packed guess directly to the admissibility check.
 
-All 97 focused coordinate, physical matching, and integrated-observables
-checks passed after cleanup; the preceding standalone-solver migration passed
-20 nonlinear matching checks. See the handoff for the validation limits and
-remaining unrelated evolution-test mismatch.
+On October 21, all 97 focused coordinate, physical matching, and
+integrated-observables checks passed after cleanup; the preceding
+standalone-solver migration passed 20 nonlinear matching checks. These are
+algorithm/interface checks, not evidence of physical spatial convergence.
+The full suite and campaign were not rerun. See the handoff for the unresolved
+response-versus-standalone admissibility rules and evolution-test return-field
+mismatch.
 
-Continue the docstring walkthrough by tracing a trial through boundary
-construction, radial integration, and the matching mismatch. Boundary-assembly
-cleanup and adopting the matched-result type are deferred. The understanding
-checkboxes above remain yours to mark.
+### Next walkthrough: one trial through radial matching
+
+Start with a `TwoPhaseProfile` and fixed `TwoPhaseProblem`. The profile contains
+two trial frequencies and physical coefficients at both boundaries; any
+prescribed outer amplitudes have already been inserted during unpacking.
+One matching evaluation follows this route:
+
+1. **Build endpoint states.** The local `assemble_boundary` closure in
+   `two_phase_matching_residual` slices the coefficient arrays by component.
+   `component_boundary_state` calculates that component's frequency and m,
+   evaluates the appropriate linear asymptotic series at the finite endpoint,
+   and returns its `[R; Q]` block, with `Q = dR/dr_*`. Leading coefficients
+   specify the series; they are not the endpoint field values themselves.
+2. **Arrange the joint state.** Gather every component's R entries, then every
+   component's Q entries. For components with `l_values=[1,3]` and `[2]`, this
+   is `[R₁₁, R₃₁, R₂₂, Q₁₁, Q₃₁, Q₂₂]`, where the subscripts here denote
+   `(l,m)` and the components are the two fundamentals with `cloud_m=[1,2]`.
+3. **Integrate both branches.** `integrate_radial` advances from `inner` to
+   `match` and from `outer` to `match`, all in tortoise radius. Each RK4 stage
+   calls `nonlinear_two_phase_rhs!` on the full joint state. Frequencies remain
+   fixed during these integrations. The linear operator mixes angular entries
+   within one component; the nonlinear source is reconstructed from all of them.
+4. **Compare at the match.** Return `[R_from_horizon-R_from_outer;
+   Q_from_horizon-Q_from_outer]` in the same flattened mode order. With N
+   retained radial modes, this is 2N complex mismatches. A trial need not match;
+   Newton changes its frequencies and free coefficients to reduce this vector.
+   The physical matching function does not apply `coefficient_scale`.
+5. **Optionally keep the histories.** `save_radial_result=true` returns
+   `from_horizon`, `from_outer`, and `residual`. Both histories end at `match`,
+   but the outer history runs toward decreasing radius. Both matching-point
+   states are retained, including any residual mismatch.
+
+The first function to discuss and revise is `component_boundary_state` in
+[radial.jl](../src/adiabatic/multiphase/radial.jl). Follow its horizon/outer
+helpers in [core/boundaries.jl](../src/adiabatic/core/boundaries.jl) as needed.
+A useful checkpoint is that doubling a component's leading coefficients at
+fixed frequency doubles its boundary R and Q: these endpoint series are linear,
+even though the subsequent radial integration includes nonlinear interactions.
+
+The existing [matching checks](../tests/adiabatic/multiphase/test_matching_residual.jl)
+exercise unequal angular-block ordering, agreement between saved and plain
+residuals, the single-cloud limit, and radial RK4 refinement. They provide
+numerical checks to accompany the explanation; they do not mark a helper
+understood. Boundary-assembly cleanup and adopting the matched-result type
+remain deferred. The understanding checkboxes above remain yours to mark.

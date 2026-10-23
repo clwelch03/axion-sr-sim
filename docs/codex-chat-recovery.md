@@ -80,7 +80,9 @@ and the installed Codex executable. It uses only the Python standard library.
 1. Saves dated SQLite backups from the current node and each requested source.
    It uses SQLite's backup API so committed WAL contents are included. It checks
    database integrity and stops if either database changes during the pair of
-   snapshots. It never copies a live `.sqlite` file with `cp` or `rsync`.
+   snapshots. It checks that pair on local storage before copying the completed
+   backups to shared storage, so later chat activity does not invalidate them.
+   It never copies a live `.sqlite` file with `cp` or `rsync`.
 2. Compares chat records, turns, items, tools, attachments, spawn edges, and
    continuation history. A source must contain every known content row with
    identical values at shared primary keys. A newer timestamp alone cannot win
@@ -94,7 +96,7 @@ and the installed Codex executable. It uses only the Python standard library.
    into temporary database copies and verifies the exact imported rows. An
    isolated Codex app-server reads every affected chat, including the owners of
    continuation-only history. Validation does not start model turns.
-5. With `--apply`, acquires maintenance and conversation writer locks, checks the
+5. With `--apply`, acquires coordination and conversation writer locks, checks the
    transcript hashes again, and takes fresh source snapshots to check that the
    affected records have not changed. It then backs up the destination again.
 6. Imports only the selected records. Under SQLite write transactions it checks
@@ -105,6 +107,10 @@ The running `CODEX_THREAD_ID` and its continuation IDs are excluded automaticall
 Use `--exclude-thread THREAD_ID` for additional exclusions, or when launching
 from a terminal without that environment variable. A busy writer lock stops the
 import. The script does not kill sessions or overwrite their rollout files.
+The backend's `.sqlite-maintenance.lock` is held by a long-lived background
+worker, even while idle; recovery does not acquire or remove it. SQLite write
+transactions serialize database changes, while the coordination and per-chat
+locks protect the conversations being imported.
 
 The validation API is described in the
 [official OpenAI app-server documentation](https://learn.chatgpt.com/docs/app-server).
@@ -140,6 +146,15 @@ retention policies. The script never automatically deletes recovery artifacts.
 
 ## When something stops the procedure
 
+- **Snapshot timed out:** slow shared storage can exceed the default 60-second
+  limit per database backup. Retry with `--snapshot-timeout 300`; the same limit
+  is passed to source nodes and their SSH timeout is increased accordingly.
+  Backups, integrity checks, and change detection still run.
+- **`.sqlite-maintenance.lock` reported as active:** older versions of this
+  utility incorrectly required the backend's background-worker lock. Use the
+  corrected script and rerun the same command. That failure occurs before live
+  imports; the `new:` and `updated:` lines describe the plan, not applied changes.
+  Do not delete the lock file or stop unrelated chats to work around it.
 - **Node unavailable or missing databases:** the command fails rather than
   silently treating that node as empty. Retry later, or explicitly select the
   reachable nodes and report that recovery covers only those sources.

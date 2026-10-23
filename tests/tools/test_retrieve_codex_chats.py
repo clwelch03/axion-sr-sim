@@ -1,10 +1,12 @@
 """Data preservation checks for the cluster chat recovery utility."""
 
+import fcntl
 import importlib.util
 from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest import mock
 
 
 spec = importlib.util.spec_from_file_location(
@@ -179,13 +181,101 @@ class RetrievalTests(unittest.TestCase):
             recovery.snapshot(self.remote, self.root / "snapshot")
         self.assertIsNotNone(recovery.Store(self.root / "snapshot").thread("chat"))
 
-    def test_busy_writer_lock_stops_import(self):
+    def test_snapshot_timeout_can_be_extended(self):
+        add_chat(self.remote)
+        with mock.patch.object(recovery.time, "monotonic", side_effect=range(0, 100, 2)):
+            with self.assertRaisesRegex(recovery.RecoveryError, "Snapshot timed out"):
+                recovery.snapshot(self.remote, self.root / "timed-out", timeout=1)
+        with mock.patch.object(recovery.time, "monotonic", side_effect=range(0, 100, 2)):
+            recovery.snapshot(self.remote, self.root / "extended", timeout=10)
+        self.assertIsNotNone(recovery.Store(self.root / "extended").thread("chat"))
+
+    def test_source_writes_during_archive_copy_do_not_change_captured_pair(self):
+        add_chat(self.remote)
+        add_turn(self.remote)
+        copyfile = recovery.shutil.copyfile
+
+        def copy_with_later_write(source, destination):
+            result = copyfile(source, destination)
+            if source.name == recovery.DATABASES[0]:
+                add_chat(self.remote, "later")
+                add_turn(self.remote, thread_id="later")
+            return result
+
+        with mock.patch.object(recovery.shutil, "copyfile", side_effect=copy_with_later_write):
+            recovery.snapshot(self.remote, self.root / "snapshot")
+        saved = recovery.Store(self.root / "snapshot")
+        self.assertEqual(saved.ids, {"chat"})
+        self.assertEqual(len(saved.records("thread_turns", "chat")), 1)
+        self.assertIn("later", recovery.Store(self.remote).ids)
+
+    def test_source_writes_during_capture_still_reject_snapshot(self):
+        add_chat(self.remote)
+        connect = recovery.connect
+
+        def connect_with_concurrent_write(path):
+            reader = connect(path)
+            if path.name != recovery.DATABASES[0]:
+                return reader
+            wrapped = mock.Mock(wraps=reader)
+
+            def backup_with_write(*args, **kwargs):
+                reader.backup(*args, **kwargs)
+                add_turn(self.remote, turn="during-snapshot")
+
+            wrapped.backup.side_effect = backup_with_write
+            return wrapped
+
+        with mock.patch.object(recovery, "connect", side_effect=connect_with_concurrent_write):
+            with self.assertRaisesRegex(recovery.RecoveryError, "changed during snapshot"):
+                recovery.snapshot(self.remote, self.root / "snapshot")
+        self.assertFalse((self.root / "snapshot" / recovery.DATABASES[0]).exists())
+
+    def test_busy_coordination_lock_stops_import(self):
         home = self.root / "home"
         (home / "thread-writer-locks").mkdir(parents=True)
-        with recovery.writer_locks(home, self.local, {"chat"}):
+        with recovery.writer_locks(home, {"chat"}):
             with self.assertRaisesRegex(recovery.RecoveryError, "active"):
-                with recovery.writer_locks(home, self.local, {"chat"}):
+                with recovery.writer_locks(home, {"chat"}):
                     self.fail("Concurrent writer was allowed")
+
+    def test_busy_thread_lock_stops_import_and_releases_coordination(self):
+        home = self.root / "home"
+        locks = home / "thread-writer-locks"
+        locks.mkdir(parents=True)
+        with (locks / "chat.lock").open("a+b") as writer:
+            fcntl.flock(writer, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with self.assertRaisesRegex(recovery.RecoveryError, r"active.*chat\.lock"):
+                with recovery.writer_locks(home, {"ancestor", "chat"}):
+                    self.fail("Active chat was not protected")
+            # A failed acquisition must release coordination and earlier locks.
+            with recovery.writer_locks(home, {"ancestor"}):
+                pass
+        with recovery.writer_locks(home, {"chat"}):
+            pass
+
+    def test_idle_maintenance_owner_does_not_block_import(self):
+        home = self.root / "home"
+        locks = home / "thread-writer-locks"
+        locks.mkdir(parents=True)
+        add_chat(self.local)
+        add_chat(self.remote, timestamp=2)
+        add_turn(self.remote)
+        stores = self.stores()
+        plan, conflicts, _ = recovery.make_plan(stores, set())
+        self.assertEqual(conflicts, [])
+        maintenance_path = self.local / ".sqlite-maintenance.lock"
+        with maintenance_path.open("a+b") as maintenance, (locks / "unrelated.lock").open("a+b") as unrelated:
+            fcntl.flock(maintenance, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(unrelated, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with recovery.writer_locks(home, {"chat"}):
+                recovery.merge(self.local, stores, plan)
+                recovery.verify_rows(self.local, stores, plan)
+            # Recovery must not unlink or replace the backend's lock file.
+            with maintenance_path.open("rb") as check:
+                with self.assertRaises(BlockingIOError):
+                    fcntl.flock(check, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        self.assertEqual(len(recovery.Store(self.local).records("thread_turns", "chat")), 1)
 
 
 if __name__ == "__main__":

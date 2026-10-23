@@ -72,7 +72,7 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def snapshot(source, destination):
+def snapshot(source, destination, timeout=60):
     """Use SQLite's backup API, including committed WAL data; never copy live DBs."""
     destination.mkdir(mode=0o700, parents=True, exist_ok=False)
     # Keep SQLite's writable scratch files on local storage, not the shared mount.
@@ -83,7 +83,7 @@ def snapshot(source, destination):
         for filename, reader in zip(DATABASES, readers):
             local = Path(temporary) / filename
             with contextlib.closing(sqlite3.connect(local)) as writer:
-                deadline = time.monotonic() + 60
+                deadline = time.monotonic() + timeout
 
                 def progress(status, remaining, total):
                     require(time.monotonic() < deadline, "Snapshot timed out: " + filename)
@@ -92,9 +92,12 @@ def snapshot(source, destination):
                 require(writer.execute("PRAGMA quick_check").fetchone()[0] == "ok",
                         "Invalid snapshot: " + filename)
                 writer.execute("PRAGMA journal_mode=DELETE")
-            shutil.copyfile(local, destination / filename)
         require(versions == [reader.execute("PRAGMA data_version").fetchone()[0] for reader in readers],
                 "Chat databases changed during snapshot; rerun when writes settle.")
+        # Check the captured pair before copying it to potentially slow shared
+        # storage. Later source writes do not invalidate these completed backups.
+        for filename in DATABASES:
+            shutil.copyfile(Path(temporary) / filename, destination / filename)
 
 
 class Store:
@@ -399,18 +402,22 @@ def validate_app_server(binary, probe, thread_ids, report_path):
 
 
 @contextlib.contextmanager
-def writer_locks(home, database_home, thread_ids):
+def writer_locks(home, thread_ids):
+    """Exclude conversation writers; SQLite transactions serialize DB writes."""
     with contextlib.ExitStack() as stack:
         lock_directory = home / "thread-writer-locks"
         require(lock_directory.is_dir(), "Missing Codex writer-lock directory")
-        paths = [database_home / ".sqlite-maintenance.lock", lock_directory / ".coordination.lock"]
+        # .sqlite-maintenance.lock belongs to a long-lived background worker,
+        # including while idle. It is not a lock for ordinary database writes.
+        # Taking it would prevent recovery from any running Codex session.
+        paths = [lock_directory / ".coordination.lock"]
         paths.extend(lock_directory / (thread_id + ".lock") for thread_id in sorted(thread_ids))
         for path in paths:
             handle = stack.enter_context(path.open("a+b"))
             try:
                 fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as error:
-                raise RecoveryError("Chat or maintenance is active; retry later: " + path.name) from error
+                raise RecoveryError("Chat writer or recovery coordination is active; retry later: " + path.name) from error
         yield
 
 
@@ -431,6 +438,8 @@ def parse_args():
     parser.add_argument("--backup-root", type=Path, default=Path(__file__).resolve().parents[1] / "recovery/chat-retrieval")
     parser.add_argument("--codex-bin", help="Override automatic discovery of the installed Codex engine")
     parser.add_argument("--remote-python", default="python3.12")
+    parser.add_argument("--snapshot-timeout", type=int, default=60, metavar="SECONDS",
+                        help="Time limit per database backup (default 60; increase for slow shared storage)")
     parser.add_argument("--exclude-thread", action="append", default=[], help="Also exclude CODEX_THREAD_ID automatically")
     parser.add_argument("--snapshot-to", type=Path, help=argparse.SUPPRESS)
     return parser.parse_args()
@@ -438,6 +447,8 @@ def parse_args():
 
 def run(args):
     os.umask(0o077)
+    require(args.snapshot_timeout > 0, "--snapshot-timeout must be positive.")
+    remote_timeout = 2 * args.snapshot_timeout + 30
     home = args.codex_home.expanduser().resolve()
     config_path = home / "config.toml"
     config = tomllib.loads(config_path.read_text()) if config_path.exists() else {}
@@ -445,14 +456,14 @@ def run(args):
     require(args.sqlite_home or configured, "sqlite_home is not configured; pass --sqlite-home explicitly.")
     live = Path(args.sqlite_home or configured).expanduser().resolve()
     if args.snapshot_to:
-        snapshot(live, args.snapshot_to)
+        snapshot(live, args.snapshot_to, timeout=args.snapshot_timeout)
         return
     require(not (args.nodes and args.from_snapshot), "Choose --nodes or --from-snapshot.")
     args.backup_root.mkdir(mode=0o700, parents=True, exist_ok=True)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     root = Path(tempfile.mkdtemp(prefix=stamp + "-", dir=args.backup_root.resolve()))
     print("Recovery directory: " + str(root), flush=True)
-    snapshot(live, root / "local")
+    snapshot(live, root / "local", timeout=args.snapshot_timeout)
     stores = {"local": Store(root / "local")}
     source_commands = {}
     if args.from_snapshot:
@@ -460,7 +471,7 @@ def run(args):
         require(all(len(value) == 2 for value in sources), "Expected --from-snapshot LABEL=DIR")
         for label, path in sources:
             require(re.fullmatch(r"[a-zA-Z0-9_-]+", label) and label not in stores, "Invalid or duplicate snapshot label")
-            snapshot(Path(path).expanduser().resolve(), root / label)
+            snapshot(Path(path).expanduser().resolve(), root / label, timeout=args.snapshot_timeout)
             stores[label] = Store(root / label)
     else:
         local_node = canonical_node(socket.gethostname())
@@ -469,10 +480,11 @@ def run(args):
                 continue
             label = node.replace(".", "_")
             command = [args.remote_python, str(Path(__file__).resolve()), "--snapshot-to", str(root / label),
-                       "--sqlite-home", str(live), "--codex-home", str(home)]
+                       "--sqlite-home", str(live), "--codex-home", str(home),
+                       "--snapshot-timeout", str(args.snapshot_timeout)]
             print("Snapshotting " + node, flush=True)
             subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "LogLevel=ERROR",
-                            node, shlex.join(command)], check=True, timeout=150)
+                            node, shlex.join(command)], check=True, timeout=remote_timeout)
             source_commands[label] = (node, command)
             stores[label] = Store(root / label)
     excluded = set(args.exclude_thread)
@@ -501,7 +513,7 @@ def run(args):
     binary = find_codex(args.codex_bin)
     with tempfile.TemporaryDirectory(prefix="codex-chat-probe-") as temporary:
         probe = Path(temporary)
-        snapshot(root / "local", probe / "db")
+        snapshot(root / "local", probe / "db", timeout=args.snapshot_timeout)
         merge(probe / "db", stores, plan)
         verify_rows(probe / "db", stores, plan)
         shutil.copytree(root / "transcripts", probe / "home")
@@ -522,7 +534,7 @@ def run(args):
     for path in hashes:
         lock_ids.update(UUID_PATTERN.findall(Path(path).name))
     require(not (lock_ids & excluded), "Import depends on an excluded conversation; retry in a fresh chat.")
-    with writer_locks(home, live, lock_ids):
+    with writer_locks(home, lock_ids):
         check_transcripts(hashes)
         # Catch source updates made between its first DB snapshot and hashing the
         # shared rollout files. Fresh snapshots are read-only on the source node.
@@ -531,7 +543,7 @@ def run(args):
             command = list(command)
             command[command.index("--snapshot-to") + 1] = str(check_directory)
             subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "LogLevel=ERROR",
-                            node, shlex.join(command)], check=True, timeout=150)
+                            node, shlex.join(command)], check=True, timeout=remote_timeout)
             fresh = Store(check_directory)
             require(fresh.schema == stores[label].schema, "Source schema changed: " + label)
             for thread_id in lock_ids:
@@ -539,7 +551,7 @@ def run(args):
                     require(fresh.records(table, thread_id) == stores[label].records(table, thread_id),
                             "Source changed during retrieval: %s / %s. Rerun." % (label, thread_id))
         check_transcripts(hashes)
-        snapshot(live, root / "before-apply")
+        snapshot(live, root / "before-apply", timeout=args.snapshot_timeout)
         save_json(root / "apply-started.json", {"status": "applying", "backup": str(root / "before-apply")})
         merge(live, stores, plan)
         verify_rows(live, stores, plan)

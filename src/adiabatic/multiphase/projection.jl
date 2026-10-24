@@ -81,7 +81,8 @@ end
 """
     nonlinear_two_phase_source(radial_values, radius, spin, alpha, output_pairs,
                                cloud_m, polar_values, grid,
-                               phase1_nodes, phase2_nodes; potential=:cosine)
+                               phase1_nodes, phase2_nodes;
+                               potential=:cosine, source_cache=nothing)
 
 Compute N_(l,q) = alpha^2 * P_(l,q)[(r^2 + spin^2*x^2)*h(Phi)] at one radius.
 
@@ -91,6 +92,10 @@ Use the reconstruction and projector conventions for inputs and phase grids.
 supplies `cosine_theta_nodes` and `polar_weights` matching `polar_values`.
 Select `potential=:cosine`, `:quartic`, or `:sextic` for h(Phi) = Phi - U'(Phi).
 
+With `source_cache=nothing`, use direct reconstruction and quadrature.
+A supplied cache delegates to `cached_two_phase_source`; it must be prepared
+for the same angular basis and quadrature settings.
+
 Return a dictionary keyed by `output_pairs`, which may include labels absent
 from the input. The radial slope equation contains
 -Delta/(r^2 + spin^2)^2 times this source;
@@ -98,7 +103,16 @@ that minus sign and tortoise factor are not included here.
 """
 function nonlinear_two_phase_source(radial_values, radius, spin, alpha,
                                     output_pairs, cloud_m, polar_values, grid,
-                                    phase1_nodes, phase2_nodes; potential=:cosine)
+                                    phase1_nodes, phase2_nodes;
+                                    potential=:cosine, source_cache=nothing)
+    # Return cached source if it exists
+    if source_cache !== nothing
+        return cached_two_phase_source(
+            radial_values, radius, spin, alpha, output_pairs,
+            cloud_m, polar_values, grid, phase1_nodes, phase2_nodes,
+            source_cache; potential)
+    end
+
     field = reconstruct_two_phase_field_at_radius(radial_values, cloud_m,
         polar_values, phase1_nodes, phase2_nodes)
 
@@ -114,6 +128,59 @@ function nonlinear_two_phase_source(radial_values, radius, spin, alpha,
         phase1_nodes, phase2_nodes)
 
     return Dict(pair => alpha^2 * coefficient for (pair, coefficient) in projected)
+end
+
+function cached_two_phase_source(radial_values, radius, spin, alpha, output_pairs,
+        cloud_m, polar_values, grid, phase1_nodes, phase2_nodes, source_cache;
+        potential=:cosine)
+
+    # Use the general calculation for modes outside this cache.
+    if !all(pair -> pair in source_cache.pairs, keys(radial_values)) ||
+            !all(pair -> pair in source_cache.pairs, output_pairs)
+        return nonlinear_two_phase_source(
+            radial_values, radius, spin, alpha, output_pairs,
+            cloud_m, polar_values, grid, phase1_nodes, phase2_nodes;
+            potential)
+    end
+
+    # Arrange coefficients in the basis matrix's column order.
+    # Missing input modes have zero field coefficient.
+    coefficients = [
+        get(radial_values, pair, 0.0 + 0.0im)
+        for pair in source_cache.pairs
+    ]
+    parameters = vcat(
+        real.(coefficients), imag.(coefficients),
+        [radius, spin, alpha],
+    )
+
+    packed_source = local_chain_source(parameters, source_cache; potential)
+
+    # Restore complex coefficients and the public dictionary format.
+    mode_count = length(source_cache.pairs)
+    values = complex.(
+        packed_source[1:mode_count],
+        packed_source[mode_count+1:2mode_count],
+    )
+    ordered_source = Dict(zip(source_cache.pairs, values))
+    return Dict(pair => ordered_source[pair] for pair in output_pairs)
+end
+
+function local_chain_source(parameters, source_cache; potential=:cosine)
+    mode_count = length(source_cache.pairs)
+    coefficients = parameters[1:2mode_count]
+    radius, spin, alpha = parameters[2mode_count+1:2mode_count+3]
+
+    # Reconstruct the real field at every angular/phase sample.
+    field = 2 .* (source_cache.basis * coefficients)
+
+    # Apply the potential, geometry, and quadrature weights pointwise.
+    geometry_factor = radius^2 .+ spin^2 .* source_cache.cosine_theta_squared
+    remainder = potential_remainder.(field, Ref(potential))
+    weighted_remainder = source_cache.weights .* geometry_factor .* remainder
+
+    # Return all real source coefficients, followed by all imaginary ones.
+    return alpha^2 .* (transpose(source_cache.basis) * weighted_remainder)
 end
 
 """

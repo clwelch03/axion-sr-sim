@@ -28,6 +28,7 @@ open caveats, and next steps. Entry points reviewed 2026-10-12:
 These documents retain the evidence and decisions from their dates. Their
 benchmark timings, job states, and proposed next steps are not current defaults.
 
+- [Multiphase work, October 23](multiphase-work-2026-10-23.md): direct Fig. 7 profile setup, source/Jacobian optimization experiments, partial library implementation, and running-job results.
 - [Nonlinear tower progress](nonlinear-progress.md): Dolan source and RK4 checks.
 - [Nonlinear performance](nonlinear-performance.md): NumPy optimizations and Julia bridge experiments.
 - [Nonlinear strategy](nonlinear-strategy.md): motivation for the adiabatic approach.

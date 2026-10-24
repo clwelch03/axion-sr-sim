@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-10-21. This is the authoritative project status: what works,
+Updated 2026-10-23. This is the authoritative project status: what works,
 open caveats, and next steps. Campaign READMEs own exact commands, saved-result
 paths, and detailed validation records; design documents own equations and
 implementation decisions.
@@ -20,7 +20,32 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
 
 ## Where things stand
 
-### Resume here: multiphase organization refactor (October 21)
+### Resume here: direct mutual-deformation profiles and source optimization (October 23)
+
+The current deliverable is a Fig. 7-style primary/secondary profile overlay
+with two additional jointly nonlinear curves. A direct solve fixes both outer
+coefficients selected from the equal-energy Omiya reference; joint energies
+are outputs. The commented driver, frozen inputs, logging, and run settings
+are recorded in the [October 23 work summary](docs/multiphase-work-2026-10-23.md)
+and [campaign record](runs/adiabatic/multiphase_two_cloud/README.md#direct-fig-7-profile-attempt-october-23).
+
+At 17:25 PDT on October 23, jobs **27241421** (v2) and **27241725** (v3,
+detailed logging) were still running. Both accepted the first correction,
+reducing the scaled residual from 1.90648e9 to 6.83206e8; the requested
+tolerance is 1e-5. No target joint solution or profile CSV exists yet. The
+first v3 Jacobian took about 70.6 minutes. Inspect the logs for newer status;
+these are timestamped observations, not a convergence result.
+
+A standalone cached-basis/local-source-Jacobian prototype measured 55.8x
+faster Jacobian construction through short endpoint integrations. Full-domain
+accuracy, timing, and Newton convergence are unverified. Guided implementation
+has added the optional cache adapter, `cached_two_phase_source`, and the ordinary
+`local_chain_source` method to `projection.jl`. The cache builder, optimized
+derivative method, cache forwarding, and Newton batching option remain to be
+added together. Running snapshots retain the original source. Preserve the
+user's incremental library-editing workflow and learning-map checkboxes.
+
+### Physical-profile organization checkpoint (October 21)
 
 The physical-profile and solver-coordinate migration is complete for this pass.
 The user authorized the solver migration and the remaining annotation, test,
@@ -524,11 +549,12 @@ scan, and convergence evidence. Use its averaged secondary results;
 
 ## Next steps
 
-- **Active multiphase work:** the response, neighbor checks, and short cosine
-  evolution are complete. The October 19 single doubling run is now underway;
-  inspect its exponential comparisons, then assess radial/domain/support
-  convergence and the physical slow-growth closure before interpreting it.
-  The campaign preserves both time resolutions and all accepted endpoint data.
+- **Active multiphase work:** finish and validate the cached-source derivative
+  implementation, inspect the October 23 direct-profile jobs, and obtain the
+  joint/reference profile overlay. The October 19 doubling run and comparison
+  are complete; see their checkpoint above. Radial/domain/support convergence
+  and the physical slow-growth closure remain separate requirements before
+  interpreting mutual-deformation or evolution results.
 - **Coupled-BH preparation:** local primary continuation in alpha and spin
   now works at both dilute amplitude and $A_0\simeq2.052$; the secondary and
   driven channels are checked on the nonlinear backgrounds, with the targeted

@@ -556,3 +556,32 @@ The source tests include nonlinear fields; the short endpoint test uses the
 saved starting profile, whose boundary fields are dilute. Full-domain
 matching accuracy, runtime, and Newton convergence still need validation
 before adopting this prototype in the library.
+
+### Guided implementation and job checkpoint (October 23, 17:25 PDT)
+
+The [October 23 work summary](../../../docs/multiphase-work-2026-10-23.md)
+records the normalization decisions, driver construction, optimization
+experiments, and exact implementation resume point. The live `projection.jl`
+now contains the optional `source_cache` adapter, `cached_two_phase_source`,
+and the ordinary matrix `local_chain_source` method. The cache builder,
+optimized derivative method, radial/matching forwarding, and Newton batching
+option remain pending. Seventeen existing nonlinear-source checks and 21
+adapter checks with the experimental helper passed; the ordinary matrix
+snippet passed 36 value/derivative checks. These edits do not affect frozen
+v2/v3 or their running jobs.
+
+At 17:25 PDT, job **27241421** was RUNNING at 2h13m07s and **27241725** was
+RUNNING at 1h56m38s. Both logs record accepted Newton iteration 1 at scaled
+residual **6.832061250638738e8**, down 64.2% from
+**1.9064826994960344e9**, but still far above the requested 1e-5 tolerance.
+Only the v2/v3 `-input.jls` checkpoints exist; neither job has saved a solution
+or profile CSV.
+
+The v3 first Jacobian ran from matching-timer 537.73 to 4776.00 seconds,
+about **70.6 minutes**. Its five passes took 832.78, 839.90, 835.22, 871.10,
+and 859.09 seconds. The full-step trial took 554.21 seconds and increased the
+residual to 2.253960839827775e19, so it was rejected. The next, half-step trial
+took 547.12 seconds and was accepted at timer 5877.72 seconds. Correction 2's
+first Jacobian pass then took 865.25 seconds; pass 2 had started at this check.
+No target convergence or final profile overlay has been established. Both
+jobs were left running under their four-hour limits.

@@ -1,6 +1,109 @@
 using Serialization, LinearAlgebra
 
 """
+    single_cloud_continuation_entry_adapter(point_id, entry; tolerance)
+
+Convert one accepted single-cloud entry, with fields `amplitude` and `solution`,
+to a ContinuationPoint. Supply the tolerance used for that solve; the entry
+does not store it. Use `nothing` if the original tolerance is unknown.
+
+Copy the boundary coefficients and residual so the new record owns its arrays.
+This conversion does not solve, check convergence, or reconstruct radial samples.
+"""
+function single_cloud_continuation_entry_adapter(point_id, legacy_continuation_record; tolerance)
+    (; amplitude, solution) = legacy_continuation_record
+
+    # A single nonlinear cloud has one base frequency, including when its
+    # profile contains several angular modes and higher harmonics.
+    profile = TwoPhaseProfile(
+        [solution.frequency],
+        copy(solution.horizon_amplitudes),
+        copy(solution.outer_amplitudes),
+    )
+
+    # The imposed parameter is the first physical outer coefficient, A0.
+    parameter_values = (; amplitude)
+
+    # Newton tests norm(residual / amplitude) against tolerance.
+    # Preserve the stored norms rather than recomputing them during conversion.
+    diagnostics = (;
+        residual=copy(solution.residual),
+        residual_norm=solution.residual_norm,
+        scaled_residual_norm=solution.scaled_residual_norm,
+        residual_scale=amplitude,
+        tolerance,
+        iterations=solution.iterations,
+    )
+
+    # This model has no fixed cloud background, and these entries contain
+    # boundary data only, with no saved radial integration samples.
+    backgrounds = ()
+    radial_result = nothing
+
+    return ContinuationPoint(
+        point_id, parameter_values, profile, diagnostics, backgrounds, radial_result,
+    )
+end
+
+"""
+    single_cloud_continuation_checkpoint_adapter(legacy_checkpoint; checkpoint_path)
+
+Convert an old single-cloud checkpoint containing `continuation` and `rows`
+to a ContinuationBranch. Preserve the other saved fields as branch settings
+and each saved table row as `point.diagnostics.observables`.
+
+The file records a branch-level tolerance, not a tolerance for every past solve.
+Keep that setting, but leave each point's original tolerance as `nothing`.
+This conversion does not solve or recheck convergence.
+"""
+function single_cloud_continuation_checkpoint_adapter(legacy_checkpoint; checkpoint_path)
+    legacy_continuation_records = legacy_checkpoint.continuation
+    legacy_diagnostic_rows = legacy_checkpoint.rows
+    length(legacy_continuation_records) == length(legacy_diagnostic_rows) ||
+        throw(ArgumentError("Require one diagnostic row per saved continuation point."))
+
+    # Keep the saved physical, grid, Newton, and continuation settings.
+    # The two histories are represented by the points below.
+    branch_settings = (;
+        model=:single_cloud,
+        (field_name => deepcopy(field_value)
+         for (field_name, field_value) in pairs(legacy_checkpoint)
+         if field_name ∉ (:continuation, :rows))...,
+    )
+
+    branch_points = map(eachindex(legacy_continuation_records)) do point_id
+        legacy_continuation_record = legacy_continuation_records[point_id]
+        legacy_diagnostic_row = legacy_diagnostic_rows[point_id]
+        legacy_diagnostic_row.amplitude == legacy_continuation_record.amplitude ||
+            throw(ArgumentError("Diagnostic row $point_id has a different amplitude."))
+
+        # Original positions become stable IDs when importing the old file.
+        converted_point = single_cloud_continuation_entry_adapter(
+            point_id, legacy_continuation_record; tolerance=nothing,
+        )
+        point_diagnostics = (;
+            converted_point.diagnostics...,
+            observables=deepcopy(legacy_diagnostic_row),
+        )
+
+        return ContinuationPoint(
+            converted_point.point_id,
+            converted_point.parameter_values,
+            converted_point.profile,
+            point_diagnostics,
+            converted_point.backgrounds,
+            converted_point.radial_result,
+        )
+    end
+
+    provenance = (;
+        checkpoint_path=abspath(checkpoint_path),
+        source_format=:legacy_single_cloud,
+    )
+    return ContinuationBranch(branch_settings, branch_points, provenance)
+end
+
+"""
     load_branch_setup(checkpoint_path; potential)
 
 Read a branch checkpoint and build the angular grid and couplings for its

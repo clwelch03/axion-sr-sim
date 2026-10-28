@@ -32,13 +32,19 @@ TABLES = {
     "thread_dynamic_tools": (0, "thread_id"),
     "thread_attachments": (0, "thread_id"),
     "thread_spawn_edges": (0, "child_thread_id"),
+    "guardian_review_feedback": (0, "thread_id"),
+    "thread_read_receipts": (0, "thread_id"),
     "thread_turns": (1, "thread_id"),
     "thread_items": (1, "thread_id"),
     "thread_history_projection_state": (1, "thread_id"),
     "thread_realtime_items": (1, "thread_id"),
 }
+# Older sources predate these additive tables and contribute no rows for them.
+# All shared table definitions must match; newer sources cannot be imported
+# into a destination that lacks their tables.
+OPTIONAL_TABLES = {"guardian_review_feedback", "thread_read_receipts"}
 CONTENT_TABLES = tuple(t for t in TABLES if t not in (
-    "threads", "thread_history_projection_state"))
+    "threads", "thread_history_projection_state", "thread_read_receipts"))
 ORGANIZATION = ("name", "project_id", "thread_section_id", "section_position",
                 "section_entered_at_ms", "is_pinned", "archived", "archived_at")
 UUID_PATTERN = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
@@ -120,6 +126,8 @@ class Store:
                 for table, (database, group_key) in TABLES.items():
                     if database != number:
                         continue
+                    if table in OPTIONAL_TABLES and table not in all_tables:
+                        continue
                     require(table in all_tables, "Missing table: " + table)
                     info = list(connection.execute("PRAGMA table_info(" + table + ")"))
                     self.columns[table] = [r[1] for r in info]
@@ -135,7 +143,7 @@ class Store:
         self.ids = set().union(*(set(groups) for groups in self.rows.values()))
 
     def records(self, table, thread_id):
-        return self.rows[table].get(thread_id, {})
+        return self.rows.get(table, {}).get(thread_id, {})
 
     def thread(self, thread_id):
         return next(iter(self.records("threads", thread_id).values()), None)
@@ -151,11 +159,54 @@ class Store:
         return complete
 
 
-def make_plan(stores, excluded):
+def reviewed_continuation_paths(thread_id, selected, paths, home):
+    """Verify a reviewed source follows every older rollout through history_base.
+
+    This is deliberately opt-in: continuation boundaries can omit aborted turns,
+    so ancestry alone is not a substitute for reviewing the saved histories.
+    """
+    require(home is not None, "A Codex home is required to review continuations")
+    inventory = transcript_inventory(home)
+    pending = Path(selected)
+    hashes, names = {}, set()
+    while True:
+        path = pending.resolve()
+        require(path.is_relative_to(home.resolve()), "Rollout outside shared Codex home: " + str(path))
+        require(str(path) not in hashes, "Cyclic continuation history: " + thread_id)
+        require(path.is_file(), "Missing rollout: " + str(path))
+        hashes[str(path)] = digest(path)
+        names.add(path.name)
+        with path.open() as stream:
+            first = json.loads(next(stream))
+        require(first.get("type") == "session_meta", "Unsupported rollout header: " + str(path))
+        metadata = first["payload"]
+        require(metadata.get("id") == thread_id, "Continuation belongs to another chat: " + str(path))
+        base = metadata.get("history_base")
+        if not base:
+            break
+        parent = base.get("thread_id")
+        matches = inventory.get(parent, [])
+        require(matches, "Missing ancestor rollout: " + str(parent))
+        require(len({digest(match) for match in matches}) == 1, "Conflicting ancestor rollouts: " + str(parent))
+        pending = matches[0]
+    require({Path(path).name for path in paths} <= names,
+            "Reviewed continuation does not descend from every known rollout: " + thread_id)
+    check_transcripts(hashes)
+    return hashes
+
+
+def make_plan(stores, excluded, reviewed_continuations=None, home=None):
     """Choose a source containing every known content row, never by timestamp alone."""
     target = stores["local"]
+    reviewed_continuations = reviewed_continuations or {}
+    for thread_id, label in reviewed_continuations.items():
+        require(label in stores and stores[label].thread(thread_id),
+                "Reviewed continuation source has no indexed chat: %s=%s" % (thread_id, label))
     for label, store in stores.items():
-        require(store.schema == target.schema, "Schema mismatch: " + label)
+        mismatches = [table for table in TABLES
+                      if store.schema.get(table) != target.schema.get(table)
+                      and not (table in OPTIONAL_TABLES and table not in store.schema)]
+        require(not mismatches, "Schema mismatch: %s (%s)" % (label, ", ".join(mismatches)))
     # Continuation history can live under an ID present only in a rollout filename.
     excluded = set(excluded)
     for thread_id in list(excluded):
@@ -178,9 +229,22 @@ def make_plan(stores, excluded):
         # Do not silently change continuation lineage, even with newer timestamps.
         paths = {store.thread(thread_id)["rollout_path"] for store in known if store.thread(thread_id)}
         # Archiving moves a file without changing its identity.
+        reviewed_paths = None
         if len({Path(path).name for path in paths}) > 1:
-            conflicts.append({"id": thread_id, "reason": "Different rollout/continuation paths require manual review"})
-            continue
+            reviewed_source = reviewed_continuations.get(thread_id)
+            if reviewed_source is None:
+                conflicts.append({"id": thread_id, "reason": "Different rollout/continuation paths require manual review",
+                                  "title": next(store.thread(thread_id).get("title", thread_id)
+                                                for store in known if store.thread(thread_id)),
+                                  "paths": {label: store.thread(thread_id)["rollout_path"]
+                                            for label, store in stores.items() if store.thread(thread_id)}})
+                continue
+            candidates = [(label, store) for label, store in candidates if label == reviewed_source]
+            if not candidates:
+                conflicts.append({"id": thread_id, "reason": "Reviewed source does not contain every known content row"})
+                continue
+            reviewed_paths = reviewed_continuation_paths(
+                thread_id, candidates[0][1].thread(thread_id)["rollout_path"], paths, home)
         def rank(candidate):
             label, store = candidate
             row = store.thread(thread_id) or {}
@@ -204,6 +268,8 @@ def make_plan(stores, excluded):
                      "title": (source_row or {}).get("name") or (source_row or {}).get("title", thread_id),
                      "source": (source_row or {}).get("source"),
                      "metadata_only": not content_changed and bool(existing)})
+        if reviewed_paths:
+            plan[-1]["reviewed_continuation_paths"] = reviewed_paths
     return plan, conflicts, excluded
 
 
@@ -211,6 +277,13 @@ def desired_rows(stores, entry, table):
     thread_id = entry["id"]
     rows = {key: dict(row) for key, row in stores[entry["node"]].records(table, thread_id).items()}
     existing = stores["local"].thread(thread_id)
+    # Read/unread cursors are local UI state, not competing chat histories.
+    # Preserve them (including absence) for existing chats; seed new chats from
+    # the source unless the destination already has a receipt for that ID.
+    if table == "thread_read_receipts":
+        local_rows = stores["local"].records(table, thread_id)
+        if existing or local_rows:
+            return {key: dict(row) for key, row in local_rows.items()}
     if table == "threads" and existing:
         for row in rows.values():
             for column in ORGANIZATION:
@@ -230,6 +303,9 @@ def merge(destination, stores, plan):
             for table, (database, group_key) in TABLES.items():
                 schema = "history" if database else "main"
                 sql = connection.execute("SELECT sql FROM " + schema + ".sqlite_master WHERE name=?", (table,)).fetchone()
+                if table not in original.schema:
+                    require(sql is None, "Destination schema changed: " + table)
+                    continue
                 require(sql and sql[0] == original.schema[table], "Destination schema changed: " + table)
                 qualified = schema + "." + table
                 columns = original.columns[table]
@@ -284,14 +360,32 @@ def collect_transcripts(stores, plan, home):
     for store in stores.values():
         for thread_id in store.rows["threads"]:
             indexed[thread_id] = store.thread(thread_id)
+    # Read the paths that will actually be installed, not whichever store was
+    # visited last (which can still point to an older continuation).
+    indexed.update({tid: stores["local"].thread(tid) for tid in stores["local"].rows["threads"]})
+    for entry in plan:
+        row = stores[entry["node"]].thread(entry["id"])
+        if row:
+            indexed[entry["id"]] = row
+        check_transcripts(entry.get("reviewed_continuation_paths", {}))
     verify_ids = {entry["id"] for entry in plan if entry["id"] in indexed}
     for entry in plan:
         if entry["id"] not in indexed:
             owners = {tid for tid, row in indexed.items() if entry["id"] in Path(row["rollout_path"]).name}
+            # An intermediate continuation need not appear in the latest path.
+            # Its session header retains the owning conversation's ID.
+            for path in inventory.get(entry["id"], []):
+                with path.open() as stream:
+                    first = json.loads(next(stream))
+                require(first.get("type") == "session_meta", "Unsupported rollout header: " + str(path))
+                owner = first["payload"].get("id")
+                if owner in indexed:
+                    owners.add(owner)
             require(owners, "Cannot find the owning chat for continuation " + entry["id"])
             verify_ids.update(owners)
     pending = [Path(indexed[tid]["rollout_path"]) for tid in verify_ids]
     pending.extend(path for entry in plan for path in inventory.get(entry["id"], []))
+    pending.extend(Path(path) for entry in plan for path in entry.get("reviewed_continuation_paths", {}))
     hashes = {}
     while pending:
         path = pending.pop().resolve()
@@ -342,8 +436,33 @@ def find_codex(explicit):
     return binary
 
 
+def empty_helper_threads(store, thread_ids):
+    """Recognize guardian placeholders with no turns in either storage format."""
+    empty = set()
+    for thread_id in thread_ids:
+        row = store.thread(thread_id)
+        if not row or row.get("source") != '{"subagent":{"other":"guardian"}}':
+            continue
+        if any(store.records(table, thread_id) for table in
+               ("thread_turns", "thread_items", "thread_realtime_items")):
+            continue
+        with Path(row["rollout_path"]).open() as stream:
+            records = [json.loads(line) for line in stream]
+        if not records or records[0].get("type") != "session_meta":
+            continue
+        metadata = records[0]["payload"]
+        if metadata.get("id") != thread_id or metadata.get("history_base") or metadata.get("forked_from_id"):
+            continue
+        if all((record.get("type"), record.get("payload", {}).get("type")) in
+               {("response_item", "compaction"), ("event_msg", "thread_settings_applied")}
+               for record in records[1:]):
+            empty.add(thread_id)
+    return empty
+
+
 def validate_app_server(binary, probe, thread_ids, report_path):
     """Read full history in an isolated home. No turns, auth, or source writes."""
+    empty_helpers = empty_helper_threads(Store(probe / "db"), thread_ids)
     environment = dict(os.environ, CODEX_HOME=str(probe / "home"), CODEX_SQLITE_HOME=str(probe / "db"))
     environment.pop("CODEX_THREAD_ID", None)
     with report_path.with_suffix(".stderr.log").open("w") as errors:
@@ -382,9 +501,13 @@ def validate_app_server(binary, probe, thread_ids, report_path):
                 # This installed engine supports includeTurns for both storage modes.
                 # If a later engine removes it, stop rather than accepting an empty read.
                 thread = request("thread/read", {"threadId": thread_id, "includeTurns": True})["thread"]
-                turns = thread.get("turns", [])
-                require(turns, "Validation returned no turns: " + thread_id)
+                require(thread.get("id") == thread_id and "turns" in thread,
+                        "Validation did not return the requested chat history: " + thread_id)
+                turns = thread["turns"]
+                require(turns or thread_id in empty_helpers, "Validation returned no turns: " + thread_id)
                 results.append({"id": thread_id, "turn_ids": [turn["id"] for turn in turns], "turns": len(turns)})
+                if not turns:
+                    results[-1]["empty_helper"] = True
                 print("Validated %s: %d turns" % (thread_id, len(turns)), flush=True)
             save_json(report_path, {"binary": str(binary), "threads": results})
         finally:
@@ -428,6 +551,25 @@ def canonical_node(value):
     return value
 
 
+def remote_snapshot(node, command, timeout):
+    """Keep remote failures actionable without silently omitting a source."""
+    try:
+        subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "LogLevel=ERROR",
+                        node, shlex.join(command)], check=True, timeout=timeout)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        if isinstance(error, subprocess.TimeoutExpired):
+            reason = "Remote snapshot timed out after %s seconds on %s" % (timeout, node)
+        elif error.returncode == 255:
+            reason = "SSH failed for %s; check the SSH diagnostic above" % node
+        else:
+            reason = "Remote snapshot failed on %s (exit %d)" % (node, error.returncode)
+        raise RecoveryError(
+            reason + ". No chats imported; completed backups are retained. "
+            "Retry when the source is available, explicitly select reachable sources with --nodes, "
+            "or use --from-snapshot LABEL=DIR for saved backups. "
+            "Omitting a node leaves its unsaved history unchecked.") from error
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--apply", action="store_true", help="Import after snapshots and validation; otherwise preview only")
@@ -441,6 +583,8 @@ def parse_args():
     parser.add_argument("--snapshot-timeout", type=int, default=60, metavar="SECONDS",
                         help="Time limit per database backup (default 60; increase for slow shared storage)")
     parser.add_argument("--exclude-thread", action="append", default=[], help="Also exclude CODEX_THREAD_ID automatically")
+    parser.add_argument("--reviewed-continuation", action="append", default=[], metavar="THREAD_ID=SOURCE",
+                        help="Use a manually reviewed continuation source; still checks ancestry and all content rows")
     parser.add_argument("--snapshot-to", type=Path, help=argparse.SUPPRESS)
     return parser.parse_args()
 
@@ -483,19 +627,28 @@ def run(args):
                        "--sqlite-home", str(live), "--codex-home", str(home),
                        "--snapshot-timeout", str(args.snapshot_timeout)]
             print("Snapshotting " + node, flush=True)
-            subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "LogLevel=ERROR",
-                            node, shlex.join(command)], check=True, timeout=remote_timeout)
+            remote_snapshot(node, command, remote_timeout)
             source_commands[label] = (node, command)
             stores[label] = Store(root / label)
     excluded = set(args.exclude_thread)
     if os.environ.get("CODEX_THREAD_ID"):
         excluded.add(os.environ["CODEX_THREAD_ID"])
-    plan, conflicts, excluded = make_plan(stores, excluded)
+    reviewed = {}
+    for value in args.reviewed_continuation:
+        parts = value.split("=", 1)
+        require(len(parts) == 2 and all(parts), "Expected --reviewed-continuation THREAD_ID=SOURCE")
+        thread_id, label = parts
+        require(thread_id not in reviewed, "Duplicate reviewed continuation: " + thread_id)
+        reviewed[thread_id] = label
+    plan, conflicts, excluded = make_plan(stores, excluded, reviewed, home)
     report = {"destination": str(live), "host": socket.gethostname(), "sources": list(stores)[1:],
               "excluded": sorted(excluded), "threads": plan, "conflicts": conflicts}
     save_json(root / "plan.json", report)
     for entry in plan:
-        print("%s: %s [%s]" % (entry["kind"], entry["title"][:100], entry["node"]), flush=True)
+        print("Planned %s: %s [%s]" % (entry["kind"], entry["title"][:100], entry["node"]), flush=True)
+    for conflict in conflicts:
+        print("Conflict: %s [%s]: %s" % (conflict.get("title", conflict["id"]),
+                                        conflict["id"], conflict["reason"]), flush=True)
     require(not conflicts, "%d conflicts; no import performed. See %s" % (len(conflicts), root / "plan.json"))
     if not plan:
         save_json(root / "receipt.json", {"status": "up_to_date", "changed": 0})
@@ -542,8 +695,7 @@ def run(args):
             check_directory = root / (label + "-recheck")
             command = list(command)
             command[command.index("--snapshot-to") + 1] = str(check_directory)
-            subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "LogLevel=ERROR",
-                            node, shlex.join(command)], check=True, timeout=remote_timeout)
+            remote_snapshot(node, command, remote_timeout)
             fresh = Store(check_directory)
             require(fresh.schema == stores[label].schema, "Source schema changed: " + label)
             for thread_id in lock_ids:

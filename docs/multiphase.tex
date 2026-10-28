@@ -22,13 +22,12 @@
 \maketitle
 
 \section{Multiphase Formalism}
+\subsection{How we decompose the field}
 In general, the axion field around a black hole contains components with many different phases. In undertaking the adiabatic approximation it is important that we separate these components out. For a piece of the field with frequency $\omega$, azimuthal number $m$, and azimuthal coordinate $\varphi$, its oscillatory factor is\footnote{The below definition neglects the fact that $\omega$ can change over time. Later on we'll use the more accurate definition of $\psi \equiv \vartheta - m\varphi, \vartheta = \int_0^t \omega(\mathbf{A}(t'))dt'$.}
 \begin{equation}
     e^{-i\psi}, \quad \psi \equiv \omega t - m \varphi.
 \end{equation}
-Let us consider a field comprising $K$ independently oscillating bound axion modes $\ket{nlm}$, as well as the products of their possible interactions. We have one phase $\psi_i$ and one amplitude $A_i$\footnote{Defined through the asymptotic normalization of its fundamental radial profile; see Equation 20 of \cite{Omiya_2022} for details.} for each bound mode present in the cloud; we arrange these in vectors $\boldsymbol{\psi}, \mathbf{A}$. Axion-axion interactions source field components whose phases are integer combinations of the various $\psi$, which we separate by Fourier expansion of the field in $\psi$. We label each Fourier component by an integer vector $\mathbf{q} \equiv (q_1,\ldots,q_K)$. A component has an overall phase factor $e^{-i(\omega_\mathbf{q} t - m_\mathbf{q} \varphi)} = e^{-i\mathbf{q}\cdot\boldsymbol{\psi}}$, where $\omega_\mathbf{q} \equiv \mathbf{q} \cdot \boldsymbol{\omega}$ and $m_\mathbf{q} \equiv \mathbf{q} \cdot \mathbf{m}$. Since interactions can drive responses at different angular quantum numbers, each component also has an angular expansion with allowed indices $l \geq |m_\mathbf{q}|$. (In practice, we will truncate the set $L_\mathbf{q}$ for computability.)
-
-Here and below, $\omega_i$ and $\omega_{\mathbf q}$ are real phase frequencies. We distinguish them from the complex eigenfrequencies $\widetilde{\omega}_i = \omega_i + i\gamma_i$ used in radial matching; in the nonlinear regime, we do not assume that $\gamma_i = \dot A_i/A_i$.
+Here and below, the $\omega$ are real phase frequencies. We distinguish them from the complex eigenfrequencies $\widetilde{\omega}_i = \omega_i + i\gamma_i$ used in radial matching. Let us consider a field comprising $K$ independently oscillating bound axion modes $\ket{nlm}$, as well as the products of their possible interactions. We have one phase $\psi_i$ and one amplitude $A_i$\footnote{Defined through the asymptotic normalization of its fundamental radial profile; see Equation 20 of \cite{Omiya_2022} for details.} for each bound mode present in the cloud; we arrange these in vectors $\boldsymbol{\psi}, \mathbf{A}$. Axion-axion interactions source field components whose phases are integer combinations of the various $\psi$, which we separate by Fourier expansion of the field in $\psi$. We label each Fourier component by an integer vector $\mathbf{q} \equiv (q_1,\ldots,q_K)$. A component has an overall phase factor $e^{-i(\omega_\mathbf{q} t - m_\mathbf{q} \varphi)} = e^{-i\mathbf{q}\cdot\boldsymbol{\psi}}$, where $\omega_\mathbf{q} \equiv \mathbf{q} \cdot \boldsymbol{\omega}$ and $m_\mathbf{q} \equiv \mathbf{q} \cdot \mathbf{m}$. Since interactions can drive responses at different angular quantum numbers, each component also has an angular expansion with allowed indices $l \geq |m_\mathbf{q}|$. (In practice, we will truncate the set $L_\mathbf{q}$ for computability.)
 
 To write the field in terms of these components, we must introduce spatial profiles:
 \begin{equation}
@@ -40,12 +39,71 @@ where $L_\mathbf{q}$ is the set of retained angular indices, $\tilde{R}_{l,\math
 \end{equation}
 Note that the sum over $q$ considers only one of the two members of each complex conjugate pair $(\mathbf{q}, -\mathbf{q})$.
 
-\subsection{Approximations}
-The above formalism depends on two main approximations. First, in the adiabatic approximation, the radial profiles $F$ vary slowly compared to the oscillatory phases, so we neglect their time derivatives at leading order in the field equation. This is really the whole point of the adiabatic method~\cite{Omiya_2022,Omiya_2023}. Second, we truncate both the number of Fourier components and the angular expansion of each spatial profile. At present (2026-10-20) we work with the components $\{(1,0), (0,1), (2,-1), (-1,2)\}$ and only keep the leading $l$ for each. Once this toy model works, we'll add more Fourier components --- namely \(\{(3,0), (2,1), (1,2), (0,3)\}\); \cite{Omiya_2023} suggests these ought to have little effect in the perturbative regime, but who knows? Convergence under the inclusion of higher angular harmonics also remains untested.
+\subsection{Decomposition approximations}
+The above formalism depends on two main approximations. First, in the adiabatic approximation, the spatial profiles $F$ vary slowly compared to the oscillatory phases, so we neglect their time derivatives at leading order in the field equation. This is really the whole point of the adiabatic method~\cite{Omiya_2022,Omiya_2023}. Second, we truncate both the number of Fourier components and the angular expansion of each spatial profile. At present (2026-10-20) we work with the components $\{(1,0), (0,1), (2,-1), (-1,2)\}$ and only keep the leading $l$ for each. Once this toy model works, we'll add more Fourier components --- namely \(\{(3,0), (2,1), (1,2), (0,3)\}\); \cite{Omiya_2023} suggests these ought to have little effect in the perturbative regime, but who knows? Convergence under the inclusion of higher angular harmonics also remains untested.
 
 Beyond these two there's the larger issue of higher modes. Once the above truncations have been characterized, and we're comfortable with all the interesting stuff that we can glean from the two-mode formulation, we'll want to start adding other bound states. But I'm getting ahead of myself now :)
 
-\CW{TODO: explain radial equation solving/matching}
+\subsection{Equation of motion and other stuff}
+Following~\cite{Omiya_2022}, we work in the Kerr metric $g_{\mu\nu}$ specified by
+\begin{equation}
+    ds^2 = - \left(1 - \frac{2Mr}{\rho^2}\right)dt^2 - \frac{4aMr\sin^2\theta}{\rho^2} dt d\varphi + \left[(r^2 + a^2)\sin^2\theta + \frac{2Mr}{\rho^2}a^2 \sin^4\theta\right]d\varphi^2 + \frac{\rho^2}{\Delta}dr^2 + \rho^2 d\theta^2,
+\end{equation}
+with
+\begin{equation}
+    \Delta \equiv r^2 - 2Mr + a^2, \qquad \rho^2 \equiv r^2 + a^2 \cos^2 \theta.
+\end{equation}
+For the potential $V(\Phi)$, which we will usually take to be the QCD axion potential, define $U \equiv V/\mu^2$ for ease of calculation. Then the equation of motion is
+\begin{equation}
+    \Box \Phi - \mu^2 U'(\Phi) = 0.
+\end{equation}
+Working in units where $M=1$, we form the dimensionless version of the above by multiplying through by $M^2$. Further, we can separate out the mass term by defining $h(\Phi) = \Phi - U'(\Phi)$, obtaining
+\begin{equation}
+    \Box\Phi - \alpha^2\Phi + \alpha^2 h(\Phi) = 0.
+\end{equation}
+Expanding out the d'Alembertian,
+\begin{equation}
+    \begin{split}
+        \frac{1}{\rho^2}\bigg[\partial_r (\Delta \partial_r \Phi) &+ \frac{1}{\sin \theta} \partial_\theta (\sin \theta \partial_\theta \Phi) - \left(\frac{(r^2+a^2)^2}{\Delta} - a^2\sin^2\theta \right) \partial_t^2\Phi \\
+        &- \frac{4ar}{\Delta}\partial_t\partial_\varphi \Phi + \left(\frac{1}{\sin^2\theta}-\frac{a^2}{\Delta}\right)\partial_\varphi^2\Phi\bigg] - \alpha^2 \Phi + \alpha^2 h(\Phi) = 0.
+    \end{split}
+\end{equation}
+
+To evaluate the d’Alembertian on the multiphase expansion, first consider its action on one term \(F_{\mathbf q}(r,\theta;\mathbf A)e^{-i \omega_q t + i m_\mathbf{q}\varphi}\). At leading adiabatic order, we neglect time derivatives of the slow amplitudes and frequencies. The time and azimuthal derivatives acting on this term become \(\partial_t\rightarrow-i\omega_{\mathbf q}\) and \(\partial_\varphi\rightarrow im_{\mathbf q}\).
+\begin{equation}
+    \begin{split}
+        \frac{1}{\rho^2}\bigg[\partial_r (\Delta \partial_r F_\mathbf{q}) + \frac{1}{\sin \theta} \partial_\theta (\sin \theta \partial_\theta F_\mathbf{q}) &+ \left(\frac{(r^2+a^2)^2}{\Delta} - a^2\sin^2\theta \right) \omega_\mathbf{q}^2F_\mathbf{q} \\
+        &- \frac{4arm_\mathbf{q}\omega_\mathbf{q}}{\Delta} F_\mathbf{q} + \left(-\frac{m_\mathbf{q}^2}{\sin^2\theta}+\frac{a^2m_\mathbf{q}^2}{\Delta}\right)F_\mathbf{q}\bigg].
+    \end{split}
+\end{equation}
+Because the d’Alembertian is linear, its action on the full field is the sum of its actions on the individual components. Defining $\mathcal{D}_\mathbf{q}$ as shorthand for the differential expression in (9), we have
+\begin{equation}
+    \sum_\mathbf{q} e^{-i\mathbf{q}\cdot\boldsymbol{\psi}} (\mathcal{D}_\mathbf{q}F_\mathbf{q} - \alpha^2 F_\mathbf{q}) + \mathrm{c.c.} + \alpha^2 h(\Phi) = 0.
+\end{equation}
+The nonlinear term $h$ is still a function of the total real field from all components. To obtain the differential equation for a particular component, we multiply by $e^{+i\mathbf{q}\cdot\boldsymbol{\psi}}$ and average over all independent phases. Using \(\langle\cdot\rangle_{\boldsymbol\psi}\) to denote that average over phases, orthogonality gives us
+\begin{equation}
+    \mathcal{D}_\mathbf{q} F_\mathbf{q} - \alpha^2 F_\mathbf{q} + \alpha^2 \langle e^{+i\mathbf{q}\cdot\boldsymbol{\psi}} h(\Phi)\rangle_\psi = 0.
+\end{equation}
+Inserting (2), the definition of $F_\mathbf{q}$, we now project onto each retained polar harmonic. Set \(x=\cos\theta\), multiply the equation by \(\rho^2\bar Y_{l,|m_{\mathbf q}|}(x)\), and integrate over \(x\in[-1,1]\). This isolates the nonlinear source term,
+\begin{equation}
+    N_{l,\mathbf q} = \alpha^2\int_{-1}^{1}dx\, Y_{l,|m_{\mathbf q}|}(x)\,\rho^2 \left\langle e^{+i\mathbf q\cdot\boldsymbol\psi}h(\Phi) \right\rangle_{\boldsymbol\psi}.
+\end{equation}
+The remaining terms proportional to \(x^2\) combine into \(a^2(\omega_{\mathbf q}^2-\alpha^2)x^2F_{\mathbf q}\). Their projection mixes angular harmonics through the matrix
+\begin{equation}
+    C^m_{ll'} =\int_{-1}^{1} \bar Y_{l,|m|}(x)\,x^2\,\bar Y_{l',|m|}(x)\,dx.
+\end{equation}
+Collecting terms gives one radial equation for each retained pair \((l,\mathbf q)\):
+\begin{equation}
+    \boxed{ \frac{d}{dr}\left(\Delta\frac{d\tilde R_{l,\mathbf q}}{dr}\right) +B_{l,\mathbf q}\tilde R_{l,\mathbf q} +a^2(\omega_{\mathbf q}^2-\alpha^2) \sum_{l'\in L_{\mathbf q}} C^{m_{\mathbf q}}_{ll'}\tilde R_{l',\mathbf q} +N_{l,\mathbf q}=0,}
+\end{equation}
+where
+\begin{equation}
+    B_{l,\mathbf q} = \frac{\big[(r^2+a^2)\omega_{\mathbf q}-am_{\mathbf q}\big]^2}{\Delta} +2am_{\mathbf q}\omega_{\mathbf q} -a^2\omega_{\mathbf q}^2 -\alpha^2r^2-l(l+1).
+\end{equation}
+The linear angular coupling mixes different \(l\) values within a fixed phase component, while \(N_{l,\mathbf q}\), evaluated from the joint field, couples different phase components as well.
+
+\subsection{Solving the radial equation}
+\CW{next section introduces tortoise, $Q = dR/dr$, boundary conditions, matching, solutions}
 \vfill
 \pagebreak
 \bibliography{refs}

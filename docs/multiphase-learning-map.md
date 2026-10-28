@@ -1,9 +1,9 @@
 # Multiphase learning map
 
 Use this checklist to understand how the joint two-cloud calculation fits
-together, then work through its functions one at a time. It covers all 32
-top-level functions and three structs in `src/adiabatic/multiphase/` as of
-October 22, 2026. The diagrams describe the current implementation; the
+together, then work through its functions one at a time. It covers all 34
+top-level functions and four structs in `src/adiabatic/multiphase/` as of
+October 26, 2026. The diagrams describe the current implementation; the
 [organization proposal](multiphase-profile-organization.md) records the
 completed profile/coordinate migration and deferred interface changes.
 [HANDOFF.md](../HANDOFF.md) records implementation progress.
@@ -45,9 +45,15 @@ Radial integration advances through space at fixed trial frequencies and
 amplitudes. Amplitude evolution advances in time and repeatedly solves a new
 radial matching problem. These are separate integration loops.
 
+The current deliverable is the primary/secondary radial-profile overlay with
+joint nonlinear deformation. Its next calculation follows the setup and
+matching route. The charge, response, and evolution stages show the wider
+project's calculation.
+
 ## Objects to recognize first
 
-- [ ] `TwoPhaseProblem` — fixed background, components, quadrature, integration settings, coefficient scale, free indices, and reference boundary branches. Defined in [profiles.jl](../src/adiabatic/multiphase/profiles.jl).
+- [ ] `TwoPhaseSourceBasis` — fixed mode order, angular/phase basis matrix, quadrature weights, and squared polar nodes, built once and reused for source evaluations. It stores no radial coefficients or evaluated source. Defined in [projection.jl](../src/adiabatic/multiphase/projection.jl).
+- [ ] `TwoPhaseProblem` — fixed background, components, quadrature, source basis, integration settings, coefficient scale, free indices, and reference boundary branches. Defined in [profiles.jl](../src/adiabatic/multiphase/profiles.jl).
 - [ ] `TwoPhaseProfile` — two complex frequencies and physical boundary coefficients for a trial or matched profile; sampled radial functions are produced by integration. Defined in [profiles.jl](../src/adiabatic/multiphase/profiles.jl).
 - [ ] `TwoPhaseMatchedSolution` — packed state, prescribed amplitudes, and convergence diagnostics. Defined in [response.jl](../src/adiabatic/multiphase/response.jl); the current corrector still returns a named tuple with these fields.
 
@@ -59,10 +65,13 @@ samples.
 
 ## Function checklist in reading order
 
-The groups follow the calculation's ingredients. Groups 1 and 2 and the
-matching-residual interface in group 4 are checked off. Resume inside that
-matching call with `component_boundary_state`, then follow radial integration
-into the linear operator and the joint nonlinear source in groups 3 and 4.
+The groups follow the calculation's ingredients. We have been discussing the
+precomputed source basis, matrix source evaluation, and local Jacobian in
+group 3. The specialized derivative method and Newton options are now present.
+The assistant's driver additions were removed at the user's request; resume
+toward another convergence test one reviewed block at a time.
+The radial-matching walkthrough below remains a guide for
+returning to group 4.
 
 ### 1 Labels and retained components
 
@@ -88,11 +97,39 @@ Check: [test_response_coordinates.jl](../tests/adiabatic/multiphase/test_respons
 Source: [projection.jl](../src/adiabatic/multiphase/projection.jl).
 Checks: [test_phase_separation.jl](../tests/adiabatic/multiphase/test_phase_separation.jl),
 [test_nonlinear_source.jl](../tests/adiabatic/multiphase/test_nonlinear_source.jl),
+[test_source_basis.jl](../tests/adiabatic/multiphase/test_source_basis.jl),
 and [test_source_validation.jl](../tests/adiabatic/multiphase/test_source_validation.jl).
 
 - [X] `reconstruct_two_phase_field_at_radius` — reconstruct the joint real field on polar and phase nodes at one radius.
 - [X] `two_phase_field_component_coefficients` — extract requested angular and phase coefficients from a sampled field.
-- [X] `nonlinear_two_phase_source` — evaluate the nonlinear remainder of the joint field and project it onto retained or requested components.
+- [ ] `build_two_phase_source_basis` — precompute the angular/phase patterns and quadrature data in the retained mode order.
+- [X] `nonlinear_two_phase_source` — reconstruct the joint field, evaluate its nonlinear remainder, and project onto the modes in the required source basis; inputs and outputs are packed real vectors.
+- [ ] `local_source_jacobian` — return the source and its derivatives with respect to the packed radial coefficients, radius, spin, and coupling, holding the source basis fixed.
+
+By default, `TwoPhaseProblem` calls `build_two_phase_source_basis` once at construction.
+The resulting `TwoPhaseSourceBasis` stores the mode labels, basis matrix,
+quadrature weights, and squared polar nodes. Radial integration reuses it;
+the source function reconstructs and projects with matrix products. The
+general reconstruction and projection functions above remain available for
+diagnostics and the direct-quadrature test reference. `local_source_jacobian`
+calculates derivatives at one radius; the specialized ForwardDiff source
+method now uses it to propagate incoming derivatives.
+
+The source interface is now
+`nonlinear_two_phase_source(parameters, source_basis; potential=:cosine)`.
+For `n` modes, `parameters` holds `n` real coefficient parts, `n` imaginary
+parts, then radius, spin, and coupling. The output has `2n` real entries in
+the same coefficient order. Include every mode to be projected onto in the
+basis, assigning zero input coefficients to modes absent from the trial field.
+There is one source implementation, with no dictionary method or uncached
+fallback.
+
+`local_source_jacobian` differentiates source coefficients with respect to
+these local inputs. `reconstruct_two_phase_field_derivatives` in group 5
+instead takes spacetime derivatives of the reconstructed field for the stress
+tensor. Ordinary source evaluation uses the matrix calculation directly;
+the `Dual{Tag,Float64,N}` method uses the explicit local Jacobian and applies
+the chain rule. Other numeric types retain the generic matrix calculation.
 
 ### 4 Radial equations and matching a trial
 
@@ -105,7 +142,7 @@ and [test_nonlinear_matching.jl](../tests/adiabatic/multiphase/test_nonlinear_ma
 
 - [ ] `component_tortoise_operator` — assemble one component's linear radial operator, including mixing between its angular harmonics.
 - [ ] `component_boundary_state` — turn leading boundary coefficients into endpoint values and tortoise slopes.
-- [ ] `nonlinear_two_phase_rhs!` — combine linear operators and the joint nonlinear source to fill the radial derivatives.
+- [ ] `nonlinear_two_phase_rhs!` — combine linear operators and the joint nonlinear source using the required source basis; verify mode order and fill the radial derivatives.
 - [X] `two_phase_matching_residual` — integrate from both boundaries and compare at the matching radius; optionally return both radial histories.
 - [ ] `solve_two_phase_mode` — solve matching at two prescribed amplitudes using the standalone complex-coordinate interface to real Newton iteration.
 
@@ -152,7 +189,7 @@ Checks: [test_evolution.jl](../tests/adiabatic/multiphase/test_evolution.jl) and
 The handoff records an unresolved return-field mismatch in `test_evolution.jl`.
 
 - [ ] `two_cloud_balance_rates` — solve the two balance equations for logarithmic amplitude rates, with scaling and conditioning diagnostics.
-- [ ] `two_phase_evolution_sample` — combine a corrected profile, charge response, losses, and amplitude rates at one pair of amplitudes.
+- [ ] `two_phase_evolution_sample` — combine a corrected profile, charge response, losses, and logarithmic amplitude rates at one pair of amplitudes.
 - [ ] `evolve_two_phase` — take midpoint steps in logarithmic amplitudes, correcting profiles at each stage and tracking charge budgets.
 - [ ] `evolve_two_phase_to_amplitude` — repeat steps until the primary amplitude reaches a target or another stopping condition applies.
 
@@ -164,10 +201,11 @@ arrows denote calls through locally defined closures or supplied callbacks.
 In particular, `evolve_two_phase` receives an `evaluate_sample` callback;
 the campaign binds it to `two_phase_evolution_sample`.
 
-All 32 multiphase functions appear below, grouped by source file. Selected
+All 34 multiphase functions appear below, grouped by source file. Selected
 `core/` functions explain the numerical delegation; the table below supplies
 other shared dependencies. Standard-library operations and output callbacks
-are omitted. Constructors and loader includes are separate from this call map.
+are omitted. `TwoPhaseProblem` construction is shown because it builds the
+source basis by default; other constructors and loader includes are omitted.
 
 ```mermaid
 flowchart TD
@@ -185,6 +223,7 @@ flowchart TD
         sensitivity["two_phase_profile_response"]
     end
     subgraph profiles["profiles.jl"]
+        problem["TwoPhaseProblem construction"]
         indices["two_phase_coefficient_indices"]
         validate["check_cloud_amplitudes_and_coefficient_scale_validity"]
         pack["pack_two_phase_profile"]
@@ -198,7 +237,9 @@ flowchart TD
         operator["component_tortoise_operator"]
     end
     subgraph projection["projection.jl"]
+        basis["build_two_phase_source_basis"]
         source["nonlinear_two_phase_source"]
+        sourcejac["local_source_jacobian"]
         reconstruct["reconstruct_two_phase_field_at_radius"]
         project["two_phase_field_component_coefficients"]
         polar["build_polar_theta_derivatives"]
@@ -246,18 +287,19 @@ flowchart TD
     unpack --> indices
     unpack --> validate
     solve --> indices
+    solve --> problem
     solve -. unpack_profile .-> unpack
     solve --> realnewton
     realnewton -. residual closure .-> matching
-    matching --> boundary
+    matching -. assemble_boundary .-> boundary
     matching --> integrate
     integrate -. rhs callback .-> rhs
     rhs --> operator
     rhs --> source
+    source -->|Float64 Dual inputs| sourcejac
     operator --> numbers
     boundary --> numbers
-    source --> reconstruct
-    source --> project
+    problem --> basis
     total --> ordered
     total --> branch
     branch --> localobs
@@ -273,6 +315,13 @@ incoming library arrows because callers outside this folder use them for
 setup. `two_phase_potential_energy_density` is a separate diagnostic; the
 full observable calculation includes potential energy through
 `scalar_stress_tensor`.
+
+`two_phase_field_component_coefficients` has no incoming production arrows:
+the projector supplies the direct-quadrature test reference. The conditional
+source-to-Jacobian arrow denotes the specialized ForwardDiff method.
+`nonlinear_two_phase_source` performs
+reconstruction and projection directly with the stored matrix, so it has no
+call arrows to the general reconstruction/projector functions.
 
 The two correction routes currently coexist. `solve_two_phase_mode` accepts
 separate physical guesses and settings, and calls `real_newton` with complex
@@ -298,18 +347,27 @@ function, rather than expanding the reading list all at once.
 | [core/quadrature.jl](../src/adiabatic/core/quadrature.jl) | `integrate_uniform` | Radial integration of charge densities |
 
 [`load.jl`](../src/adiabatic/multiphase/load.jl) defines no functions. It loads
-`core/`, then components, radial, profiles, projection, observables, response,
-and evolution once into the calling module. Include order is distinct from
-call order: function bodies can refer to functions defined by a later include.
+`core/`, then components, projection, radial, profiles, observables, response,
+and evolution once into the calling module. Projection now precedes radial
+and profiles so `TwoPhaseSourceBasis` exists when their type annotations are
+evaluated. Include order is distinct from call order: function bodies can
+refer to functions defined by a later include, but signature types must
+already be defined.
 
 ## Current place to resume
 
-Progress through October 21, recorded October 22: your eight checked functions
-cover the three label helpers, the four profile-coordinate helpers, and
-`two_phase_matching_residual`. Its check records the physical matching
-interface and orchestration; the boundary, radial-operator, and nonlinear-source
-helpers it calls remain separate walkthrough items. The three object boxes
-remain unmarked pending your own review.
+**Important architecture follow-up:** the user wants to revisit the source,
+Jacobian, and differentiation adapter together to prevent bloat. The next
+convergence test remains the immediate priority. See the persistent
+[architecture-review note](../HANDOFF.md#important-revisit-multiphase-architecture).
+
+Updated October 26: the library changes remain, but the assistant's driver
+additions were rolled back. The user subsequently added the reviewed one-line
+full-width batching option; v5 job 27304701 exhausted 12 corrections at
+scaled residual 1.49475e8 and saved no joint solution. Continue
+walking through each block. Existing understanding checkboxes are
+preserved. The new basis type, builder, and local-Jacobian entries start
+unchecked for your review; implementation and tests do not mark them understood.
 
 The profile-coordinate migration is complete for this pass. Packing and
 unpacking use `TwoPhaseProfile` and `TwoPhaseProblem`; physical matching takes
@@ -318,19 +376,38 @@ live driver uses the shared coefficient-index helper. The old tuple unpacker
 and packed matching wrapper are removed. The corrected driver passes its
 already-packed guess directly to the admissibility check.
 
-On October 21, all 97 focused coordinate, physical matching, and
-integrated-observables checks passed after cleanup; the preceding
-standalone-solver migration passed 20 nonlinear matching checks. These are
-algorithm/interface checks, not evidence of physical spatial convergence.
-The full suite and campaign were not rerun. See the handoff for the unresolved
-response-versus-standalone admissibility rules and evolution-test return-field
-mismatch.
+The source basis is now required and connected through radial integration,
+matching, and response calculations. `TwoPhaseProblem` builds it once by
+default and reuses it while mode order and angular/phase settings remain fixed.
+`local_source_jacobian` returns the source and its `2n` by `(2n + 3)` derivative
+matrix for `n` retained modes. The specialized source method applying this
+matrix to incoming ForwardDiff directions has now been added.
+Newton exposes chunk-size and accepted-state callback options; the driver now
+uses full-width batching, but does not save accepted iterates.
+Job 27296945 timed the full-domain Jacobian at 92.51 s,
+but stopped before Newton on a directional-derivative discrepancy. See the
+[current handoff](../HANDOFF.md#resume-here-direct-mutual-deformation-profiles-and-source-optimization-october-26)
+before choosing the next run; do not reintroduce driver machinery without
+walking through it with the user.
 
-### Next walkthrough: one trial through radial matching
+During the October 26 basis integration, 388 checks passed through source,
+radial integration, Newton matching, observables, and profile coordinates.
+The broader suite then stopped on two existing evolution-test errors:
+`test_evolution.jl` expects `amplitude_rates`, but `two_cloud_balance_rates`
+returns `log_rates`. After the source-basis rename, 147 focused source,
+radial, matching, and profile-coordinate checks passed again. These are
+algorithm/interface checks; full-domain runtime and physical spatial
+convergence remain unverified. No new production solve was submitted.
+See the handoff for the unresolved response-versus-standalone admissibility
+rules and the evolution return-field mismatch.
+
+### Radial-matching walkthrough to return to
 
 Start with a `TwoPhaseProfile` and fixed `TwoPhaseProblem`. The profile contains
 two trial frequencies and physical coefficients at both boundaries; any
 prescribed outer amplitudes have already been inserted during unpacking.
+The problem already holds the source basis built from its fixed mode order
+and angular/phase grids.
 One matching evaluation follows this route:
 
 1. **Build endpoint states.** The local `assemble_boundary` closure in
@@ -347,7 +424,8 @@ One matching evaluation follows this route:
    `match` and from `outer` to `match`, all in tortoise radius. Each RK4 stage
    calls `nonlinear_two_phase_rhs!` on the full joint state. Frequencies remain
    fixed during these integrations. The linear operator mixes angular entries
-   within one component; the nonlinear source is reconstructed from all of them.
+   within one component; the nonlinear source is reconstructed from all of them
+   using the same source basis at every stage.
 4. **Compare at the match.** Return `[R_from_horizon-R_from_outer;
    Q_from_horizon-Q_from_outer]` in the same flattened mode order. With N
    retained radial modes, this is 2N complex mismatches. A trial need not match;
@@ -358,7 +436,7 @@ One matching evaluation follows this route:
    but the outer history runs toward decreasing radius. Both matching-point
    states are retained, including any residual mismatch.
 
-The first function to discuss and revise is `component_boundary_state` in
+When returning to the boundary helpers, start with `component_boundary_state` in
 [radial.jl](../src/adiabatic/multiphase/radial.jl). Follow its horizon/outer
 helpers in [core/boundaries.jl](../src/adiabatic/core/boundaries.jl) as needed.
 A useful checkpoint is that doubling a component's leading coefficients at

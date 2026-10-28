@@ -48,7 +48,8 @@ function logged_profile_newton(residual, initial; tolerance, max_iterations,
     end
 
     solution = newton_solve(logged_residual, initial; tolerance, max_iterations,
-        admissible, progress_callback, jacobian_backend=:forwarddiff)
+        admissible, progress_callback, jacobian_backend=:forwarddiff,
+        jacobian_chunk_size=length(initial))
     report("Newton converged after $(solution.iterations) corrections")
     return solution
 end
@@ -247,7 +248,7 @@ else
 
         # Use the same residual, admissibility check, and Newton settings as
         # correct_two_phase_profile, with timing around each residual evaluation.
-        matching_residual = state -> two_phase_real_residual(state, cloud_amplitudes, problem)
+        matching_residual = state -> two_phase_real_matching_residual(state, cloud_amplitudes, problem)
         admissible = state -> two_phase_profile_admissible(state, problem)
         newton_solution = logged_profile_newton(matching_residual, packed_guess;
             tolerance=matching_tolerance, max_iterations=maximum_newton_iterations,

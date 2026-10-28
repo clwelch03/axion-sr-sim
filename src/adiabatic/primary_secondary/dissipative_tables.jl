@@ -77,7 +77,7 @@ end
 
 function dissipative_fluxes(primary_path, secondary_path, energy_path, output_path;
                             dissipative_modes=DISSIPATIVE_MODES, maximum_points=nothing)
-    setup = load_secondary_setup(primary_path)
+    setup = load_primary_secondary_setup(primary_path)
     (; primary, secondary_modes, grid, polar, azimuthal, couplings) = setup
     secondary_branch = deserialize(secondary_path)
     get(secondary_branch, :reading, "fixed_time") == "averaged" ||

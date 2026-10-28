@@ -1,12 +1,12 @@
 using Serialization, Printf, LinearAlgebra
 
 """
-    load_secondary_setup(primary_path; secondary_modes=[(2, 2), (4, 2), (6, 2)])
+    load_primary_secondary_setup(primary_path; secondary_modes=[(2, 2), (4, 2), (6, 2)])
 
 Read a primary branch checkpoint and build angular tables covering both the
 primary's and the secondary's modes.
 """
-function load_secondary_setup(primary_path; secondary_modes=[(2, 2), (4, 2), (6, 2)])
+function load_primary_secondary_setup(primary_path; secondary_modes=[(2, 2), (4, 2), (6, 2)])
     primary = deserialize(primary_path)
     maximum_l = max(maximum(first, primary.modes), maximum(first, secondary_modes))
     grid = angular_grid(primary.n_polar, primary.n_azimuth)
@@ -107,7 +107,7 @@ falls below the floor.
 function continue_secondary(primary_path, output_prefix; tolerance=1e-8,
                             ulp_tolerance_factor=nothing, jacobian_backend=:forwarddiff,
                             reading=:averaged, maximum_points=nothing)
-    setup = load_secondary_setup(primary_path)
+    setup = load_primary_secondary_setup(primary_path)
     (; primary, secondary_modes, couplings) = setup
     settings = (; tolerance, ulp_tolerance_factor, jacobian_backend=String(jacobian_backend),
                   reading=String(reading))

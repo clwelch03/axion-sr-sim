@@ -21,7 +21,7 @@ cases = (("runs/adiabatic/fig2_20260922/results/cosine_branch.jls", 60, 0.426645
          ("runs/adiabatic/multimode_secondary/results/alpha030_cosine_branch.jls", 83, 0.300859))
 
 for (path, index, frequency) in cases
-    setup = load_secondary_setup(joinpath(@__DIR__, "../..", path))
+    setup = load_primary_secondary_setup(joinpath(@__DIR__, "../..", path))
     (; primary, grid) = setup
     polar = build_polar_values(9, grid.cosine_theta_nodes)
     azimuthal = build_azimuthal_values(9, grid.azimuth_nodes)

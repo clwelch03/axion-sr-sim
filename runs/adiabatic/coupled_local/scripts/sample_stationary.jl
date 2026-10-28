@@ -13,7 +13,7 @@ function sample_stationary(output_directory; targets_path=nothing)
     initial_primary = only(filter(entry -> entry.row.label == "baseline_half_step",primary_saved.entries))
     initial_secondary = only(filter(entry -> entry.row.label == "baseline_half_step",secondary_saved.entries))
     source_path = joinpath(repository,primary_saved.metadata.seed_path)
-    setup = load_secondary_setup(source_path)
+    setup = load_primary_secondary_setup(source_path)
     amplitude0 = initial_primary.row.amplitude
     amplitude_radius, alpha_radius, spin_radius = 0.02, 1e-4, 1e-4
     targets = isnothing(targets_path) ? [

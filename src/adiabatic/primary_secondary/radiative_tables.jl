@@ -63,7 +63,7 @@ function radiative_fluxes(primary_path, secondary_path, energy_path, output_path
                           maximum_l=7, maximum_points=nothing)
     isodd(maximum_l) && maximum_l >= 3 || error("maximum_l must be odd and at least 3")
     radiative_modes = [(l, 3) for l in 3:2:maximum_l]
-    setup = load_secondary_setup(primary_path)
+    setup = load_primary_secondary_setup(primary_path)
     (; primary, secondary_modes, grid) = setup
     # Angular tables covering the m = 3 modes as well as the primary and secondary.
     table_l = max(maximum_l, maximum(first, primary.modes), maximum(first, secondary_modes))

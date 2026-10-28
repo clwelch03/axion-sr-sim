@@ -1,7 +1,7 @@
 using Serialization, Printf
 
 function secondary_energies(primary_path, secondary_path, output_path; maximum_points=nothing)
-    setup = load_secondary_setup(primary_path)
+    setup = load_primary_secondary_setup(primary_path)
     (; primary, secondary_modes, grid, polar, azimuthal, couplings) = setup
     secondary_branch = deserialize(secondary_path)
     get(secondary_branch, :reading, "fixed_time") == "averaged" ||

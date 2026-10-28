@@ -9,7 +9,7 @@ using Printf
 include(joinpath(@__DIR__, "../../../src/adiabatic/primary_secondary/load.jl"))
 
 primary_path = joinpath(@__DIR__, "../../../runs/adiabatic/fig2_20260922/results/cosine_branch.jls")
-setup = load_secondary_setup(primary_path)
+setup = load_primary_secondary_setup(primary_path)
 (; primary, grid, polar, azimuthal) = setup
 match = primary.options.match
 

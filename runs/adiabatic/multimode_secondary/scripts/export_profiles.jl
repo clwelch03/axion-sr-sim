@@ -16,7 +16,7 @@ primary_path = isempty(tag) ?
 secondary_path = joinpath(campaign, isempty(tag) ? "results/cosine_secondary.jls" :
                                                    "results/$(tag)_cosine_secondary.jls")
 output_path = joinpath(campaign, isempty(tag) ? "work/profiles.csv" : "work/$(tag)_profiles.csv")
-setup = load_secondary_setup(primary_path)
+setup = load_primary_secondary_setup(primary_path)
 secondary_branch = deserialize(secondary_path)
 secondary_branch.reading == "averaged" || error("expected the averaged secondary branch")
 (; primary, secondary_modes, grid, polar, azimuthal, couplings) = setup

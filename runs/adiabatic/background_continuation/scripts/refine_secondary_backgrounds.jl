@@ -9,7 +9,7 @@ function refine_secondary_backgrounds()
     primary_path = joinpath(@__DIR__, "../results/amplitude2052/nearby_backgrounds.jls")
     response_path = joinpath(@__DIR__, "../results/amplitude2052/secondary/secondary_backgrounds.jls")
     nearby, responses = deserialize(primary_path), deserialize(response_path)
-    setup = load_secondary_setup(joinpath(repository, nearby.metadata.seed_path))
+    setup = load_primary_secondary_setup(joinpath(repository, nearby.metadata.seed_path))
     primary_modes, secondary_modes = setup.primary.modes, setup.secondary_modes
     dissipative_modes, radiative_modes = responses.metadata.dissipative_modes, responses.metadata.radiative_modes
     grid = setup.grid

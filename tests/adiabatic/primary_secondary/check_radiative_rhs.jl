@@ -15,7 +15,7 @@ include(joinpath(@__DIR__, "../../../src/adiabatic/primary_secondary/load.jl"))
 primary_path = joinpath(@__DIR__, "../../../runs/adiabatic/fig2_20260922/results/cosine_branch.jls")
 secondary_path = joinpath(@__DIR__, "../../../runs/adiabatic/multimode_secondary/results/cosine_secondary.jls")
 
-setup = load_secondary_setup(primary_path)
+setup = load_primary_secondary_setup(primary_path)
 (; primary, secondary_modes, grid) = setup
 # Tables up to l = 9, for the m = 3 modes and the parity check.
 maximum_l = 9

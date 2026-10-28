@@ -14,7 +14,7 @@ include(joinpath(@__DIR__, "../../../src/adiabatic/primary_secondary/load.jl"))
 results = joinpath(@__DIR__, "../../../runs/adiabatic/multimode_secondary/results")
 primary_path = joinpath(@__DIR__, "../../../runs/adiabatic/fig2_20260922/results/cosine_branch.jls")
 
-setup = load_secondary_setup(primary_path)
+setup = load_primary_secondary_setup(primary_path)
 (; primary, secondary_modes, grid, polar, azimuthal, couplings) = setup
 secondary_branch = deserialize(joinpath(results, "cosine_secondary.jls"))
 dissipative_modes = [(0, 0), (2, 0), (4, 0)]

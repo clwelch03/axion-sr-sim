@@ -12,7 +12,7 @@ using Printf, Serialization, LinearAlgebra
 include(joinpath(@__DIR__, "../../../src/adiabatic/primary_secondary/load.jl"))
 
 results = joinpath(@__DIR__, "../../../runs/adiabatic/multimode_secondary/results")
-setup = load_secondary_setup(joinpath(results, "alpha030_cosine_branch.jls"))
+setup = load_primary_secondary_setup(joinpath(results, "alpha030_cosine_branch.jls"))
 (; primary, secondary_modes, grid, polar, azimuthal, couplings) = setup
 secondary_branch = deserialize(joinpath(results, "alpha030_cosine_secondary.jls"))
 energies = read_secondary_energies(joinpath(results, "alpha030_cosine_secondary_energy.csv"))

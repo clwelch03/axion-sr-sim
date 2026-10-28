@@ -16,7 +16,7 @@ include(joinpath(@__DIR__, "../../../src/adiabatic/primary_secondary/load.jl"))
 results = joinpath(@__DIR__, "../../../runs/adiabatic/multimode_secondary/results")
 primary_path = joinpath(@__DIR__, "../../../runs/adiabatic/fig2_20260922/results/cosine_branch.jls")
 
-setup = load_secondary_setup(primary_path)
+setup = load_primary_secondary_setup(primary_path)
 (; primary, secondary_modes, grid) = setup
 polar = build_polar_values(7, grid.cosine_theta_nodes)
 azimuthal = build_azimuthal_values(7, grid.azimuth_nodes)

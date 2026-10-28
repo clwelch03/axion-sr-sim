@@ -1,6 +1,6 @@
 """
     TwoPhaseProblem{Components, Couplings, PolarValues, Grid,
-        Phase1Nodes, Phase2Nodes, Integration}
+        Phase1Nodes, Phase2Nodes, SourceBasis, Integration}
 
 Fixed physical and numerical settings shared by two-cloud profile
 correction, response calculations, and evolution.
@@ -12,6 +12,8 @@ Fields:
 - `couplings`, `polar_values`, `grid`: angular coupling data, polar basis
   values, and angular quadrature.
 - `phase1_nodes`, `phase2_nodes`: sampling nodes for the two independent phases.
+- `source_basis`: fixed reconstruction/projection data, built once from the
+  retained mode order and angular/phase grids when this problem is constructed.
 - `potential`: nonlinear potential choice.
 - `coefficient_scale`: positive scale used to normalize boundary coefficients
   and matching residuals; held fixed as cloud amplitudes vary.
@@ -24,14 +26,17 @@ Fields:
 
 The driver calculates the coefficient indices and reference boundary branches,
 constructs this object with keywords, and validates the settings. The constructor
-stores the supplied fields without performing those calculations or checks.
+stores the supplied fields and builds the source basis by default, without
+performing those driver calculations or checks. A supplied basis must match
+the retained mode order, cloud m values, polar table, and phase grids. Rebuild
+the problem/basis if those settings change; treat its arrays as read-only.
 
 Trial frequencies, boundary coefficients, and current cloud amplitudes are
 supplied separately; this object does not contain a solved profile.
 """
 Base.@kwdef struct TwoPhaseProblem{
     Components, Couplings, PolarValues, Grid,
-    Phase1Nodes, Phase2Nodes, Integration
+    Phase1Nodes, Phase2Nodes, SourceBasis<:TwoPhaseSourceBasis, Integration
 }
     # Background and retained modes
     spin::Float64
@@ -45,6 +50,9 @@ Base.@kwdef struct TwoPhaseProblem{
     grid::Grid
     phase1_nodes::Phase1Nodes
     phase2_nodes::Phase2Nodes
+    source_basis::SourceBasis = build_two_phase_source_basis(
+        [(l, component.q) for component in components for l in component.l_values],
+        cloud_m, polar_values, grid, phase1_nodes, phase2_nodes)
 
     # Nonlinear potential and numerical coordinates
     potential::Symbol
@@ -54,34 +62,6 @@ Base.@kwdef struct TwoPhaseProblem{
     # Boundary branches and radial integration settings
     initial_bound::BitVector
     integration::Integration
-end
-
-"""
-    TwoPhaseProfile(frequencies, horizon_coefficients, outer_coefficients)
-
-Frequencies and physical boundary coefficients specifying a guess at, or a
-converged profile of, the two-cloud system.
-
-- `frequencies`: the two complex cloud frequencies, in cloud order. Each
-  Fourier component's frequency is their combination specified by component.q.
-- `horizon_coefficients`: one physical horizon coefficient per retained radial
-  mode, ordered by component and then by that component's l_values.
-- `outer_coefficients`: one physical outer coefficient per retained radial
-  mode, in the same order. Includes the two prescribed amplitudes at the first
-  retained angular harmonic of q=(1,0) and q=(0,1).
-
-All three fields are vectors of Complex{T}, with a shared real numeric type T.
-Boundary coefficients retain their physical normalization. Use
-pack_two_phase_profile(profile, problem) to select the free outer coefficients,
-scale the boundary coefficients, and pack the unknowns into a real solver vector.
-
-This object stores boundary data rather than sampled radial functions.
-Construction does not integrate the radial equations or verify matching.
-"""
-struct TwoPhaseProfile{T<:Real}
-    frequencies::Vector{Complex{T}}
-    horizon_coefficients::Vector{Complex{T}}
-    outer_coefficients::Vector{Complex{T}}
 end
 
 """
@@ -118,6 +98,118 @@ function pack_two_phase_profile(profile::TwoPhaseProfile, problem::TwoPhaseProbl
 end
 
 """
+    predict_two_phase_amplitude(seed, amplitude; cloud_index=2)
+
+Change one prescribed amplitude using weak-cloud scaling: boundary coefficients
+scale by the amplitude ratio to `abs(q[cloud_index])`, and frequencies stay fixed.
+Residual weights use ONE power of the ratio for every dependent mode, including
+higher harmonics, as in the seed normalization. Leave the seed arrays unchanged.
+"""
+function predict_two_phase_amplitude(seed, amplitude; cloud_index=2)
+    cloud_index in (1, 2) || throw(ArgumentError("cloud_index must be 1 or 2"))
+    isfinite(amplitude) && amplitude > 0 ||
+        throw(ArgumentError("require a positive finite amplitude"))
+    ratio = amplitude / seed.cloud_amplitudes[cloud_index]
+    mode_labels = seed.problem.source_basis.mode_labels
+    factors = [ratio^abs(q[cloud_index]) for (_, q) in mode_labels]
+    profile = TwoPhaseProfile(copy(seed.profile.frequencies),
+        factors .* seed.profile.horizon_coefficients,
+        factors .* seed.profile.outer_coefficients)
+    cloud_amplitudes = copy(seed.cloud_amplitudes)
+    cloud_amplitudes[cloud_index] = amplitude
+    residual_weights = seed.residual_weights .* repeat(
+        [q[cloud_index] == 0 ? 1.0 : ratio for (_, q) in mode_labels], 4)
+    return (; profile, cloud_amplitudes, residual_weights)
+end
+
+# Physics-specific correction; stepping and persistence live in core/continuation*.
+function correct_two_phase_amplitude(problem::TwoPhaseProblem, prediction;
+        tolerance=1e-5, max_iterations=20, accepted_state_callback=nothing)
+    (; profile, cloud_amplitudes, residual_weights) = prediction
+    initial_state = pack_two_phase_profile(profile, problem)
+    residual = state -> two_phase_real_matching_residual(
+        state, cloud_amplitudes, problem) ./ residual_weights
+    admissible = state -> two_phase_profile_admissible(state, problem)
+    solution = newton_solve(residual, initial_state; tolerance, max_iterations,
+        admissible, accepted_state_callback, jacobian_backend=:forwarddiff,
+        jacobian_chunk_size=length(initial_state))
+    profile = unpack_two_phase_profile(solution.state, cloud_amplitudes, problem)
+    return (; problem, cloud_amplitudes, residual_weights, solution, profile)
+end
+
+# Run outside the retry block: a failed fresh integration must stop the run.
+function validate_two_phase_amplitude(point; tolerance)
+    radial_result = two_phase_matching_residual(
+        point.profile, point.problem; save_radial_result=true)
+    mismatch = pack_complex(radial_result.residual) ./
+        point.problem.coefficient_scale ./ point.residual_weights
+    weighted_residual_norm = norm(mismatch)
+    weighted_residual_norm <= tolerance || error(
+        "Fresh integration exceeds the matching tolerance: $weighted_residual_norm")
+    all(isfinite, radial_result.from_horizon.states) &&
+        all(isfinite, radial_result.from_outer.states) ||
+        error("Fresh integration contains nonfinite radial samples")
+    return (; point..., radial_result, weighted_residual_norm)
+end
+
+"""
+    continue_two_phase_amplitude(seed, output_prefix; target_amplitude, kwargs...)
+
+Continue one cloud's amplitude from a saved matched seed, keeping the other
+amplitude and the problem fixed. The seed contains `problem`, `cloud_amplitudes`,
+`residual_weights`, `profile`, and `weighted_residual_norm`.
+
+Each attempt saves its latest Newton iterate to `output_prefix-attemptN-accepted.jls`.
+Only a converged, freshly reintegrated point is saved to `output_prefix-attemptN.jls`,
+using the original seed schema. Refuse existing attempt files. To restart, supply
+a matched point and a fresh prefix; return the last matched point.
+
+The core driver controls adaptive steps. `cloud_index=2`, `tolerance=1e-5`, and
+`max_iterations=20` preserve the two-cloud campaign defaults and full-width AD.
+Other keywords configure [`continue_amplitude`](@ref).
+"""
+function continue_two_phase_amplitude(seed, output_prefix; target_amplitude,
+        cloud_index=2, tolerance=1e-5, max_iterations=20, log_io=stdout, kwargs...)
+    cloud_index in (1, 2) || throw(ArgumentError("cloud_index must be 1 or 2"))
+    isfinite(tolerance) && tolerance > 0 ||
+        throw(ArgumentError("require a positive finite tolerance"))
+    check_cloud_amplitudes_and_coefficient_scale_validity(
+        seed.cloud_amplitudes, seed.problem.coefficient_scale)
+    isfinite(seed.weighted_residual_norm) && seed.weighted_residual_norm <= tolerance ||
+        throw(ArgumentError("seed must satisfy the weighted matching tolerance"))
+    length(seed.residual_weights) == 4length(seed.problem.source_basis.mode_labels) ||
+        throw(DimensionMismatch("require four residual weights per radial mode"))
+    all(value -> isfinite(value) && value > 0, seed.residual_weights) ||
+        throw(ArgumentError("require positive finite residual weights"))
+
+    attempt_prefix(attempt) = output_prefix * "-attempt$(attempt)"
+    function correct(previous, target, attempt)
+        prefix = attempt_prefix(attempt)
+        any(ispath(prefix * suffix) for suffix in
+            ("-accepted.jls", "-accepted.jls.tmp", ".jls", ".jls.tmp")) &&
+            error("Output files already exist; choose a fresh output prefix: $prefix")
+        prediction = predict_two_phase_amplitude(previous, target; cloud_index)
+        metadata = (; problem=seed.problem,
+            prediction.cloud_amplitudes, prediction.residual_weights)
+        callback = continuation_newton_checkpoint(
+            prefix * "-accepted.jls", metadata; log_io)
+        return correct_two_phase_amplitude(seed.problem, prediction;
+            tolerance, max_iterations, accepted_state_callback=callback)
+    end
+    function save(point, attempt)
+        path = write_continuation_checkpoint(attempt_prefix(attempt) * ".jls",
+            point; overwrite=false)
+        println(log_io, "Saved matched point: ", path,
+            " weighted residual=", point.weighted_residual_norm)
+        flush(log_io)
+    end
+    return continue_amplitude(seed;
+        amplitude=point -> point.cloud_amplitudes[cloud_index], correct, save,
+        validate=point -> validate_two_phase_amplitude(point; tolerance),
+        target_amplitude, log_io, kwargs...)
+end
+
+"""
     two_phase_matching_residual(profile::TwoPhaseProfile,
         problem::TwoPhaseProblem; save_radial_result=false)
 
@@ -140,8 +232,7 @@ function two_phase_matching_residual(profile::TwoPhaseProfile, problem::TwoPhase
     #TODO: "make the boundary-data cleanup as a separate, small refactor" - see Review recent refactoring work
     cloud_frequencies = profile.frequencies
     (; horizon_coefficients, outer_coefficients) = profile
-    (; spin, alpha, components, cloud_m, couplings, polar_values, grid,
-        phase1_nodes, phase2_nodes, potential) = problem
+    (; spin, alpha, components, cloud_m, couplings, source_basis, potential) = problem
     (; inner, outer, match, step, horizon_order, outer_order) = problem.integration
 
     inner < match < outer || throw(ArgumentError("match must lie between endpoints"))
@@ -167,7 +258,7 @@ function two_phase_matching_residual(profile::TwoPhaseProfile, problem::TwoPhase
     outer_state = assemble_boundary(:outer, outer, outer_coefficients)
     rhs! = (derivative, state, position) -> nonlinear_two_phase_rhs!(
         derivative, state, position, spin, alpha, components, cloud_frequencies,
-        cloud_m, couplings, polar_values, grid, phase1_nodes, phase2_nodes; potential)
+        cloud_m, couplings, source_basis; potential)
 
     from_horizon = integrate_radial(rhs!, horizon_state, inner, match; step, save_profile=save_radial_result)
     from_outer = integrate_radial(rhs!, outer_state, outer, match; step, save_profile=save_radial_result)

@@ -20,12 +20,16 @@ end
 @testset "Model loader boundaries and repeated loading" begin
     @test CoreLoaderCheck.potential_value(0.0) == 0.0
     @test !isdefined(CoreLoaderCheck, :solve_nonlinear_mode)
+    @test isdefined(CoreLoaderCheck, :continue_amplitude)
+    @test isdefined(CoreLoaderCheck, :read_branch)
+    @test !isdefined(CoreLoaderCheck, :continue_two_phase_amplitude)
     @test isdefined(SingleLoaderCheck, :solve_nonlinear_mode)
     @test !isdefined(SingleLoaderCheck, :solve_secondary_mode)
     @test isdefined(MultiphaseLoaderCheck, :radial_operator_coefficients)
     @test isdefined(MultiphaseLoaderCheck, :two_phase_integrated_observables)
     @test isdefined(MultiphaseLoaderCheck, :two_phase_profile_response)
     @test isdefined(MultiphaseLoaderCheck, :evolve_two_phase)
+    @test isdefined(MultiphaseLoaderCheck, :continue_two_phase_amplitude)
     @test !isdefined(MultiphaseLoaderCheck, :solve_secondary_mode)
     @test isdefined(FullLoaderCheck, :solve_secondary_mode)
     @test isdefined(FullLoaderCheck, :qcd_stationary_point)

@@ -44,11 +44,11 @@ function two_phase_profile_admissible(packed_profile, problem::TwoPhaseProblem)
 end
 
 """
-    two_phase_real_residual(packed_state, amplitudes, problem)
+    two_phase_real_matching_residual(packed_state, amplitudes, problem)
 
 TODO: describe the real matching equations and residual scaling.
 """
-function two_phase_real_residual(packed_state, amplitudes, problem::TwoPhaseProblem)
+function two_phase_real_matching_residual(packed_state, amplitudes, problem::TwoPhaseProblem)
     profile = unpack_two_phase_profile(packed_state, amplitudes, problem)
     residual = two_phase_matching_residual(profile, problem)
     return pack_complex(residual) ./ problem.coefficient_scale
@@ -61,7 +61,7 @@ TODO: describe Newton correction, convergence tolerance, and returned packed sta
 """
 function correct_two_phase_profile(problem::TwoPhaseProblem, amplitudes, packed_state_guess;
         tolerance=1e-9, max_iterations=12, progress_callback=nothing)
-    residual = packed_state -> two_phase_real_residual(packed_state, amplitudes, problem)
+    residual = packed_state -> two_phase_real_matching_residual(packed_state, amplitudes, problem)
     admissible = packed_state -> two_phase_profile_admissible(packed_state, problem)
     solution = newton_solve(residual, packed_state_guess; tolerance, max_iterations,
         admissible, progress_callback, jacobian_backend=:forwarddiff)
@@ -97,7 +97,7 @@ function two_phase_profile_response(problem::TwoPhaseProblem, solution; toleranc
     isfinite(tolerance) && tolerance > 0 || throw(ArgumentError("require positive tolerance"))
     two_phase_profile_admissible(packed_state, problem) || error("inadmissible response state")
     residual = (trial_packed_state, trial_amplitudes) ->
-        two_phase_real_residual(trial_packed_state, trial_amplitudes, problem)
+        two_phase_real_matching_residual(trial_packed_state, trial_amplitudes, problem)
     residual_norm = norm(residual(packed_state, amplitudes))
     isfinite(residual_norm) && residual_norm <= tolerance ||
         error("profile must be converged before differentiation: residual=$residual_norm")

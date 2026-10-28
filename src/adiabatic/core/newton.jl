@@ -12,21 +12,27 @@ Select centered differences with `:finite` or automatic differentiation with
 
 See also [`centered_difference_jacobian`](@ref), [`newton_solve`](@ref).
 """
-function residual_jacobian(
-    residual,
-    state;
-    backend=:finite,
-    difference_step=1e-6,
-    admissible=state -> true,
-)
+function residual_jacobian(residual, state;
+        backend=:finite, chunk_size=nothing,
+        difference_step=1e-6, admissible=state -> true)
+
+    if chunk_size !== nothing && !(backend === :forwarddiff &&
+            chunk_size isa Int && 1 <= chunk_size <= length(state))
+        throw(ArgumentError(
+            "chunk_size requires :forwarddiff and an integer from 1 to length(state)"))
+    end
+
     if backend === :forwarddiff
-        return ForwardDiff.jacobian(residual, state)
+        config = if chunk_size === nothing
+            ForwardDiff.JacobianConfig(residual, state)
+        else
+            ForwardDiff.JacobianConfig(
+                residual, state, ForwardDiff.Chunk{chunk_size}())
+        end
+        return ForwardDiff.jacobian(residual, state, config)
     elseif backend === :finite
         return centered_difference_jacobian(
-            residual, state;
-            difference_step,
-            admissible,
-        )
+            residual, state; difference_step, admissible)
     end
 
     throw(ArgumentError("unknown Jacobian backend: $backend"))
@@ -113,6 +119,8 @@ function newton_solve(
     progress_callback=nothing,
     stagnation_limit::Int=8,
     minimum_progress=1e-3,
+    jacobian_chunk_size=nothing,
+    accepted_state_callback=nothing,
 )
     # Validate solver settings before evaluating the residual.
     if !isfinite(tolerance) || tolerance <= 0
@@ -167,6 +175,10 @@ function newton_solve(
             progress_callback(iteration, mismatch_norm)
         end
 
+        if !isnothing(accepted_state_callback)
+            accepted_state_callback(iteration, copy(state), copy(mismatch))
+        end
+
         if mismatch_norm <= tolerance
             return (
                 state=state,
@@ -191,6 +203,7 @@ function newton_solve(
         jacobian = residual_jacobian(
             residual, state;
             backend=jacobian_backend,
+            chunk_size=jacobian_chunk_size,
             difference_step,
             admissible,
         )

@@ -55,6 +55,32 @@ include(joinpath(@__DIR__, "../../../src/adiabatic/single_cloud/load.jl"))
     @test maximum(abs.(solution.frequencies - linear_frequencies)) < 1e-5
     @test all(abs.(solution.outer_coefficients[3:4]) .> 1e-16)
 
+    # Exercise the actual AD correction, fresh radial check, and both checkpoint
+    # formats on a short continuation of this already-matched dilute prototype.
+    mktempdir() do directory
+        seed = (; problem, profile, cloud_amplitudes=copy(normalizations),
+            residual_weights=ones(4length(components)),
+            weighted_residual_norm=norm(checked)/problem.coefficient_scale)
+        prefix = joinpath(directory, "continuation")
+        target = 1.001normalizations[2]
+        matched = continue_two_phase_amplitude(seed, prefix;
+            target_amplitude=target, tolerance=1e-8, log_io=devnull)
+        @test matched.cloud_amplitudes == [normalizations[1], target]
+        @test matched.profile.outer_coefficients[1:2] == matched.cloud_amplitudes
+        @test matched.weighted_residual_norm <= 1e-8
+        saved = deserialize(prefix * "-attempt1.jls")
+        iterate = deserialize(prefix * "-attempt1-accepted.jls")
+        @test saved.profile.frequencies == matched.profile.frequencies
+        @test saved.radial_result.residual == matched.radial_result.residual
+        @test iterate.state == matched.solution.state
+        @test iterate.cloud_amplitudes == matched.cloud_amplitudes
+        @test iterate.residual_weights == matched.residual_weights
+        @test_throws ErrorException continue_two_phase_amplitude(seed, prefix;
+            target_amplitude=target, tolerance=1e-8, log_io=devnull)
+        @test seed.cloud_amplitudes == normalizations
+        @test seed.residual_weights == ones(4length(components))
+    end
+
     # Normalization is attached to the fundamental q, not its list position.
     permutation = [3, 2, 4, 1]
     reordered = solve_trial(solution.frequencies, normalizations, components[permutation],

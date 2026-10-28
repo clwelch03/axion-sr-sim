@@ -80,8 +80,8 @@ end
 
 """
     nonlinear_two_phase_rhs!(derivative, state, position, spin, alpha, components,
-                             cloud_frequencies, cloud_m, couplings, polar_values,
-                             grid, phase1_nodes, phase2_nodes; potential=:cosine)
+                             cloud_frequencies, cloud_m, couplings,
+                             source_basis; potential=:cosine)
 
 Calculate the radial derivatives of all retained Fourier components.
 
@@ -103,29 +103,35 @@ leaving `state` unchanged.
 
 Compute N from the joint field of all components. Supply validated components
 with distinct, nonzero q labels and only one member of each q, -q pair.
-Use the same cloud ordering, angular tables, and phase grids as for
-`nonlinear_two_phase_source`. Select :cosine, :quartic, or :sextic potential.
+Supply a basis built for the same cloud ordering and angular/phase grids,
+with mode labels in exactly the state order. Build it once before radial
+integration and reuse it at every step. Select :cosine, :quartic, or :sextic
+potential.
 """
 function nonlinear_two_phase_rhs!(derivative, state, position, spin, alpha,
                                   components, cloud_frequencies, cloud_m,
-                                  couplings, polar_values, grid,
-                                  phase1_nodes, phase2_nodes; potential=:cosine)
-    pairs = [(l, component.q) for component in components for l in component.l_values]
-    count = length(pairs)
-    length(state) == length(derivative) == 2count ||
+                                  couplings, source_basis::TwoPhaseSourceBasis; potential=:cosine)
+    mode_labels = [(l, component.q) for component in components for l in component.l_values]
+    num_radial_modes = length(mode_labels)
+    length(state) == length(derivative) == 2num_radial_modes ||
         throw(DimensionMismatch("expected [R; Q] for all retained pairs"))
+    source_basis.mode_labels == mode_labels ||
+        throw(ArgumentError("source basis mode order must match the radial state"))
 
-    # Reconstruct the joint field from R only; the potential contains no Q.
-    radial_values = Dict(pair => state[index] for (index, pair) in enumerate(pairs))
+    # Pack R only; the nonlinear potential contains no radial slopes Q.
     geometry = tortoise_geometry(position, spin)
-    source = nonlinear_two_phase_source(radial_values, geometry.radius, spin, alpha,
-        pairs, cloud_m, polar_values, grid, phase1_nodes, phase2_nodes; potential)
+    radial_coefficients = state[1:num_radial_modes]
+    parameters = vcat(real.(radial_coefficients), imag.(radial_coefficients),
+        [geometry.radius, spin, alpha])
+    packed_source = nonlinear_two_phase_source(parameters, source_basis; potential)
+    source = complex.(packed_source[1:num_radial_modes],
+        packed_source[num_radial_modes+1:2num_radial_modes])
     source_scale = geometry.delta / geometry.radial_factor^2
 
     offset = 0
     for component in components
         indices = (offset + 1):(offset + length(component.l_values))
-        slope_indices = count .+ indices
+        slope_indices = num_radial_modes .+ indices
         operator = component_tortoise_operator(position, spin, alpha, component,
             cloud_frequencies, cloud_m, couplings)
 
@@ -133,7 +139,7 @@ function nonlinear_two_phase_rhs!(derivative, state, position, spin, alpha,
         derivative[indices] .= state[slope_indices]
         derivative[slope_indices] .= -operator.slope_coefficient .* state[slope_indices] -
             operator.profile_matrix * state[indices] -
-            source_scale .* [source[pair] for pair in pairs[indices]]
+            source_scale .* source[indices]
         offset += length(component.l_values)
     end
     return derivative

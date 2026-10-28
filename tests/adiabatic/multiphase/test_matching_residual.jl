@@ -90,9 +90,11 @@ end
     # fixed, finite nonlinear state over a short interval, in both directions.
     initial = ComplexF64[0.2+0.1im, 0.02-0.01im, 0.15-0.07im, 0, 0,
                         0.01-0.02im, 0.003im, -0.02+0.01im, 0, 0]
+    mode_labels = [(l, component.q) for component in components for l in component.l_values]
+    source_basis = build_two_phase_source_basis(mode_labels, cloud_m, polar, grid, phase1, phase2)
     rhs! = (derivative, state, position) -> nonlinear_two_phase_rhs!(derivative,
         state, position, 0.7, 0.42, components, frequencies, cloud_m, couplings,
-        polar, grid, phase1, phase2; potential=:quartic)
+        source_basis; potential=:quartic)
     for (start, stop) in ((4.0, 8.0), (8.0, 4.0))
         endpoints = [integrate_radial(rhs!, initial, start, stop; step)
             for step in (0.4, 0.2, 0.1)]

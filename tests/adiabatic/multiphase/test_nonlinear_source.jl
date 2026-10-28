@@ -14,9 +14,13 @@ include(joinpath(@__DIR__, "../../../src/adiabatic/single_cloud/load.jl"))
     output_pairs = [(0, (2, -1)), (3, (-1, 2)), (1, (2, -1)), (3, (1, 1))]
     radius, spin, alpha = 8.0, 0.7, 0.2
 
-    source = nonlinear_two_phase_source(radial_values, radius, spin, alpha,
-        output_pairs, [1, 2], polar_table, grid, phase1_nodes, phase2_nodes;
-        potential=:quartic)
+    mode_labels = union(collect(keys(radial_values)), output_pairs)
+    source_basis = build_two_phase_source_basis(mode_labels, [1, 2], polar_table,
+        grid, phase1_nodes, phase2_nodes)
+    coefficients = [get(radial_values, label, 0.0im) for label in mode_labels]
+    parameters = vcat(pack_complex(coefficients), [radius, spin, alpha])
+    source = Dict(zip(mode_labels, unpack_complex(
+        nonlinear_two_phase_source(parameters, source_basis; potential=:quartic))))
 
     # The cubic cross terms drive components absent from radial_values.
     expected_first = alpha^2 * first_coefficient^2 * conj(second_coefficient) *
@@ -31,10 +35,10 @@ include(joinpath(@__DIR__, "../../../src/adiabatic/single_cloud/load.jl"))
     # No sum of three signed input labels gives q=(1,1).
     @test isapprox(source[(3, (1, 1))], 0; atol=1e-14, rtol=0)
 
-    empty_source = nonlinear_two_phase_source(Dict(), radius, spin, alpha,
-        output_pairs, [1, 2], polar_table, grid, phase1_nodes, phase2_nodes;
+    empty_parameters = vcat(zeros(2length(mode_labels)), [radius, spin, alpha])
+    empty_source = nonlinear_two_phase_source(empty_parameters, source_basis;
         potential=:quartic)
-    @test all(iszero, values(empty_source))
+    @test all(iszero, empty_source)
 end
 
 @testset "Nonlinear source in the single-cloud limit" begin
@@ -50,12 +54,15 @@ end
     single_cloud_values = Dict((1, 1) => radial_coefficient)
     output_pairs = [(1, (1, 0)), (3, (3, 0)), (3, (-1, 2))]
     radius, spin, alpha = 8.0, 0.7, 0.2
+    source_basis = build_two_phase_source_basis(output_pairs, [1, 2], polar_table,
+        grid, phase1_nodes, phase2_nodes)
+    coefficients = [get(radial_values, label, 0.0im) for label in output_pairs]
+    parameters = vcat(pack_complex(coefficients), [radius, spin, alpha])
 
     for potential in (:quartic, :sextic, :cosine)
         @testset "$potential" begin
-            source = nonlinear_two_phase_source(radial_values, radius, spin, alpha,
-                output_pairs, [1, 2], polar_table, grid, phase1_nodes, phase2_nodes;
-                potential)
+            source = Dict(zip(output_pairs, unpack_complex(
+                nonlinear_two_phase_source(parameters, source_basis; potential))))
             reference = nonlinear_source(single_cloud_values, radius, spin, alpha,
                 polar_table, azimuthal_table, grid; modes=[(1, 1), (3, 3)], potential)
 

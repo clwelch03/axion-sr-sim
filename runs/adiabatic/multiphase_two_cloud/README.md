@@ -17,6 +17,16 @@ The library is in `src/adiabatic/multiphase/response.jl` and `evolution.jl`.
 The user authorized direct implementation on October 15, with explanatory
 comments and docstring skeletons left for them to fill in.
 
+## Amplitude continuation
+
+Current source layout: the run script calls `continue_two_phase_amplitude` from
+the multiphase library. Shared stepping and I/O are in
+`src/adiabatic/core/continuation.jl` and `continuation_io.jl`; the model predictor,
+correction, and radial validation are in `src/adiabatic/multiphase/profiles.jl`.
+The script accepts an optional third argument, `OUTPUT_PREFIX`, for a fresh run
+or restart. The two-argument batch command and per-attempt checkpoint schemas
+are preserved. Frozen snapshots described below retain their original source.
+
 ## Model and numerical settings
 
 - Kerr spin `0.99`, scalar mass parameter `alpha=0.42`, fixed background.

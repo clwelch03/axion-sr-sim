@@ -79,108 +79,217 @@ function two_phase_field_component_coefficients(field, output_pairs, cloud_m, po
 end
 
 """
-    nonlinear_two_phase_source(radial_values, radius, spin, alpha, output_pairs,
-                               cloud_m, polar_values, grid,
-                               phase1_nodes, phase2_nodes;
-                               potential=:cosine, source_cache=nothing)
+    TwoPhaseSourceBasis(mode_labels, basis, weights, cosine_theta_squared)
 
-Compute N_(l,q) = alpha^2 * P_(l,q)[(r^2 + spin^2*x^2)*h(Phi)] at one radius.
+Fixed angular/phase data reused when evaluating the joint nonlinear source.
 
-Reconstruct the joint real field from `radial_values`, keyed by `(l, q)`.
-Use the reconstruction and projector conventions for inputs and phase grids.
-`radius` is Boyer-Lindquist r, not tortoise radius; x = cos(theta), `grid`
-supplies `cosine_theta_nodes` and `polar_weights` matching `polar_values`.
-Select `potential=:cosine`, `:quartic`, or `:sextic` for h(Phi) = Phi - U'(Phi).
+- `mode_labels`: the ordered `(l, q)` mode labels.
+- `basis`: reconstruction/projection matrix, with cosine columns followed by
+  sine columns and rows in flattened polar/phase-sample order.
+- `weights`: polar quadrature weights including the two-phase averaging factor.
+- `cosine_theta_squared`: squared polar nodes in the same sample order.
 
-With `source_cache=nothing`, use direct reconstruction and quadrature.
-A supplied cache delegates to `cached_two_phase_source`; it must be prepared
-for the same angular basis and quadrature settings.
-
-Return a dictionary keyed by `output_pairs`, which may include labels absent
-from the input. The radial slope equation contains
--Delta/(r^2 + spin^2)^2 times this source;
-that minus sign and tortoise factor are not included here.
+Construct a consistent basis with [`build_two_phase_source_basis`](@ref).
+The field types are inferred from the supplied data. This container is
+immutable, but its arrays remain mutable; treat them as read-only after
+construction. The constructor stores the supplied arrays without copying or
+validating them. Radial coefficients, field samples, and source values are
+computed separately and are not stored here.
 """
-function nonlinear_two_phase_source(radial_values, radius, spin, alpha,
-                                    output_pairs, cloud_m, polar_values, grid,
-                                    phase1_nodes, phase2_nodes;
-                                    potential=:cosine, source_cache=nothing)
-    # Return cached source if it exists
-    if source_cache !== nothing
-        return cached_two_phase_source(
-            radial_values, radius, spin, alpha, output_pairs,
-            cloud_m, polar_values, grid, phase1_nodes, phase2_nodes,
-            source_cache; potential)
-    end
+struct TwoPhaseSourceBasis{ModeLabels, Basis, Weights, CosineThetaSquared}
+    mode_labels::ModeLabels
+    basis::Basis
+    weights::Weights
+    cosine_theta_squared::CosineThetaSquared
+end
 
-    field = reconstruct_two_phase_field_at_radius(radial_values, cloud_m,
-        polar_values, phase1_nodes, phase2_nodes)
+"""
+    build_two_phase_source_basis(mode_labels, cloud_m, polar_values, grid,
+                                 phase1_nodes, phase2_nodes)
 
-    # Evaluate h on the total field so interactions between clouds are retained.
-    remainder = potential_remainder.(field, Ref(potential))
+Precompute the angular/phase basis and quadrature weights for repeated source evaluations.
 
-    # The geometric factor varies along the polar axis, and belongs inside P.
-    geometry_factor = reshape(radius^2 .+ spin^2 .* grid.cosine_theta_nodes.^2,
-        :, 1, 1)
+Supply `mode_labels` as an ordered collection of distinct `(l, q)` labels, with
+nonzero integer 2-tuples `q` and one representative per conjugate pair.
+`cloud_m` contains the two clouds' azimuthal integers. The real table
+`polar_values[(l, abs(m))]`,
+where `m = sum(q .* cloud_m)`, must be evaluated at `grid.cosine_theta_nodes`.
+Both phase-node arrays must sample one full period uniformly; the polar and
+phase grids must be nonempty. These input conventions are assumed, not validated.
 
-    projected = two_phase_field_component_coefficients(geometry_factor .* remainder,
-        output_pairs, cloud_m, polar_values, grid.polar_weights,
+For `n = length(mode_labels)` and `p` angular/phase samples, return a
+[`TwoPhaseSourceBasis`](@ref) with these fields:
+
+- `mode_labels`: the supplied mode order, collected into a vector.
+- `basis`: a `p x 2n` Float64 matrix. For each mode, the first half of columns
+  contains its polar harmonic times `cos(q[1]*phase1 + q[2]*phase2)`; the
+  second half contains the corresponding sine pattern.
+- `weights`: polar quadrature weights repeated for every phase pair and
+  divided by `length(phase1_nodes) * length(phase2_nodes)` to average over phases.
+- `cosine_theta_squared`: the squared polar nodes repeated for every phase pair.
+
+Rows follow `vec(field)` ordering: polar index first, then the first phase,
+then the second phase. Thus `2 * basis * vcat(real.(R), imag.(R))` reconstructs
+the flattened real field when the complex coefficients `R` follow `mode_labels`.
+
+Reuse the basis while the mode order, cloud m values, polar table, and grids
+remain fixed; rebuild it when those inputs change. It stores fixed basis data,
+not a field or source value, and contains no radial coefficients or background
+parameters. Treat its arrays as read-only during evaluation.
+
+See also [`nonlinear_two_phase_source`](@ref).
+"""
+function build_two_phase_source_basis(mode_labels, cloud_m, polar_values, grid,
         phase1_nodes, phase2_nodes)
+    mode_labels = collect(mode_labels)
+    polar_node_count = length(grid.polar_weights)
+    phase_pair_count = length(phase1_nodes) * length(phase2_nodes)
+    num_radial_modes = length(mode_labels)
+    basis = Matrix{Float64}(undef, polar_node_count * phase_pair_count, 2num_radial_modes)
 
-    return Dict(pair => alpha^2 * coefficient for (pair, coefficient) in projected)
-end
-
-function cached_two_phase_source(radial_values, radius, spin, alpha, output_pairs,
-        cloud_m, polar_values, grid, phase1_nodes, phase2_nodes, source_cache;
-        potential=:cosine)
-
-    # Use the general calculation for modes outside this cache.
-    if !all(pair -> pair in source_cache.pairs, keys(radial_values)) ||
-            !all(pair -> pair in source_cache.pairs, output_pairs)
-        return nonlinear_two_phase_source(
-            radial_values, radius, spin, alpha, output_pairs,
-            cloud_m, polar_values, grid, phase1_nodes, phase2_nodes;
-            potential)
+    # Consider a single mode with phase combination `phase`
+    # phase = q[1] * phase1_nodes[j] + q[2] * phase2_nodes[k]
+    # That mode contributes to the field as
+    # 2 * (polar harmonic) * [Re(radial coeff) * cos(phase) + Im(radial coeff) * sin(phase)]
+    # So we need to store (polar harmonic) * sin(phase) and (polar harmonic) * cos(phase)
+    # Each row in `basis` corresponds to a single polar/phase sampling point
+    # First (second) half of the columns contains the cosine (sine) patterns
+    for (column, (l, q)) in enumerate(mode_labels)
+        polar_harmonic_values = polar_values[(l, abs(sum(q .* cloud_m)))]
+        for k in eachindex(phase2_nodes), j in eachindex(phase1_nodes)
+            phase = q[1] * phase1_nodes[j] + q[2] * phase2_nodes[k]
+            for i in eachindex(polar_harmonic_values)
+                row = i + polar_node_count * ((j - 1) + length(phase1_nodes) * (k - 1))
+                basis[row, column] = polar_harmonic_values[i] * cos(phase)
+                basis[row, num_radial_modes + column] = polar_harmonic_values[i] * sin(phase)
+            end
+        end
     end
 
-    # Arrange coefficients in the basis matrix's column order.
-    # Missing input modes have zero field coefficient.
-    coefficients = [
-        get(radial_values, pair, 0.0 + 0.0im)
-        for pair in source_cache.pairs
-    ]
-    parameters = vcat(
-        real.(coefficients), imag.(coefficients),
-        [radius, spin, alpha],
-    )
-
-    packed_source = local_chain_source(parameters, source_cache; potential)
-
-    # Restore complex coefficients and the public dictionary format.
-    mode_count = length(source_cache.pairs)
-    values = complex.(
-        packed_source[1:mode_count],
-        packed_source[mode_count+1:2mode_count],
-    )
-    ordered_source = Dict(zip(source_cache.pairs, values))
-    return Dict(pair => ordered_source[pair] for pair in output_pairs)
+    # Use the same flattened sample ordering as the basis rows.
+    weights = repeat(grid.polar_weights, phase_pair_count) ./ phase_pair_count
+    cosine_theta_squared = repeat(grid.cosine_theta_nodes.^2, phase_pair_count)
+    return TwoPhaseSourceBasis(mode_labels, basis, weights, cosine_theta_squared)
 end
 
-function local_chain_source(parameters, source_cache; potential=:cosine)
-    mode_count = length(source_cache.pairs)
-    coefficients = parameters[1:2mode_count]
-    radius, spin, alpha = parameters[2mode_count+1:2mode_count+3]
+"""
+    nonlinear_two_phase_source(parameters, source_basis; potential=:cosine)
+
+Evaluate the nonlinear source at one radius by reconstruction and projection
+with a precomputed basis, accepting and returning packed real vectors.
+A prepared basis is required for every evaluation.
+
+Let `n = length(source_basis.mode_labels)`. Supply a real parameter vector of length
+`2n + 3`, ordered as `[real.(R); imag.(R); radius; spin; alpha]`, where the
+complex radial coefficients `R` follow the basis's mode order. `radius` is
+Boyer–Lindquist r in M=1 units. Use a basis from
+[`build_two_phase_source_basis`](@ref) and potential `:cosine`, `:quartic`,
+or `:sextic`.
+
+Reconstruct the flattened joint field as `2 * basis * coefficients`. Apply
+`potential_remainder` to that field, multiply by the precomputed quadrature
+weights and `radius^2 + spin^2*cos(theta)^2`, then project with `transpose(basis)`.
+Reconstruction includes the conjugate modes through its factor of two;
+projection introduces no additional factor of two.
+
+Return a real vector of length `2n`: all real source coefficients followed by
+all imaginary source coefficients, in basis order. The result includes
+`alpha^2`; the radial RHS applies its minus sign and tortoise factor separately.
+
+This generic method propagates ForwardDiff values through the matrix arithmetic
+when they are supplied in `parameters`. It does not explicitly construct the
+local source Jacobian. The fixed basis is reused without modification.
+
+See also [`build_two_phase_source_basis`](@ref), [`potential_remainder`](@ref).
+"""
+function nonlinear_two_phase_source(parameters, source_basis::TwoPhaseSourceBasis; potential=:cosine)
+    num_radial_modes = length(source_basis.mode_labels)
+    length(parameters) == 2num_radial_modes + 3 ||
+        throw(DimensionMismatch("expected real and imaginary coefficients, radius, spin, and alpha"))
+    coefficients = parameters[1:2num_radial_modes]
+    radius, spin, alpha = parameters[2num_radial_modes+1:2num_radial_modes+3]
 
     # Reconstruct the real field at every angular/phase sample.
-    field = 2 .* (source_cache.basis * coefficients)
+    field = 2 .* (source_basis.basis * coefficients)
 
     # Apply the potential, geometry, and quadrature weights pointwise.
-    geometry_factor = radius^2 .+ spin^2 .* source_cache.cosine_theta_squared
+    geometry_factor = radius^2 .+ spin^2 .* source_basis.cosine_theta_squared
     remainder = potential_remainder.(field, Ref(potential))
-    weighted_remainder = source_cache.weights .* geometry_factor .* remainder
+    weighted_remainder = source_basis.weights .* geometry_factor .* remainder
 
     # Return all real source coefficients, followed by all imaginary ones.
-    return alpha^2 .* (transpose(source_cache.basis) * weighted_remainder)
+    return alpha^2 .* (transpose(source_basis.basis) * weighted_remainder)
+end
+
+"""
+    local_source_jacobian(parameters, source_basis; potential=:cosine)
+
+Return `(source, jacobian)` for the packed source at one radius,
+where the jacobian is `J_{ij} = partial source[i]/partial parameters[j]`.
+Supply ordinary real parameters in the order used by `nonlinear_two_phase_source`:
+`[real.(R); imag.(R); radius; spin; alpha]`, with R in basis order.
+For n retained modes, the source has length 2n and its Jacobian is
+2n by (2n + 3); columns follow the parameter order. Hold the basis fixed.
+Differentiate the implemented potential remainder, including its small-field
+branch. The returned derivatives do not include radial integration or matching.
+"""
+function local_source_jacobian(parameters, source_basis::TwoPhaseSourceBasis; potential=:cosine)
+    mode_count = length(source_basis.mode_labels)
+    coefficients = parameters[1:2mode_count]
+    radius, spin, alpha = parameters[2mode_count+1:2mode_count+3]
+    field = 2 .* (source_basis.basis * coefficients)
+
+    # Evaluate h(field) and its derivative with respect to field together.
+    remainder_duals = [
+        potential_remainder(ForwardDiff.Dual{Nothing}(value, (1.0,)), potential)
+        for value in field
+    ]
+    remainder = ForwardDiff.value.(remainder_duals)
+    remainder_derivative = [ForwardDiff.partials(value)[1] for value in remainder_duals]
+
+    # The source value uses the same quadrature as nonlinear_two_phase_source.
+    geometry_weights = source_basis.weights .*
+        (radius^2 .+ spin^2 .* source_basis.cosine_theta_squared)
+    projected = transpose(source_basis.basis) * (geometry_weights .* remainder)
+
+    # Chain rule: coefficient changes -> field changes -> source changes.
+    coefficient_jacobian = (2alpha^2) .* (transpose(source_basis.basis) *
+        ((geometry_weights .* remainder_derivative) .* source_basis.basis))
+
+    # Final three columns differentiate radius, spin, and alpha.
+    background_columns = hcat(
+        2radius .* source_basis.weights .* remainder,
+        2spin .* source_basis.weights .* source_basis.cosine_theta_squared .* remainder,
+    )
+    background_jacobian = alpha^2 .* (transpose(source_basis.basis) * background_columns)
+    source = alpha^2 .* projected
+    jacobian = hcat(coefficient_jacobian, background_jacobian, 2alpha .* projected)
+    return source, jacobian
+end
+
+"""
+"""
+function nonlinear_two_phase_source(
+        parameters::AbstractVector{ForwardDiff.Dual{Tag,Float64,N}},
+        source_basis::TwoPhaseSourceBasis; potential=:cosine) where {Tag,N}
+    length(parameters) == 2length(source_basis.mode_labels) + 3 ||
+        throw(DimensionMismatch("expected real and imaginary coefficients, radius, spin, and alpha"))
+
+    # Evaluate the source and its local Jacobian using ordinary real values.
+    source, source_jacobian = local_source_jacobian(
+        ForwardDiff.value.(parameters), source_basis; potential)
+
+    # Carry the incoming parameter derivatives through the local source map.
+    parameter_derivatives = [
+        ForwardDiff.partials(parameter)[direction]
+        for parameter in parameters, direction in 1:N
+    ]
+    source_derivatives = source_jacobian * parameter_derivatives
+
+    # Return Dual values with the original differentiation tag and directions.
+    return [ForwardDiff.Dual{Tag}(source[index],
+        ntuple(direction -> source_derivatives[index, direction], Val(N)))
+        for index in eachindex(source)]
 end
 
 """

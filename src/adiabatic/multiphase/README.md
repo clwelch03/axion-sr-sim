@@ -16,6 +16,14 @@ in `projection.jl`, without importing the other models.
 The root adiabatic loader leaves this library opt-in.
 The loader now also includes `observables.jl`, `response.jl`, and `evolution.jl`.
 
+Amplitude continuation is available as
+`continue_two_phase_amplitude(seed, output_prefix; target_amplitude, kwargs...)`.
+Its predictor and profile correction live in `profiles.jl`, alongside matching;
+adaptive stepping and checkpoint handling live in `core/continuation.jl` and
+`core/continuation_io.jl`. The campaign's `scripts/continue_amplitude.jl` only
+selects inputs, output prefix, and run settings. Matched seeds and per-attempt
+Newton recovery files retain their existing formats.
+
 Run the unit checks with
 `julia --project=. tests/adiabatic/multiphase/runtests.jl`.
 The radial and source tests load the single-cloud library for comparison only. Current

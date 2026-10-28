@@ -20,8 +20,13 @@
     field = reconstruct_two_phase_field_at_radius(radial, [1, 2], polar, phase1, phase2)
     remainder = potential_remainder.(field, Ref(:quartic))
     radius, spin, alpha = 8.0, 0.7, 0.2
-    source = nonlinear_two_phase_source(radial, radius, spin, alpha, keys(expected),
-        [1, 2], polar, grid, phase1, phase2; potential=:quartic)
+    mode_labels = collect(keys(expected))
+    source_basis = build_two_phase_source_basis(mode_labels, [1, 2], polar,
+        grid, phase1, phase2)
+    coefficients = [get(radial, label, 0.0im) for label in mode_labels]
+    parameters = vcat(pack_complex(coefficients), [radius, spin, alpha])
+    source = Dict(zip(mode_labels, unpack_complex(
+        nonlinear_two_phase_source(parameters, source_basis; potential=:quartic))))
     for ((l, q), phase_coefficient) in expected
         recovered = [sum(remainder[i, j, k] * cis(q[1]*phase1[j] + q[2]*phase2[k])
             for j in eachindex(phase1), k in eachindex(phase2)) /
@@ -43,9 +48,11 @@ function cosine_source_grid_sample(npolar, nfirst, nsecond)
     radial = Dict((1, (1, 0)) => 2.3 + 0.7im, (2, (0, 1)) => 1.6 - 0.5im)
     outputs = [(1, (1, 0)), (2, (0, 1)), (0, (2, -1)), (3, (-1, 2)),
                (3, (3, 0)), (6, (0, 3)), (5, (1, 0))]
-    source = nonlinear_two_phase_source(radial, 8.0, 0.7, 0.2, outputs,
-        [1, 2], polar, grid, grid.azimuth_nodes, phase2; potential=:cosine)
-    return [source[pair] for pair in outputs]
+    source_basis = build_two_phase_source_basis(outputs, [1, 2], polar,
+        grid, grid.azimuth_nodes, phase2)
+    coefficients = [get(radial, label, 0.0im) for label in outputs]
+    parameters = vcat(pack_complex(coefficients), [8.0, 0.7, 0.2])
+    return unpack_complex(nonlinear_two_phase_source(parameters, source_basis; potential=:cosine))
 end
 
 @testset "Cosine polar and phase quadrature convergence" begin
@@ -83,17 +90,23 @@ end
     outputs = [(1, (1, 0)), (2, (0, 1)), (0, (2, -1)),
                (3, (-1, 2)), (3, (3, 0)), (6, (0, 3))]
     field = reconstruct_two_phase_field_at_radius(radial, [1, 2], polar, phase1, phase2)
+    source_basis = build_two_phase_source_basis(outputs, [1, 2], polar,
+        grid, phase1, phase2)
+    coefficients = [get(radial, label, 0.0im) for label in outputs]
+    parameters = vcat(pack_complex(coefficients), [8.0, 0.7, 0.2])
     for potential in (:quartic, :sextic, :cosine)
-        source = nonlinear_two_phase_source(radial, 8.0, 0.7, 0.2, outputs,
-            [1, 2], polar, grid, phase1, phase2; potential)
+        source = Dict(zip(outputs, unpack_complex(
+            nonlinear_two_phase_source(parameters, source_basis; potential))))
         average_potential = sum(potential_value.(field, Ref(potential)); dims=(2, 3)) /
             (length(phase1)*length(phase2))
         # Neither shift is an integer grid translation. Check each phase, then both.
         for shift in ((0.37, 0.0), (0.0, -0.53), (0.37, -0.53))
             shifted_radial = Dict((l, q) => value * cis(-sum(q .* shift))
                 for ((l, q), value) in radial)
-            shifted_source = nonlinear_two_phase_source(shifted_radial, 8.0, 0.7, 0.2,
-                outputs, [1, 2], polar, grid, phase1, phase2; potential)
+            shifted_coefficients = [get(shifted_radial, label, 0.0im) for label in outputs]
+            shifted_parameters = vcat(pack_complex(shifted_coefficients), [8.0, 0.7, 0.2])
+            shifted_source = Dict(zip(outputs, unpack_complex(
+                nonlinear_two_phase_source(shifted_parameters, source_basis; potential))))
             @test isapprox([shifted_source[pair] for pair in outputs],
                 [source[(l, q)] * cis(-sum(q .* shift)) for (l, q) in outputs];
                 atol=1e-12, rtol=1e-12)

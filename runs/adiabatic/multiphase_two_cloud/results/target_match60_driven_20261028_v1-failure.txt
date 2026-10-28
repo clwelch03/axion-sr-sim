@@ -1,0 +1,16 @@
+Newton iteration limit reached; residual=1692.4986686897735
+Stacktrace:
+ [1] error(s::String)
+   @ Base ./error.jl:44
+ [2] newton_solve(residual::typeof(matching_residual), initial::Vector{Float64}; tolerance::Float64, max_iterations::Int64, jacobian_backend::Symbol, difference_step::Float64, admissible::var"#233#234", progress_callback::Nothing, stagnation_limit::Int64, minimum_progress::Float64, jacobian_chunk_size::Int64, accepted_state_callback::var"#229#230")
+   @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/runs/adiabatic/multiphase_two_cloud/work/amplitude_continuation_20261028_v1/src/adiabatic/core/newton.jl:191
+ [3] kwcall(::@NamedTuple{tolerance::Float64, max_iterations::Int64, admissible::var"#233#234", accepted_state_callback::var"#229#230", jacobian_backend::Symbol, jacobian_chunk_size::Int64}, ::typeof(newton_solve), residual::Function, initial::Vector{Float64})
+   @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/runs/adiabatic/multiphase_two_cloud/work/amplitude_continuation_20261028_v1/src/adiabatic/core/newton.jl:111
+ [4] top-level scope
+   @ /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/runs/adiabatic/multiphase_two_cloud/work/target_match_newton_20261028_v1.jl:45
+ [5] include(mod::Module, _path::String)
+   @ Base ./Base.jl:309
+ [6] exec_options(opts::Base.JLOptions)
+   @ Base ./client.jl:344
+ [7] _start()
+   @ Base ./client.jl:577

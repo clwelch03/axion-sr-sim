@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-10-23. This is the authoritative project status: what works,
+Updated 2026-10-28. This is the authoritative project status: what works,
 open caveats, and next steps. Campaign READMEs own exact commands, saved-result
 paths, and detailed validation records; design documents own equations and
 implementation decisions.
@@ -20,7 +20,213 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
 
 ## Where things stand
 
-### Resume here: direct mutual-deformation profiles and source optimization (October 23)
+### October 28: investigate a direct solve at the plot amplitudes
+
+**Twelve additional driven-seed corrections authorized and submitted:** the user
+requested twelve more corrections from the last driven-field state. Job
+**27388374** resumes correction 6, residual `1692.4986686897735`, and allows
+corrections **7–18**, stopping earlier on convergence or a solver failure.
+It uses the same verified frozen library, full target amplitudes, join 60,
+boundary prescription, residual weights, full-width local AD, and `1e-5`
+tolerance. New standalone restart scripts preserve the prior run and use output
+prefix `results/target_match60_driven_20261028_v2`; log:
+`logs/target-match-resume-27388374.out`. Input checkpoint SHA-256:
+`f680a44bb983ede293e36575f27300ffe4472d4a063ba2061611f0278fa4476f`.
+Setup, syntax, source hashes, checkpoint identity, and total correction-count
+checks passed. The first residual evaluation also checks fresh agreement with
+the stored mismatch. Every accepted checkpoint retains the cumulative count.
+Resources: one CPU, 8 GB, one-hour limit. Check this job before another extension.
+
+**Driven-field seeds added:** at the user's request, job **27384564 COMPLETED**
+in 1m33s using standalone `work/driven_field_seed_20261028_v1.jl`, the verified
+prior library snapshot, and frozen reference inputs. All forced-field matching
+and power checks passed; the five joint initial guesses are saved under
+`results/driven_field_seed_20261028_v1`. The full-target residual is 56.5614
+with zero driven fields, 3529.9916 with m=0 only, 57.0283 with m=3 only, and
+3529.2624 with both fields using the joint boundary prescription. The increase
+is mostly in the primary mismatch. Using far-leg m=3 reference coefficients
+instead gives 3529.0943, nearly the same overall result. The near/far m=3
+outer states differ by 28.3% for identical leading coefficients; this is not
+a boundary-subspace comparison after refitting. See the investigation record.
+
+Job **27384946** tested six Newton corrections with both driven fields, at the
+same target amplitudes, join 60, boundary prescription, and `1e-5` tolerance.
+It **FAILED at the six-correction cap after 8m36s**, ending 13:07:02 PDT:
+residual `3529.2624 → 1692.4987`, about a 52% decrease. Trial evaluations per
+correction were 4,3,4,3,3,1; the last correction reduced the norm by 10.7% and
+accepted its first evaluated trial. This progresses more than the zero-driven
+test, but remains far above tolerance and does not establish fast convergence.
+Input: `results/driven_field_seed_20261028_v1-both_near.jls`; output prefix:
+`results/target_match60_driven_20261028_v1`; log:
+`logs/target-match-newton-27384946.out`. The last accepted state and failure
+report are saved; no matched target profile exists and no further target job
+was submitted at this review. A further bounded attempt can resume this state.
+The production library and reference driver were left unchanged; source files
+in the shared workspace have concurrent edits. At the same review continuation
+**27378594** was RUNNING after 2h01m, with 13 new matched points. Latest
+A2=`5.394443404258194e-6` (4.95082% of target), norm `6.00678166743477e-6`;
+attempt 14 is underway with the increment now 0.78125%.
+
+The user requested reevaluating the workflow and explicitly authorized outlining
+and beginning a fixed-target shooting investigation. See the
+[investigation plan](docs/multiphase-target-solve-investigation-2026-10-28.md).
+Job **27380795** COMPLETED in 5m19s, comparing joins at r*=5, 10, 20, 40, 60
+using the original target-amplitude guess and verified frozen source. The old
+baseline reproduces exactly. At r*=60 the horizon/outer field norms are
+0.06573/0.06340, the relative field/slope jumps are 0.09335/0.29657, and the
+scaled residual is 56.5614 versus 1.90648e9 at r*=5. Full Newton steps are
+admissible at 40 and 60. Native Jacobian conditioning remains severe; at 60
+the native/equilibrated condition estimates are 1.95e16/2.99e3. The plan records
+all five comparisons and their limits.
+
+Selected r*=60 for a bounded **six-correction direct solve at full target A2**,
+job **27381429**, with unchanged `1e-5` tolerance and the same frozen library.
+It **FAILED at the correction cap after 13m32s**, ending at 12:27:05 PDT:
+residual `56.5614 → 53.8721`, only a 4.75% decrease. Six trial integrations
+were needed for the first correction and nine for each later correction. The
+last accepted state and failure report are preserved under
+`results/target_match60_20261028_v1`; no matched target profile exists. Log:
+`logs/target-match-newton-27381429.out`. The changed join improved the initial
+mismatch but did not yield useful Newton convergence for this guess.
+
+**Saved-matrix follow-up:** explicit equilibration and a 256-bit solve of the
+same saved initial Jacobian agree with the original Newton correction to
+`9.46e-15` relative norm. Inaccurate linear-system solution does not explain the
+first failed full step. That step predicts cancellation in the linear model but
+fresh integration gives residual 6118.8 versus 56.56 initially; the first accepted
+step is only 1/32 of it. The largest boundary-coefficient changes are in the
+mixed driven components initialized to zero. See the investigation record and
+`logs/target-match60-linear-check-20261028-v1.out`. Next candidates are testing
+driven-field seeds or isolating those correction blocks, and checking the local
+derivative along the actual target Newton direction. These remain hypotheses
+and proposed tests. Merely raising the correction cap is not recommended.
+Existing continuation **27378594** remains RUNNING; at the same review it had
+saved seven new points, reaching A2=`5.069450807458185e-6` (4.65255% of target)
+with weighted norm `5.828310199789505e-6`; attempt 8 was underway. These
+diagnostics change no production library or driver.
+
+### October 28: amplitude attempt 25 recovered
+
+The goal remains jointly solved primary/secondary profiles at the plot's fixed
+outer amplitudes: A1=`0.036390480353373555`, A2=`1.0896058341192524e-4`.
+Continuation job **27337026** reached its four-hour limit on October 27 at
+21:54:43 PDT after saving 24 matched points. Attempt 25's accepted checkpoint
+had already reached tolerance at correction 8, but its radial profiles were
+not saved before timeout. The queue was empty at the October 28 review.
+
+The user explicitly requested recovering attempt 25. Recovery job **27377949**
+COMPLETED in 33 s on n0003.lr7 using the verified original 201-file snapshot.
+Fresh integration reproduces the checkpoint's weighted residual vector exactly;
+its norm is `2.153421086390111e-6 < 1e-5`. Both radial branches are finite,
+span the original endpoints, and meet at r*=5. The complete matched seed is now
+`runs/adiabatic/multiphase_two_cloud/results/amplitude_step_20261027_v1-attempt25.jls`.
+It preserves A1, A2=`4.54807098617202e-6` (4.17405% of target), the saved
+Newton state, residual weights, and correction count. The original accepted
+checkpoint is unchanged. See the campaign README for recovery provenance.
+
+**Continuation restarted on October 28:** the user then explicitly requested
+further continuation. Changed only the live driver's initial fractional step
+to `0.015625` and output prefix to `amplitude_step_20261028_v1`. Snapshot
+`work/amplitude_continuation_20261028_v1` verifies all 201 files; core/multiphase
+source matches the previous snapshot and its frozen input is recovered attempt
+25. The frozen driver setup and saved-seed checks passed. Job **27378594** is
+RUNNING on **n0064.lr7**, with one CPU, 8 GB, and a four-hour limit. Its first
+new amplitude is `4.6191345953309576e-6`; the initial weighted residual is
+`606644.1247245938`. Check `logs/amplitude-27378594.out` and Slurm before
+submitting another continuation. Results use the new prefix with attempt
+numbering restarted at 1. No target profile is established by this launch.
+
+The user raised concern about time-evolution cost. The current evolution code
+corrects midpoint and endpoint profiles and evaluates charge responses at both;
+it already uses an implicit amplitude-response predictor, whereas this
+continuation uses only coefficient scaling with unchanged predicted frequencies.
+Thus the current correction cost is a real performance warning, but is not a
+benchmark of a complete evolution step. At a constant 1.5625% increment about
+205 continuation steps remain. A focused next experiment is comparing a secant
+or implicit-response predictor at the same amplitude increment and tolerance,
+then timing a full evolution sample/step including response calculations before
+committing to a long trajectory. This experiment has not been submitted.
+The target-amplitude joint profiles, spatial refinement, and comparison plot
+remain outstanding. This checkpoint supersedes the October 27 launch-only
+status below; preserve the user's small-snippet workflow for further changes.
+
+### October 27 run review and workplan
+
+The [October 27 workplan](docs/multiphase-workplan-2026-10-27.md) records today's
+priorities and verified outcomes. The user's end goal for today, potentially
+a stretch, is the target-amplitude linear/Omiya/joint deformation plot for
+both clouds, including difference panels and PDF/PNG/CSV exports. The seed,
+derivative checks, continuation, and reference curves are milestones toward
+that figure; prepare the plotting layout while solves run.
+At approximately 13:08 PDT, Slurm showed an
+empty queue for `clwelch`; accounting and campaign logs confirm all five
+October 26 jobs ended that afternoon, with no additional overnight run.
+At that morning review, the weak seed remained unmatched at
+`2.274196817352566e-5` versus `1e-5`, and its final accepted state was not saved.
+The October 26 independent diagnostic preserves
+the initial guess and one directional comparison, not that final iterate.
+Later October 27, the user authorized completing derivative verification
+autonomously. The [verification record](docs/multiphase-ad-verification-2026-10-27.md)
+tracks the fixed input, criteria, frozen snapshot, and results. All 55 focused
+local checks passed. Job **27333738** COMPLETED: all 56 columns at the initial
+weak guess and both finite-difference directions pass. Job **27334006** COMPLETED after
+22m45s: correction 13 and fresh reintegration give `5.306800040310494e-6`, below
+the unchanged `1e-5` tolerance. The seed and both radial branches are saved in
+`results/ad_seed_20261027_v1-seed.jls` under the multiphase campaign. It retains
+A2 at 0.1% of its target. Job **27334124** COMPLETED at 15:59:48 PDT:
+all 56 matched-state columns pass (worst relative error `9.587805e-9` versus
+`1e-8`) and both finite-difference directions pass. The agreed derivative
+verification is complete for the tested configuration/states; target-amplitude
+convergence and spatial accuracy remain separate checks. All three ran on
+**n0060.lr7** using verified snapshot `ad_verification_20261027_v1`; their
+artifacts survived the n0003 SSH outage on shared storage. Saved comparisons,
+seed state, radial branches, and the matched-stage seed hash were checked
+during recovery. The queue was empty at that recovery checkpoint.
+
+**Amplitude continuation launched later October 27:** after building
+`continue_amplitude.jl` together in pasted, commented blocks, the user authorized
+creating the Slurm wrapper and submitting it. Job **27337026** started at
+**17:54:21 PDT** on **n0060.lr7**, with one CPU, 8 GB, and a four-hour limit
+(21:54:21 PDT). Snapshot `amplitude_continuation_20261027_v1` verifies all 201
+files; its core/multiphase library is byte-for-byte identical to the verified
+AD snapshot, and its frozen input is the matched weak seed. The initial A2
+step is `1.1985664175311778e-7`; its weighted residual fell from
+`2354.7637801303267` to `0.009104341308015403` after correction 1. At this launch
+check, its accepted-state file exists but no new matched point is saved yet.
+The target is `1.0896058341192524e-4`, with A1 and spatial settings fixed.
+See the campaign README for the run command, output names, and adaptive rules.
+The plot remains the end goal. Check the active job before submitting anything else.
+
+**Workflow reminder:** the user rejected an autonomous driver restructuring
+even though it stayed below their roughly 160-line cap. They now explicitly
+prefer code to paste themselves. Keep the existing script structure, names,
+and comments; show small tested edits. The exception for creating and running
+the submission shell does not authorize another driver rewrite.
+
+### Important: revisit multiphase architecture
+
+**Explicit user priority, October 26: revisit this architecture and prevent
+bloat.** Acceptance of the current ForwardDiff specialization lets us proceed
+toward another convergence test; it does not close the architecture discussion.
+Keep that convergence attempt the immediate priority, then return to this review.
+
+Review the responsibilities of source evaluation, the local Jacobian, and the
+ForwardDiff adapter together. Look for duplicated source mathematics, repeated
+packing/unpacking, unnecessary wrappers, and confusing function/method names.
+Keep the physical calculation easy to follow and justify any additional
+abstraction with a concrete need. Preserve numerical agreement and the measured
+speedup while simplifying. Continue the user's tested-snippet workflow for
+library changes unless they explicitly delegate implementation.
+
+### Resume here: direct mutual-deformation profiles and source optimization (October 26)
+
+The requested [October 26 workplan](docs/multiphase-workplan-2026-10-26.md) organizes:
+projection walkthrough, a small reviewed change for another convergence test,
+and the fixed-amplitude linear/Omiya/joint deformation comparison. The source
+walkthrough and reviewed batching edit are complete; verified v5 was submitted
+as job **27304701**, which exhausted all 12 corrections at scaled residual
+`1.4947468124727777e8`. No joint solution or profiles were saved. See the
+checkpoint below.
 
 The current deliverable is a Fig. 7-style primary/secondary profile overlay
 with two additional jointly nonlinear curves. A direct solve fixes both outer
@@ -29,21 +235,167 @@ are outputs. The commented driver, frozen inputs, logging, and run settings
 are recorded in the [October 23 work summary](docs/multiphase-work-2026-10-23.md)
 and [campaign record](runs/adiabatic/multiphase_two_cloud/README.md#direct-fig-7-profile-attempt-october-23).
 
-At 17:25 PDT on October 23, jobs **27241421** (v2) and **27241725** (v3,
-detailed logging) were still running. Both accepted the first correction,
-reducing the scaled residual from 1.90648e9 to 6.83206e8; the requested
-tolerance is 1e-5. No target joint solution or profile CSV exists yet. The
-first v3 Jacobian took about 70.6 minutes. Inspect the logs for newer status;
-these are timestamped observations, not a convergence result.
+Checked on October 26: jobs **27241421** (v2) and **27241725** (v3, detailed
+logging) both ended with **TIMEOUT** at their four-hour limits on October 23,
+at 19:13:04 and 19:29:40 PDT respectively. Both accepted two corrections,
+with scaled residuals 1.90648e9 -> 6.83206e8 -> 4.65316e8, still far above
+the 1e-5 tolerance. The v3 log stops during correction 3's third Jacobian
+pass; its first two Jacobians took about 70.6 and 71.3 minutes. Only the
+initial-input files exist: accepted Newton states were not checkpointed,
+and no target joint solution or profile CSV was produced. Preserve these
+attempts. Accepted-state checkpointing remains a possible follow-up.
 
 A standalone cached-basis/local-source-Jacobian prototype measured 55.8x
 faster Jacobian construction through short endpoint integrations. Full-domain
-accuracy, timing, and Newton convergence are unverified. Guided implementation
-has added the optional cache adapter, `cached_two_phase_source`, and the ordinary
-`local_chain_source` method to `projection.jl`. The cache builder, optimized
-derivative method, cache forwarding, and Newton batching option remain to be
-added together. Running snapshots retain the original source. Preserve the
-user's incremental library-editing workflow and learning-map checkboxes.
+derivative agreement and Newton convergence remain unresolved; see the v4
+timing and failed check below. Guided implementation
+has added the basis builder, ordinary matrix source, and `local_source_jacobian`
+to `projection.jl`. The builder returns an immutable `TwoPhaseSourceBasis`
+containing `mode_labels`, `basis`, `weights`, and `cosine_theta_squared`.
+At the user's request, the source now requires this precomputed basis data:
+only `nonlinear_two_phase_source(parameters, source_basis)` remains. The
+dictionary method and uncached fallback were removed. `TwoPhaseProblem`
+constructs the basis once by default, and radial/matching/response calculations
+reuse it. The radial RHS packs its coefficient vector and checks that its mode
+order agrees with the basis. Direct quadrature remains a test reference.
+
+The multiphase suite passed 388 checks through source, radial, matching,
+observable, and profile-coordinate tests. It then stopped on two existing
+evolution-test errors: `test_evolution.jl` expects `amplitude_rates`, while
+`two_cloud_balance_rates` returns `log_rates`. The same return fields were
+verified from the committed function; neither evolution file was changed.
+After renaming the type, builder, and problem field to source-basis names,
+147 focused source/RHS/matching/profile-coordinate checks passed again,
+including repeated loading.
+The user has now added the derivative-specific source method and Newton's
+chunk-size/accepted-state callback options. The assistant's driver additions
+passed 112 focused Newton/source/driver checks and were frozen in v4. User-submitted
+job **27296945** matched the old initial residual in 14.63 s and built the
+full-domain Jacobian in 92.51 s. Its first directional finite-difference check
+reached only 2.38e-4 relative agreement against a 1e-5 threshold, so the preflight
+stopped the job before Newton. The discrepancy is unresolved; the timing does
+not establish correctness or convergence. Preserve the v4 snapshot and log.
+
+**User-directed reset, October 26:** the assistant added too much driver code
+without walking through it. Restored `direct_profile.jl` and
+`submit_direct_profile.sh` to their prior versions and deleted the live
+`preflight_direct_profile.jl`. The library changes remained; at that reset the driver used
+default ForwardDiff batching and did not save accepted iterates. Resume the
+request to expedite another convergence test, one reviewed block at a time,
+including driver changes. The smallest proposed driver change is to pass the
+existing `jacobian_chunk_size` option; the reviewed edit is recorded below. Discuss
+the derivative discrepancy before choosing the next run. Preserve the user's
+tested-snippet workflow and learning-map checkboxes.
+
+**Reviewed v5 preparation, October 26:** the user added only
+`jacobian_chunk_size=length(initial)` to `logged_profile_newton`'s existing
+Newton call. The actual driver passed five known-answer checks, including
+one derivative evaluation carrying all 56 directions. The setup-only check
+passed with unchanged physical settings; 38 focused source checks also passed.
+Snapshot `work/direct_fig7_20261026_v5` verifies all 194 files, and its three
+reference inputs have the same hashes as v4. The user submitted job **27304701**;
+Slurm confirms the frozen v5 wrapper, snapshot, and output prefix. It was
+PENDING at the first check and subsequently RUNNING. Its initial scaled
+residual is `1.906482699496033e9` in 12.44 s, identical to v4. At the subsequent
+18-minute Slurm check it remained RUNNING; the inspected log had accepted
+correction 7 at `2.805706872654804e8` and begun correction 8. The first seven
+Jacobians took 51–70 s each. The residual has fallen by a factor of 6.80 but
+remained `2.81e13` times the `1e-5` target, with slow recent progress.
+Final status: FAILED (exit 1) after 29m04s, with all 12 corrections accepted
+and final residual `1.4947468124727777e8` at matching-timer 1721.05 s.
+All 12 Jacobians took 51.41–69.71 s. The input and failure report are preserved;
+there is no solution, profile CSV, or saved accepted iterate to resume.
+Review the failure and unresolved derivative comparison before choosing
+another Newton attempt; no automatic resubmission or continuation.
+The scale is the fixed secondary outer coefficient `1.0896058341192524e-4`,
+not a local field norm. A fresh integration of the saved initial guess with
+the frozen v5 source gives matching-point field norms 0.05055 (horizon side)
+and 129715.5 (outer side), dominated by the secondary l=6 mismatch. This is
+a severe initial joining failure; intermediate states are not saved, so the
+same component breakdown is unavailable for the current iterate.
+Follow-up controls with frozen v5 source reproduce the original primary's
+unscaled mismatch `2.0333e-12` and secondary's unit-amplitude mismatch
+`3.1578e-6` (`3.4408e-10` at the target A2). In the full joint system,
+zeroing the secondary boundary coefficients gives `2.1184e-12`; multiplying
+them by 0.1 gives `900.405`, versus `207731.467` at the target amplitude.
+Halving radial spacing changes the latter by only `1.49e-6` relative.
+This points to the direct finite-secondary guess and amplification during
+inward shooting, rather than the reference solutions or coarse radial spacing,
+as the immediate failure. It does not yet identify which added interaction
+dominates or prove a remedy. See the campaign diagnostic record.
+The full-domain derivative discrepancy remains unresolved; there
+is no preflight gate or accepted-iterate saving. See the campaign README for
+the exact submission command and run record.
+
+**Reference-driver workflow:** the user explicitly requested building the
+reference comparison together, including driver code, one small tested snippet
+at a time. They have inserted the input-loading and Omiya-selection blocks in
+`scripts/reference_profiles.jl`. The primary-reconstruction block is now also
+inserted, together with the user's explanatory `joint_input` field tree.
+It passed Slurm check 27305885: scaled primary mismatch `5.587385657966086e-11`,
+with change from the saved residual `8.671068890112971e-29`.
+The user resumed this work and explicitly retained manual driver edits.
+Job **27337260** tested the original secondary snippet: matching passed, but
+separate integration at A2 disagreed with scaled unit samples by `8.24126e-10`
+on the inward branch, above the proposed `1e-10` scaling threshold. The revised
+snippet reconstructs the unit solution and scales its saved samples afterward,
+valid for this linear equation on a fixed primary. Job **27337856** passed:
+normalized mismatch `3.157814155718417e-6`, sample-scaling errors below `2e-16`,
+and independent RHS-scaling checks at 14 radial samples below `1.6e-16`.
+Use `work/check_reference_secondary_20261027_v2.jl` for the tested block.
+Job **27337858** also passed both linear eigenmode/profile checks; candidate
+blocks are in `work/check_reference_linears_20261027_v1.jl`. Scaled matching
+norms are `3.73863e-13` and `6.78907e-9` for primary and secondary. The four
+reference profiles now exist in `results/reference_secondary_20261027_v2.jls`
+(both Omiya profiles) and `results/reference_linears_20261027_v1.jls`.
+The live driver still ends at primary reconstruction; give the user the tested
+secondary block first, then walk through the linear blocks. Combined CSV/plot
+export and spatial refinement remain unfinished. Preserve the tested-snippet
+workflow and the learning-map boxes.
+
+**User-authorized weak-secondary continuation, October 26:** after the direct
+failure and control calculations, the user agreed to obtain a weak-secondary
+seed, verify its matching Jacobian, and then increase the secondary amplitude
+in small steps. **Stopped at the user's departure request; no further job or
+amplitude ramp is queued by this work.** Job **27305905** ran from frozen snapshot
+`work/weak_secondary_20261026_v1`. The first stage fixes the primary and all
+spatial settings, using A2=`1.0896058341192524e-7` (0.1% of the target).
+Its residual uses the old scale for primary-only rows and the smaller A2 for
+all secondary-dependent rows, with norm tolerance `1e-5`. It saves a matched
+seed before comparing the optimized Jacobian against ordinary-source AD and
+centered finite differences in two directions. Source AD checks and all 38
+direct-quadrature checks passed before submission. No shared library was edited.
+Job 27305905 FAILED at the 12-correction cap after 14m00s: weighted residuals
+`1.3255351e7 -> ... -> 124.01057 -> 0.001374344 -> 2.274196817352566e-5`.
+The last value is only 2.274 times the `1e-5` tolerance, but it did not pass.
+No seed or accepted iterate was saved, because this driver saves only after
+convergence. Its post-convergence Jacobian check was never reached.
+During this work the user explicitly requested more frequent, understandable
+updates and decision points. Explain each numerical experiment before starting
+it; report progress roughly every minute with its implication. The current
+attempt only covered the weak seed and its derivative checks. Bring that outcome
+back to the user before starting an amplitude ramp; no ramp is submitted.
+After slow seed progress, the user explicitly selected an independent Jacobian
+check at the original weak-secondary guess while the seed attempt finishes.
+Submitted job **27306004**, snapshot `work/weak_jacobian_20261026_v2`, using the
+same diagnostic helper without Newton; log `logs/weak-jacobian-27306004.out`.
+This tests derivatives at the initial guess, not at a converged solution.
+Job 27306004 FAILED after 2m31s at the first finite-difference check, preserving
+`results/weak_jacobian_20261026_v2.jls` (initial state, full optimized Jacobian,
+first direction and errors). Ordinary-source and optimized AD agreed to
+`7.47785e-15` relative in that direction. Finite-difference errors were
+0.5103, 0.3044, and 0.1636 at steps `1e-6`, `1e-7`, `1e-8`; direction 2 was
+not reached. The predicted derivative norm is `5.8345761e17`; even step
+`1e-8` predicts a change 440 times the initial residual. These probes are not
+demonstrably local, so their failure does not isolate a derivative bug.
+Slurm confirms the direct run and both diagnostics have finished.
+
+Next decision on return: review a small driver change to save accepted states
+using the existing callback before retrying the nearly matched weak seed with
+a modestly larger iteration cap. Keep the `1e-5` tolerance. Use the saved
+Jacobian to investigate smaller, properly scaled finite-difference probes;
+do not automatically relax the derivative threshold or start continuation.
+No retry or further diagnostic was submitted after the departure request.
 
 ### Physical-profile organization checkpoint (October 21)
 
@@ -549,9 +901,15 @@ scan, and convergence evidence. Use its averaged secondary results;
 
 ## Next steps
 
-- **Active multiphase work:** finish and validate the cached-source derivative
-  implementation, inspect the October 23 direct-profile jobs, and obtain the
-  joint/reference profile overlay. The October 19 doubling run and comparison
+- **Important architecture follow-up:** after the next convergence test,
+  [revisit the source/derivative architecture](#important-revisit-multiphase-architecture)
+  with the user's explicit concern about bloat in view.
+- **Active multiphase work:** return to another convergence test with small,
+  reviewed changes to the restored driver. The library optimization remains;
+  v4's derivative discrepancy is unresolved. The October 23 attempts timed out
+  after two accepted corrections, and v4 stopped before Newton. The
+  joint/reference overlay is pending.
+  The October 19 doubling run and comparison
   are complete; see their checkpoint above. Radial/domain/support convergence
   and the physical slow-growth closure remain separate requirements before
   interpreting mutual-deformation or evolution results.

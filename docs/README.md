@@ -14,6 +14,10 @@ open caveats, and next steps. Entry points reviewed 2026-10-12:
 | [Adiabatic reproduction](adiabatic-repro.md) | Validation records and observable conventions |
 | [Multimode adiabatic design](multimode-adiabatic-design.md) | Sec. III reproduction (2211.01949): equations, decisions, component map, extension ideas |
 | [Multiphase implementation plan](multiphase-implementation-plan.md) | Proposed mutual-deformation and three-cloud milestones, closure checks, and repository/branch organization |
+| [Fixed-target profile investigation, October 28](multiphase-target-solve-investigation-2026-10-28.md) | Matching-location and Jacobian diagnostics at the plot amplitudes; decisions for a direct solve or shorter shooting segments |
+| [Multiphase workplan, October 27](multiphase-workplan-2026-10-27.md) | End goal: linear/Omiya/joint deformation plot; run outcomes, seed retry, derivative checks, continuation, references, and architecture review |
+| [Multiphase derivative verification, October 27](multiphase-ad-verification-2026-10-27.md) | Full-matrix AD comparisons, finite-difference checks, matched-seed attempt, and reproducible regression evidence |
+| [Multiphase workplan, October 26](multiphase-workplan-2026-10-26.md) | Projection block diagram, direct convergence attempt, and the linear/Omiya/joint deformation-plot specification |
 | [Multiphase radial RK4 design](multiphase-rk4-design.md) | Flowcharts for one radial RK4 step and its joint nonlinear RHS, state ordering, and function map |
 | [Coupled BH–cloud balance](coupled-bh-cloud-balance.md) | Fixed reference units, leading scalar-only coupled rates, metric work and angular response, and algebraic checks |
 | [QCD spin-down campaign](../runs/adiabatic/qcd_spindown/README.md) | First preliminary coupled BH/211/322 trajectory and comparison with linear nonrelativistic evolution |

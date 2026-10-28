@@ -1,0 +1,70 @@
+Building the optimized Jacobian...
+Optimized Jacobian seconds: 0.455707996
+Ordinary AD column 1/2
+  absolute=0.0 relative=0.0 seconds=0.04258023
+Ordinary AD column 2/2
+  absolute=0.0 relative=0.0 seconds=6.067e-6
+Building the optimized Jacobian...
+Optimized Jacobian seconds: 0.410886476
+Ordinary AD column 1/2
+  absolute=1.0 relative=0.1414213562373095 seconds=0.032632843
+Ordinary AD column 2/2
+  absolute=0.0 relative=0.0 seconds=3.5e-7
+Building the optimized Jacobian...
+Optimized Jacobian seconds: 0.283745358
+Ordinary AD column 1/2
+  absolute=0.0 relative=0.0 seconds=0.019208001
+Ordinary AD column 2/2
+  absolute=0.0 relative=0.0 seconds=1.287e-6
+Building the optimized Jacobian...
+Optimized Jacobian seconds: 0.306608917
+Ordinary AD column 1/2
+  absolute=NaN relative=NaN seconds=0.020005694
+Ordinary AD column 2/2
+  absolute=NaN relative=NaN seconds=1.231e-6
+FD direction 1 step=0.001 relative=4.446752605876399e-13 realized=4.3052811983017283e-13 rounding=3.233249744922474e-14
+FD direction 1 step=0.0001 relative=4.371235431776554e-12 realized=2.9621235143575176e-12 rounding=2.131823941243329e-12
+FD direction 1 step=1.0e-5 relative=1.6455030206120533e-11 realized=1.3654730778850074e-11 rounding=1.0622776301608215e-11
+FD direction 2 step=0.001 relative=7.43980917277673e-14 realized=6.165804683049937e-14 rounding=1.422587094906553e-14
+FD direction 2 step=0.0001 relative=1.2129826648806705e-12 realized=3.2788500598181933e-13 rounding=8.903695744385969e-13
+FD direction 2 step=1.0e-5 relative=1.3146028814925073e-11 realized=6.6570657885878605e-12 rounding=6.596874657793815e-12
+Test Summary:                       | Pass  Total  Time
+AD comparison and saved diagnostics |   14     14  6.5s
+Building the optimized Jacobian...
+Optimized Jacobian seconds: 8.494523908
+Ordinary AD column 1/16
+  absolute=7.572411443361667e-7 relative=1.1380929156482388e-16 seconds=5.104340192
+Ordinary AD column 2/16
+  absolute=2.4336410697147007e-6 relative=1.8288162507072422e-16 seconds=0.001811895
+Ordinary AD column 3/16
+  absolute=3.46468574210583e-19 relative=2.017570941934246e-19 seconds=0.001744249
+Ordinary AD column 4/16
+  absolute=4.1756865252882695e-18 relative=2.678851546327056e-19 seconds=0.001737366
+Ordinary AD column 5/16
+  absolute=4.1851342181504115e-20 relative=7.614121015276708e-20 seconds=0.001726654
+Ordinary AD column 6/16
+  absolute=1.5825210287718556e-17 relative=1.4866781098020606e-19 seconds=0.001705425
+Ordinary AD column 7/16
+  absolute=7.01831696908218e-17 relative=2.6069956464728536e-17 seconds=0.001734136
+Ordinary AD column 8/16
+  absolute=7.90376501759684e-9 relative=1.543133346273088e-16 seconds=0.001747845
+Ordinary AD column 9/16
+  absolute=2.549555211513282e-7 relative=3.830208401188153e-17 seconds=0.001687871
+Ordinary AD column 10/16
+  absolute=9.730062318015298e-7 relative=7.308758426370138e-17 seconds=0.001681644
+Ordinary AD column 11/16
+  absolute=2.584797059433604e-19 relative=1.5051888098686382e-19 seconds=0.001711866
+Ordinary AD column 12/16
+  absolute=1.0192421753323477e-18 relative=6.538253331548056e-20 seconds=0.001678227
+Ordinary AD column 13/16
+  absolute=6.040169393135859e-20 relative=1.0989033666836398e-19 seconds=0.00166126
+Ordinary AD column 14/16
+  absolute=3.552738510548077e-15 relative=3.338056759617505e-17 seconds=0.001726451
+Ordinary AD column 15/16
+  absolute=7.533204305936479e-17 relative=2.798250819068935e-17 seconds=0.00170231
+Ordinary AD column 16/16
+  absolute=7.470458829343525e-9 relative=1.457820272222611e-16 seconds=0.001639057
+Test Summary:                                     | Pass  Total   Time
+Full AD matrices through short nonlinear matching |    3      3  16.3s
+Test Summary:                                         | Pass  Total  Time
+Required source basis and direct quadrature agreement |   38     38  4.5s

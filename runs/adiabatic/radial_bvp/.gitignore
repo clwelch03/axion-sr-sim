@@ -1,0 +1,4 @@
+/work/
+/logs/*.log
+# Regenerable sampling-profiler dumps stay with local benchmark artifacts.
+/results/*-profile-*.txt

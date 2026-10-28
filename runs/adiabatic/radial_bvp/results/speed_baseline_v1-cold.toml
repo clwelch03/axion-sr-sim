@@ -1,0 +1,24 @@
+gc_seconds = 9.951169633
+pass = "cold"
+profiled = false
+boundary_residual = 3.372799183866404e-8
+recompilation_seconds = 0.0
+assessment_seconds = 6.068738294
+elapsed_seconds = 519.856193332
+mesh_points = 401
+passed_residual_checks = true
+retcode = "Success"
+allocated_bytes = 795216555136
+boundary_calls = 266
+variant = "baseline"
+off_mesh_defect = 3.181609500959742e-5
+boundary_seconds = 0.170232095
+compilation_seconds = 91.186264147
+
+[rhs_seconds]
+0 = 7.753832266
+28 = 376.388995827
+
+[rhs_calls]
+0 = 16800
+28 = 144000

@@ -1,0 +1,30 @@
+julia_version = "1.13.0"
+gc_seconds = 13.598334066
+pass = "cold"
+profiled = false
+hostname = "n0076.lr7"
+boundary_residual = 3.372799183866404e-8
+recompilation_seconds = 0.0
+assessment_seconds = 6.130930901
+elapsed_seconds = 309.012316975
+mesh_points = 401
+passed_residual_checks = true
+retcode = "Success"
+cpu = "Intel(R) Xeon(R) Gold 6330 CPU @ 2.00GHz"
+threads = 1
+allocated_bytes = 358504901408
+boundary_calls = 134
+variant = "directional"
+off_mesh_defect = 3.181609500959742e-5
+boundary_seconds = 0.167065784
+compilation_seconds = 106.406877068
+
+[rhs_seconds]
+0 = 8.409600968
+1 = 19.075634121
+28 = 158.561314061
+
+[rhs_calls]
+0 = 16800
+1 = 7200
+28 = 57600

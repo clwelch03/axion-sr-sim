@@ -1,0 +1,12 @@
+{
+  "coarse": "runs/adiabatic/radial_bvp/results/target_driven_mirk4_v1.jls",
+  "refined": "runs/adiabatic/radial_bvp/results/target_driven_mirk4_refined_v1.jls",
+  "relative_changes": {
+    "energy": -1.0015543400136175e-07,
+    "angular_momentum": -2.5975430574725332e-08,
+    "horizon_energy_flux": -4.7438114044579345e-05,
+    "outer_energy_flux": 4.903370095746627e-07,
+    "horizon_angular_momentum_flux": 4.867978964871672e-06,
+    "outer_angular_momentum_flux": 4.890963672729057e-07
+  }
+}

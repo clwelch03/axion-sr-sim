@@ -1,0 +1,5 @@
+directional derivative at -37.234: (7.635734228174993e-10, 6.872161924273542e-11, 7.635790459140396e-12, 6.882116655119849e-13)
+directional derivative at 41.234: (1.6497191841200085e-6, 2.0324932139574427e-7, 8.776648438428613e-8, 1.5680813877414645e-6)
+directional derivative at 217.234: (1.1593796364553358e-6, 1.0434415902964345e-7, 1.1593795879652105e-8, 1.0434396421441863e-9)
+Test Summary:                                 | Pass  Total   Time
+Frozen radial equations exposed as a real BVP |   25     25  33.0s

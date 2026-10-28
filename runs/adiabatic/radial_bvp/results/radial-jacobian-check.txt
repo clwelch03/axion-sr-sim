@@ -1,0 +1,2 @@
+Explicit greedy coloring, AD chunk size 28, three-node physical BVP.
+Physical collocation Jacobian vs uncompressed AD: 0.0

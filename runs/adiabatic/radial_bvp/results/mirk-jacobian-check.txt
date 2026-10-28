@@ -1,0 +1,5 @@
+MIRK version: 1.19.2
+Unpatched compressed/direct Jacobian max difference: 0.010304921996152405
+Patched compressed/direct Jacobian max difference: 0.0
+Coupled linear BVP return code: Success
+Maximum independent profile error: 2.582936087236476e-10

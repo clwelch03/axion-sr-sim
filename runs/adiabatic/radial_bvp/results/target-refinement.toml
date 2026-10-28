@@ -1,0 +1,40 @@
+reference = "runs/adiabatic/radial_bvp/results/target_driven_mirk4_refined_v1.jls"
+
+[[runs]]
+mesh_points = 401
+requested_tolerance = 0.0001
+passed_residual_checks = true
+frequencies_real = [0.29600682376427184, 0.29836840338540166]
+return_code = "Success"
+amplitudes = [0.036390480353373555, 0.00010896058341192524]
+frequencies_imaginary = [-2.9475426702338456e-6, 8.41410719429948e-7]
+successful = true
+compilation_seconds = 121.112006578
+relative_profile_difference_by_mode = [5.606782224510927e-7, 2.6281770939645025e-7, 2.1014753315567744e-7, 8.032619675510563e-6, 8.309349773126216e-5, 5.657301890729236e-6, 5.203341849556418e-6, 1.9759098907431144e-7, 1.3253953289327543e-7, 0.00025643536078504085, 2.3401308271076866e-6, 2.587883092449253e-7, 2.5731920791340772e-6, 1.3062410689136144e-7, 5.222169269848108e-6, 3.0301595661216135e-6, 8.394384565426661e-7, 9.035118455762994e-5, 0.0010287726225810534, 5.730346388229606e-5, 0.00010643842568186609, 9.899159914377014e-7, 5.595018527809119e-7, 0.0002564354644534518, 1.5591552686652656e-5, 1.2063481564843078e-6, 8.062749186525581e-5, 4.0151396982041456e-7]
+file = "runs/adiabatic/radial_bvp/results/target_driven_mirk4_v1.jls"
+off_mesh_defect = 3.181609500959742e-5
+maximum_frequency_difference = 1.2460728503889933e-10
+parameter_drift = 1.3234889800848443e-23
+solve_seconds = 592.424271037
+sha256 = "940fb60a6185f4d90afbd50d42ba9bab683c72441ab448736d0493ed8f375423"
+case = "target_driven"
+boundary_residual = 3.372799183866404e-8
+[[runs]]
+mesh_points = 881
+requested_tolerance = 1.0e-6
+passed_residual_checks = true
+frequencies_real = [0.2960068238888687, 0.29836840336938947]
+return_code = "Success"
+amplitudes = [0.036390480353373555, 0.00010896058341192524]
+frequencies_imaginary = [-2.947541056316801e-6, 8.414094360639902e-7]
+successful = true
+compilation_seconds = 112.205793397
+relative_profile_difference_by_mode = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+file = "runs/adiabatic/radial_bvp/results/target_driven_mirk4_refined_v1.jls"
+off_mesh_defect = 3.041020799521973e-7
+maximum_frequency_difference = 0.0
+parameter_drift = 0.0
+solve_seconds = 634.973547316
+sha256 = "78663f4757eb0fabecec491b5d1840d70315ee5cd3f3315210531e654d153e37"
+case = "target_driven"
+boundary_residual = 1.6167622796103842e-13

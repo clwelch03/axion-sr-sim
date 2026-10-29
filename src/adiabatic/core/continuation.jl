@@ -50,6 +50,15 @@ struct ContinuationBranch{Settings,Point<:ContinuationPoint,Provenance}
     provenance::Provenance
 end
 
+"""
+    branch_point(branch, point_id)
+
+Find one saved calculation by its stable ID, independent of the vector order.
+Require exactly one match; missing or duplicate IDs are errors.
+"""
+branch_point(branch::ContinuationBranch, point_id::Integer) =
+    only(point for point in branch.points if point.point_id == point_id)
+
 # Retry numerical failures only. Programming, checkpoint, and validation errors
 # must reach the caller instead of silently shrinking the continuation step.
 continuation_numerical_failure(exception) =

@@ -1,6 +1,75 @@
 using Serialization, Printf, LinearAlgebra
 
 """
+    secondary_continuation_checkpoint_adapter(legacy_checkpoint; checkpoint_path)
+
+Read the old secondary branch into the common branch representation. Each point
+contains a unit-normalized secondary profile and an explicit reference to its
+fixed primary background. Retain the actual per-point tolerance when recorded.
+
+Keep all other checkpoint fields, including the linear seed, in settings.
+The primary path identifies the historical input; callers using a frozen copy
+must check its selected primary amplitude and frequency against this record.
+"""
+function secondary_continuation_checkpoint_adapter(legacy_checkpoint; checkpoint_path)
+    branch_settings = (;
+        model=:primary_secondary,
+        (field_name => deepcopy(field_value)
+         for (field_name, field_value) in pairs(legacy_checkpoint)
+         if field_name != :rows)...,
+    )
+
+    branch_points = map(eachindex(legacy_checkpoint.rows)) do point_id
+        legacy_secondary_record = legacy_checkpoint.rows[point_id]
+        solution = legacy_secondary_record.solution
+        first(solution.outer_amplitudes) == 1 ||
+            throw(ArgumentError("Expected a unit-normalized secondary solution."))
+
+        profile = TwoPhaseProfile(
+            [solution.frequency],
+            copy(solution.horizon_amplitudes),
+            copy(solution.outer_amplitudes),
+        )
+
+        # The old amplitude column is the PRIMARY amplitude. The secondary's
+        # own first outer coefficient is fixed to one during these solves.
+        parameter_values = (;
+            amplitude=1.0,
+            primary_amplitude=legacy_secondary_record.amplitude,
+        )
+        backgrounds = (primary=(;
+            checkpoint_path=legacy_checkpoint.primary_path,
+            point_id=legacy_secondary_record.primary_index,
+        ),)
+
+        # Secondary Newton uses the unscaled residual. Its tolerance can grow
+        # along the branch, so the branch default must not replace a row's value.
+        diagnostics = (;
+            residual=copy(solution.residual),
+            residual_norm=solution.residual_norm,
+            scaled_residual_norm=solution.residual_norm,
+            residual_scale=1.0,
+            tolerance=get(legacy_secondary_record, :tolerance, nothing),
+            iterations=solution.iterations,
+            primary_frequency=legacy_secondary_record.omega1,
+            primary_residual_change=legacy_secondary_record.primary_residual_change,
+        )
+        return ContinuationPoint(
+            point_id, parameter_values, profile, diagnostics, backgrounds, nothing,
+        )
+    end
+
+    # A fresh checkpoint can contain only the linear seed and an untyped rows=[].
+    isempty(branch_points) && (branch_points = ContinuationPoint[])
+
+    provenance = (;
+        checkpoint_path=abspath(checkpoint_path),
+        source_format=:legacy_primary_secondary,
+    )
+    return ContinuationBranch(branch_settings, branch_points, provenance)
+end
+
+"""
     load_primary_secondary_setup(primary_path; secondary_modes=[(2, 2), (4, 2), (6, 2)])
 
 Read a primary branch checkpoint and build angular tables covering both the

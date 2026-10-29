@@ -36,7 +36,8 @@ Return the real scalar `d(E/Fa²)/dr_*`, including the radial Jacobian
 
 # Arguments
 - `fundamental_m=1`: positive integer azimuthal number of the fundamental.
-- `potential=:cosine`: select `:cosine`, `:quartic`, or `:sextic`.
+- `potential=:cosine`: select `:quadratic`, `:cosine`, `:quartic`, or `:sextic`.
+  Use `:quadratic` for the free massive field, with self-interaction neglected.
 
 See also [`reconstruct_field`](@ref), [`tortoise_geometry`](@ref).
 """
@@ -122,14 +123,15 @@ contains `[R; Q]` in `modes` order. Accept strictly increasing or decreasing
 positions; orient the integral toward increasing tortoise radius.
 
 Return the real scalar `E/Fa²` over the branch's finite radial interval,
-using composite Simpson quadrature. Require uniform spacing and an even
-number of intervals on each branch. This quadrature is fourth order for
+using composite Simpson quadrature. Require uniform spacing and at least two
+intervals; an odd interval count uses Simpson's 3/8 rule for the last three.
+This quadrature is fourth order for
 smooth energy densities; check radial spacing and endpoint dependence
 separately.
 
 # Arguments
 - `fundamental_m=1`: positive integer azimuthal number of the fundamental.
-- `potential=:cosine`: select `:cosine`, `:quartic`, or `:sextic`;
+- `potential=:cosine`: select `:quadratic`, `:cosine`, `:quartic`, or `:sextic`;
   use the same potential that generated the radial profiles.
 
 See also [`energy_per_tortoise_radius`](@ref).
@@ -165,24 +167,15 @@ function integrate_energy_branch(
         for index in order
     ]
 
-    # Simpson's rule
+    # The shared quadrature handles both primary and secondary grid parities.
     interval_count = length(ordered_positions) - 1
-    iseven(interval_count) ||
-        throw(ArgumentError("Simpson's rule requires an even number of intervals"))
-
     spacing = (last(ordered_positions) - first(ordered_positions)) / interval_count
     all(
         step -> isapprox(step, spacing; rtol=1e-10, atol=0),
         diff(ordered_positions),
     ) || throw(ArgumentError("Simpson's rule requires uniformly spaced positions"))
 
-    # Julia index 2 corresponds to the first interior point, with weight 4.
-    weighted_density =
-        first(densities) + last(densities) +
-        4 * sum(densities[2:2:end-1]) +
-        2 * sum(densities[3:2:end-2])
-
-    return (spacing / 3) * weighted_density
+    return integrate_uniform(densities, spacing)
 end
 
 """

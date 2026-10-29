@@ -210,6 +210,50 @@ function continue_two_phase_amplitude(seed, output_prefix; target_amplitude,
 end
 
 """
+    two_phase_boundary_state(profile::TwoPhaseProfile,
+        problem::TwoPhaseProblem, side::Symbol)
+
+Return the complex boundary-series state `[R; Q]`, where `Q = dR/dr*`.
+
+Choose `side = :horizon` or `:outer`. Read the frequencies and the selected
+boundary coefficients from `profile`; read the endpoint radius, series orders,
+component ordering, and physical settings from `problem`.
+
+Collect all field values before all slopes, ordered by `problem.components`
+and then each component's `l_values`. Return two complex entries per retained
+radial mode. Input arrays are read without mutation.
+
+Throw `ArgumentError` for an unsupported side or an empty component list,
+and `DimensionMismatch` if the selected coefficient count is inconsistent.
+"""
+function two_phase_boundary_state(profile::TwoPhaseProfile,
+        problem::TwoPhaseProblem, side::Symbol)
+    side in (:horizon, :outer) || throw(ArgumentError("unknown boundary side"))
+    (; spin, alpha, components, cloud_m, couplings) = problem
+    (; inner, outer, horizon_order, outer_order) = problem.integration
+    position = side == :horizon ? inner : outer
+    coefficients = side == :horizon ?
+        profile.horizon_coefficients : profile.outer_coefficients
+
+    isempty(components) && throw(ArgumentError("require at least one component"))
+    counts = [length(component.l_values) for component in components]
+    offsets = cumsum(vcat(0, counts))
+    length(coefficients) == offsets[end] ||
+        throw(DimensionMismatch("require one boundary coefficient per retained pair"))
+
+    blocks = [component_boundary_state(side, position, spin, alpha, component,
+        profile.frequencies, cloud_m, couplings,
+        coefficients[offsets[index]+1:offsets[index+1]];
+        horizon_order, outer_order)
+        for (index, component) in enumerate(components)]
+
+    # Each component returns [R; Q]; the joint RHS needs every R before every Q.
+    fields = [block[1:counts[index]] for (index, block) in enumerate(blocks)]
+    slopes = [block[counts[index]+1:end] for (index, block) in enumerate(blocks)]
+    return vcat(fields..., slopes...)
+end
+
+"""
     two_phase_matching_residual(profile::TwoPhaseProfile,
         problem::TwoPhaseProblem; save_radial_result=false)
 
@@ -242,20 +286,9 @@ function two_phase_matching_residual(profile::TwoPhaseProfile, problem::TwoPhase
     length(horizon_coefficients) == length(outer_coefficients) == offsets[end] ||
         throw(DimensionMismatch("require one boundary coefficient per retained pair"))
 
-    function assemble_boundary(side, position, coefficients)
-        blocks = [component_boundary_state(side, position, spin, alpha, component,
-            cloud_frequencies, cloud_m, couplings,
-            coefficients[offsets[j]+1:offsets[j+1]]; horizon_order, outer_order)
-            for (j, component) in enumerate(components)]
+    horizon_state = two_phase_boundary_state(profile, problem, :horizon)
+    outer_state = two_phase_boundary_state(profile, problem, :outer)
 
-        # Each block is [R; Q]. Gather ALL R blocks before ALL Q blocks for the RHS.
-        profiles = [block[1:counts[j]] for (j, block) in enumerate(blocks)]
-        slopes = [block[counts[j]+1:end] for (j, block) in enumerate(blocks)]
-        return vcat(profiles..., slopes...)
-    end
-
-    horizon_state = assemble_boundary(:horizon, inner, horizon_coefficients)
-    outer_state = assemble_boundary(:outer, outer, outer_coefficients)
     rhs! = (derivative, state, position) -> nonlinear_two_phase_rhs!(
         derivative, state, position, spin, alpha, components, cloud_frequencies,
         cloud_m, couplings, source_basis; potential)

@@ -123,12 +123,15 @@ nonzero amplitude to exclude the trivial zero field.
 - `inner=-100.0`: inner endpoint in tortoise radius.
 - `outer=100.0`: outer endpoint in tortoise radius.
 - `match=5.0`: matching coordinate, with `inner < match < outer`.
+- `save_profile=false`: when true, retain both integrations and return
+  `(from_horizon, from_outer, residual)`, as for nonlinear reconstruction.
 
 See also [`solve_linear_mode`](@ref), [`nonlinear_matching_residual`](@ref).
 """
 function matching_residual(frequency, horizon_amplitudes, outer_amplitudes,
                            spin, alpha, l_values, m, couplings;
-                           step=0.05, inner=-100.0, outer=100.0, match=5.0)
+                           step=0.05, inner=-100.0, outer=100.0, match=5.0,
+                           save_profile=false)
     inner < match < outer ||
         throw(ArgumentError("match must lie between endpoints"))
 
@@ -145,12 +148,16 @@ function matching_residual(frequency, horizon_amplitudes, outer_amplitudes,
         outer, spin, alpha, frequency, l_values, m, couplings, outer_amplitudes)
 
     from_horizon = integrate_radial(
-        rhs!, vcat(horizon.values, horizon.tortoise_slopes), inner, match; step)
-    from_infinity = integrate_radial(
-        rhs!, vcat(infinity.values, infinity.tortoise_slopes), outer, match; step)
+        rhs!, vcat(horizon.values, horizon.tortoise_slopes), inner, match; step, save_profile)
+    from_outer = integrate_radial(
+        rhs!, vcat(infinity.values, infinity.tortoise_slopes), outer, match; step, save_profile)
 
     # Requiring both halves to vanish joins the profiles and their slopes.
-    return from_horizon - from_infinity
+    if save_profile
+        residual = from_horizon.states[:, end] - from_outer.states[:, end]
+        return (; from_horizon, from_outer, residual)
+    end
+    return from_horizon - from_outer
 end
 
 

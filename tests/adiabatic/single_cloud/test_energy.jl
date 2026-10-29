@@ -98,7 +98,7 @@ end
     start, stop = 2.0, 4.0
     expected = (stop - start) + (stop^4 - start^4) / 4
 
-    for interval_count in (2, 8)
+    for interval_count in (2, 3, 5, 8)
         positions = collect(range(start, stop; length=interval_count + 1))
         states = zeros(ComplexF64, 2, length(positions))
 
@@ -126,4 +126,41 @@ end
             @test isapprox(computed, expected; rtol=1e-12)
         end
     end
+end
+
+@testset "Free-field energy and amplitude normalization" begin
+    grid = angular_grid(16, 31)
+    polar_values = build_polar_values(2, grid.cosine_theta_nodes)
+    azimuthal_values = build_azimuthal_values(2, grid.azimuth_nodes)
+    spin, alpha, position = 0.99, 0.3, 10.0
+    frequency = 0.296 + 1e-8im
+    state = ComplexF64[0.7 + 0.2im, -0.03 + 0.01im]
+    geometry = tortoise_geometry(position, spin)
+    radial_value, radial_slope = state
+
+    # For normalized Y_mm, <cos² theta> = 1/(2m+3). This independently checks
+    # the quadratic mass energy and the fundamental-m convention for both clouds.
+    for m in (1, 2)
+        mean_cosine_squared = 1 / (2m + 3)
+        expected = 2π * (
+            (geometry.radial_factor - geometry.dr_drstar * spin^2 *
+                (1 - mean_cosine_squared)) * abs2(frequency * radial_value) +
+            geometry.radial_factor * abs2(radial_slope) +
+            (geometry.dr_drstar * (m * (m + 1) + alpha^2 *
+                (geometry.radius^2 + spin^2 * mean_cosine_squared)) -
+                spin^2 * m^2 / geometry.radial_factor) * abs2(radial_value)
+        )
+        measured = energy_per_tortoise_radius(
+            state, position, frequency, spin, alpha, [(m, m)],
+            polar_values, azimuthal_values, grid; fundamental_m=m, potential=:quadratic)
+        @test isapprox(measured, expected; rtol=1e-12)
+        for amplitude_factor in (0.1, 0.73, 2.0)
+            rescaled = energy_per_tortoise_radius(
+                amplitude_factor .* state, position, frequency, spin, alpha, [(m, m)],
+                polar_values, azimuthal_values, grid; fundamental_m=m, potential=:quadratic)
+            @test isapprox(rescaled, amplitude_factor^2 * measured; rtol=1e-12)
+        end
+    end
+    @test potential_value(3.0, :quadratic) == 4.5
+    @test potential_remainder(3.0, :quadratic) == 0
 end

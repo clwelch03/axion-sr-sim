@@ -45,8 +45,12 @@ TABLES = {
 OPTIONAL_TABLES = {"guardian_review_feedback", "thread_read_receipts"}
 CONTENT_TABLES = tuple(t for t in TABLES if t not in (
     "threads", "thread_history_projection_state", "thread_read_receipts"))
+HISTORY_TABLES = tuple(t for t, (database, _) in TABLES.items() if database == 1)
 ORGANIZATION = ("name", "project_id", "thread_section_id", "section_position",
                 "section_entered_at_ms", "is_pinned", "archived", "archived_at")
+# Recency can change when a node merely opens a chat. Import these timestamps
+# along with real changes, but do not schedule a recovery solely for UI activity.
+RECENCY = ("updated_at", "updated_at_ms", "recency_at", "recency_at_ms")
 UUID_PATTERN = re.compile(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}")
 DEFAULT_NODES = tuple("n000%d.scs00" % i for i in (1, 2, 3))
 
@@ -159,16 +163,51 @@ class Store:
         return complete
 
 
-def reviewed_continuation_paths(thread_id, selected, paths, home):
-    """Verify a reviewed source follows every older rollout through history_base.
+def continuation_boundary(path, base):
+    """Check a continuation's byte/ordinal boundary and inventory its old tail.
 
-    This is deliberately opt-in: continuation boundaries can omit aborted turns,
-    so ancestry alone is not a substitute for reviewing the saved histories.
+    A continuation can deliberately branch before the end of its parent. Keep
+    that whole parent (and its database rows), and disclose the omitted tail;
+    never rewrite the boundary to splice two different histories together.
     """
-    require(home is not None, "A Codex home is required to review continuations")
+    end_ordinal, end_byte = base.get("end_ordinal_exclusive"), base.get("end_byte_offset")
+    require(type(end_ordinal) is int and type(end_byte) is int
+            and end_ordinal >= 0 and end_byte >= 0,
+            "Invalid continuation boundary: " + str(path))
+    offset, boundary_offset, tail_records, tail_turns = 0, None, 0, set()
+    with path.open("rb") as stream:
+        for index, line in enumerate(stream):
+            record = json.loads(line)
+            if index == 0:
+                start = (record.get("payload", {}).get("history_base") or {}).get("end_ordinal_exclusive", 0)
+                require(type(start) is int and start >= 0, "Invalid ancestor ordinal: " + str(path))
+            ordinal = start + index
+            if ordinal == end_ordinal:
+                boundary_offset = offset
+            if ordinal >= end_ordinal:
+                tail_records += 1
+                payload = record.get("payload", {})
+                if record.get("type") == "turn_context" or (
+                        record.get("type") == "event_msg" and payload.get("type") == "task_started"):
+                    if payload.get("turn_id"):
+                        tail_turns.add(payload["turn_id"])
+            offset += len(line)
+        if offset and ordinal + 1 == end_ordinal:
+            boundary_offset = offset
+    require(boundary_offset == end_byte,
+            "Continuation byte/ordinal boundary does not match ancestor: " + str(path))
+    return {"path": str(path.resolve()), "end_ordinal_exclusive": end_ordinal,
+            "end_byte_offset": end_byte, "tail_records": tail_records,
+            "tail_turn_ids": sorted(tail_turns)}
+
+
+def continuation_paths(thread_id, selected, paths, home, *, audit_boundaries=True):
+    """Verify the selected rollout descends from every known indexed version."""
+    require(home is not None, "A Codex home is required to verify continuations")
     inventory = transcript_inventory(home)
     pending = Path(selected)
-    hashes, names = {}, set()
+    hashes, names, boundaries = {}, set(), []
+    child_base = None
     while True:
         path = pending.resolve()
         require(path.is_relative_to(home.resolve()), "Rollout outside shared Codex home: " + str(path))
@@ -181,6 +220,8 @@ def reviewed_continuation_paths(thread_id, selected, paths, home):
         require(first.get("type") == "session_meta", "Unsupported rollout header: " + str(path))
         metadata = first["payload"]
         require(metadata.get("id") == thread_id, "Continuation belongs to another chat: " + str(path))
+        if child_base is not None and audit_boundaries:
+            boundaries.append(continuation_boundary(path, child_base))
         base = metadata.get("history_base")
         if not base:
             break
@@ -189,10 +230,39 @@ def reviewed_continuation_paths(thread_id, selected, paths, home):
         require(matches, "Missing ancestor rollout: " + str(parent))
         require(len({digest(match) for match in matches}) == 1, "Conflicting ancestor rollouts: " + str(parent))
         pending = matches[0]
+        child_base = base
     require({Path(path).name for path in paths} <= names,
-            "Reviewed continuation does not descend from every known rollout: " + thread_id)
+            "Selected continuation does not descend from every known rollout: " + thread_id)
     check_transcripts(hashes)
-    return hashes
+    return hashes, boundaries
+
+
+def uncached_history_path(source, thread_id, home):
+    """Identify a complete rollout whose pagination cache can be rebuilt.
+
+    Never fall back from a partial cache or a continuation: those need their
+    database history. The isolated engine must still read the imported chat.
+    """
+    row = source.thread(thread_id)
+    if home is None or not row or row.get("history_mode") != "paginated":
+        return None
+    if any(source.records(table, thread_id) for table in (
+            "thread_turns", "thread_items", "thread_realtime_items", "thread_history_projection_state")):
+        return None
+    path = Path(row["rollout_path"]).resolve()
+    require(path.is_relative_to(home.resolve()), "Rollout outside shared Codex home: " + str(path))
+    expected = digest(path)
+    with path.open() as stream:
+        first = json.loads(stream.readline())
+    require(first.get("type") == "session_meta", "Unsupported rollout header: " + str(path))
+    metadata = first["payload"]
+    require(metadata.get("id") == thread_id, "Rollout belongs to another chat: " + str(path))
+    if metadata.get("history_base") or UUID_PATTERN.findall(path.name)[-1:] != [thread_id]:
+        return None
+    if thread_id in empty_helper_threads(source, [thread_id]):
+        return None
+    check_transcripts({str(path): expected})
+    return path, expected
 
 
 def make_plan(stores, excluded, reviewed_continuations=None, home=None):
@@ -226,39 +296,54 @@ def make_plan(stores, excluded, reviewed_continuations=None, home=None):
         if not candidates:
             conflicts.append({"id": thread_id, "reason": "Divergent content; no source contains all versions"})
             continue
-        # Do not silently change continuation lineage, even with newer timestamps.
+        # Choose lineage by ancestry, never by timestamps. A stale node can still
+        # index an earlier segment of a chat resumed elsewhere.
         paths = {store.thread(thread_id)["rollout_path"] for store in known if store.thread(thread_id)}
         # Archiving moves a file without changing its identity.
-        reviewed_paths = None
+        verified_paths, boundaries = None, []
         if len({Path(path).name for path in paths}) > 1:
             reviewed_source = reviewed_continuations.get(thread_id)
-            if reviewed_source is None:
-                conflicts.append({"id": thread_id, "reason": "Different rollout/continuation paths require manual review",
+            if reviewed_source is not None:
+                candidates = [(label, store) for label, store in candidates if label == reviewed_source]
+                if not candidates:
+                    conflicts.append({"id": thread_id, "reason": "Reviewed source does not contain every known content row"})
+                    continue
+            verified, failures = {}, []
+            for label, store in candidates:
+                try:
+                    verified[label] = continuation_paths(
+                        thread_id, store.thread(thread_id)["rollout_path"], paths, home,
+                        audit_boundaries=reviewed_source is None)
+                except (RecoveryError, OSError, ValueError) as error:
+                    if reviewed_source is not None:
+                        raise
+                    failures.append("%s: %s" % (label, error))
+            candidates = [(label, store) for label, store in candidates if label in verified]
+            if not candidates:
+                conflicts.append({"id": thread_id,
+                                  "reason": "Different rollout/continuation paths could not be verified; " + "; ".join(failures),
                                   "title": next(store.thread(thread_id).get("title", thread_id)
                                                 for store in known if store.thread(thread_id)),
                                   "paths": {label: store.thread(thread_id)["rollout_path"]
                                             for label, store in stores.items() if store.thread(thread_id)}})
                 continue
-            candidates = [(label, store) for label, store in candidates if label == reviewed_source]
-            if not candidates:
-                conflicts.append({"id": thread_id, "reason": "Reviewed source does not contain every known content row"})
-                continue
-            reviewed_paths = reviewed_continuation_paths(
-                thread_id, candidates[0][1].thread(thread_id)["rollout_path"], paths, home)
         def rank(candidate):
             label, store = candidate
             row = store.thread(thread_id) or {}
             return (row.get("history_mode") == "paginated",
                     row.get("updated_at_ms") or row.get("updated_at", 0) * 1000, label == "local")
         label, source = max(candidates, key=rank)
+        if len({Path(path).name for path in paths}) > 1:
+            verified_paths, boundaries = verified[label]
         source_row = source.thread(thread_id)
         content_changed = any(source.records(table, thread_id) != target.records(table, thread_id)
                               for table in CONTENT_TABLES)
         metadata_changed = source_row and existing and any(
             source_row.get(key) != existing.get(key)
-            for key in source.columns["threads"] if key not in ORGANIZATION)
+            for key in source.columns["threads"] if key not in ORGANIZATION + RECENCY)
         if label == "local" or (not content_changed and not metadata_changed and bool(source_row) == bool(existing)):
             continue
+        uncached = uncached_history_path(source, thread_id, home)
         # New project/section memberships need additional tables; fail explicitly.
         if source_row and not existing and (source_row.get("project_id") or source_row.get("thread_section_id")):
             conflicts.append({"id": thread_id, "reason": "New chat belongs to a project or section; manual import required"})
@@ -268,13 +353,20 @@ def make_plan(stores, excluded, reviewed_continuations=None, home=None):
                      "title": (source_row or {}).get("name") or (source_row or {}).get("title", thread_id),
                      "source": (source_row or {}).get("source"),
                      "metadata_only": not content_changed and bool(existing)})
-        if reviewed_paths:
-            plan[-1]["reviewed_continuation_paths"] = reviewed_paths
+        if verified_paths:
+            plan[-1]["verified_continuation_paths"] = verified_paths
+            plan[-1]["continuation_boundaries"] = boundaries
+        if uncached is not None:
+            path, expected = uncached
+            plan[-1]["rebuild_history_paths"] = {str(path): expected}
     return plan, conflicts, excluded
 
 
 def desired_rows(stores, entry, table):
     thread_id = entry["id"]
+    if table in HISTORY_TABLES and "recovered_history" in entry:
+        return {tuple(row[k] for k in stores["local"].primary_keys[table]): dict(row)
+                for row in entry["recovered_history"][table]}
     rows = {key: dict(row) for key, row in stores[entry["node"]].records(table, thread_id).items()}
     existing = stores["local"].thread(thread_id)
     # Read/unread cursors are local UI state, not competing chat histories.
@@ -367,7 +459,8 @@ def collect_transcripts(stores, plan, home):
         row = stores[entry["node"]].thread(entry["id"])
         if row:
             indexed[entry["id"]] = row
-        check_transcripts(entry.get("reviewed_continuation_paths", {}))
+        check_transcripts(entry.get("verified_continuation_paths", {}))
+        check_transcripts(entry.get("rebuild_history_paths", {}))
     verify_ids = {entry["id"] for entry in plan if entry["id"] in indexed}
     for entry in plan:
         if entry["id"] not in indexed:
@@ -385,7 +478,7 @@ def collect_transcripts(stores, plan, home):
             verify_ids.update(owners)
     pending = [Path(indexed[tid]["rollout_path"]) for tid in verify_ids]
     pending.extend(path for entry in plan for path in inventory.get(entry["id"], []))
-    pending.extend(Path(path) for entry in plan for path in entry.get("reviewed_continuation_paths", {}))
+    pending.extend(Path(path) for entry in plan for path in entry.get("verified_continuation_paths", {}))
     hashes = {}
     while pending:
         path = pending.pop().resolve()
@@ -460,9 +553,10 @@ def empty_helper_threads(store, thread_ids):
     return empty
 
 
-def validate_app_server(binary, probe, thread_ids, report_path):
-    """Read full history in an isolated home. No turns, auth, or source writes."""
-    empty_helpers = empty_helper_threads(Store(probe / "db"), thread_ids)
+def validate_app_server(binary, probe, thread_ids, report_path, resume_ids=()):
+    """Read isolated histories; resuming copies starts no model turns."""
+    store = Store(probe / "db")
+    empty_helpers = empty_helper_threads(store, thread_ids)
     environment = dict(os.environ, CODEX_HOME=str(probe / "home"), CODEX_SQLITE_HOME=str(probe / "db"))
     environment.pop("CODEX_THREAD_ID", None)
     with report_path.with_suffix(".stderr.log").open("w") as errors:
@@ -498,6 +592,12 @@ def validate_app_server(binary, probe, thread_ids, report_path):
                                    "capabilities": {"experimentalApi": True}})
             process.stdin.write(b'{"method":"initialized"}\n')
             for thread_id in thread_ids:
+                # This engine builds missing projections on resume. Legacy
+                # readers also require a loaded session for list_turns. These
+                # writes are confined to disposable copies of the databases
+                # and rollouts; never resume a live/source chat here.
+                if thread_id in resume_ids or store.thread(thread_id).get("history_mode") == "legacy":
+                    request("thread/resume", {"threadId": thread_id})
                 # This installed engine supports includeTurns for both storage modes.
                 # If a later engine removes it, stop rather than accepting an empty read.
                 thread = request("thread/read", {"threadId": thread_id, "includeTurns": True})["thread"]
@@ -522,6 +622,67 @@ def validate_app_server(binary, probe, thread_ids, report_path):
                     process.kill()
                     process.wait()
             process.stdout.close()
+
+
+def prepare_probe(probe, root, stores, plan, home, timeout):
+    snapshot(root / "local", probe / "db", timeout=timeout)
+    merge(probe / "db", stores, plan)
+    verify_rows(probe / "db", stores, plan)
+    shutil.copytree(root / "transcripts", probe / "home")
+    with contextlib.closing(connect(probe / "db" / DATABASES[0], writable=True)) as connection:
+        for row in connection.execute("SELECT id,rollout_path FROM threads").fetchall():
+            path = Path(row["rollout_path"]).resolve()
+            require(path.is_relative_to(home), "Rollout outside Codex home: " + str(path))
+            connection.execute("UPDATE threads SET rollout_path=? WHERE id=?",
+                               (str(probe / "home" / path.relative_to(home)), row["id"]))
+        connection.commit()
+
+
+def recovered_history(store, thread_id, original, resumed):
+    """Accept only rows derived from the original bytes, excluding resume settings."""
+    require(resumed.startswith(original), "History rebuild rewrote the copied rollout: " + thread_id)
+    for line in resumed[len(original):].splitlines():
+        record = json.loads(line)
+        require(record.get("type") == "event_msg"
+                and record.get("payload", {}).get("type") == "thread_settings_applied",
+                "History rebuild appended conversation content: " + thread_id)
+    size, count = len(original), len(original.splitlines())
+    rows = {table: [dict(row) for row in store.records(table, thread_id).values()] for table in HISTORY_TABLES}
+    require(rows["thread_turns"] and len(rows["thread_history_projection_state"]) == 1,
+            "History rebuild produced no complete projection: " + thread_id)
+    require(not rows["thread_realtime_items"], "Unexpected realtime history during rebuild: " + thread_id)
+    for table in ("thread_turns", "thread_items"):
+        for row in rows[table]:
+            for column in ("rollout_byte_offset", "rollout_end_byte_offset"):
+                require(row.get(column) is None or 0 <= row[column] <= size,
+                        "Rebuilt history extends beyond original rollout: " + thread_id)
+            for column in ("rollout_ordinal", "rollout_end_ordinal", "updated_at_ordinal"):
+                require(row.get(column) is None or 0 <= row[column] < count,
+                        "Rebuilt history extends beyond original ordinals: " + thread_id)
+    projection = rows["thread_history_projection_state"][0]
+    require(projection["next_rollout_byte_offset"] == len(resumed)
+            and projection["next_rollout_ordinal"] == len(resumed.splitlines()),
+            "History rebuild did not consume the full rollout: " + thread_id)
+    projection.update(next_rollout_byte_offset=size, next_rollout_ordinal=count)
+    return rows
+
+
+def rebuild_histories(binary, root, stores, plan, home, timeout):
+    entries = [entry for entry in plan if entry.get("rebuild_history_paths")]
+    if not entries:
+        return
+    with tempfile.TemporaryDirectory(prefix="codex-chat-rebuild-") as temporary:
+        probe = Path(temporary)
+        prepare_probe(probe, root, stores, plan, home, timeout)
+        ids = [entry["id"] for entry in entries]
+        validate_app_server(binary, probe, ids, root / "rebuild-validation.json", resume_ids=ids)
+        rebuilt = Store(probe / "db")
+        require(rebuilt.schema == stores["local"].schema, "History rebuild changed the database schema")
+        for entry in entries:
+            path = Path(next(iter(entry["rebuild_history_paths"]))).relative_to(home)
+            entry["recovered_history"] = recovered_history(
+                rebuilt, entry["id"], (root / "transcripts" / path).read_bytes(),
+                (probe / "home" / path).read_bytes())
 
 
 @contextlib.contextmanager
@@ -646,6 +807,13 @@ def run(args):
     save_json(root / "plan.json", report)
     for entry in plan:
         print("Planned %s: %s [%s]" % (entry["kind"], entry["title"][:100], entry["node"]), flush=True)
+        if entry.get("rebuild_history_paths"):
+            print("  Missing pagination cache; rebuilding and validating from an isolated rollout copy.", flush=True)
+        for boundary in entry.get("continuation_boundaries", []):
+            if boundary["tail_records"]:
+                print("  Continuation branches before %d older records (%d turn starts); "
+                      "retaining the full ancestor and all stored history. See plan.json."
+                      % (boundary["tail_records"], len(boundary["tail_turn_ids"])), flush=True)
     for conflict in conflicts:
         print("Conflict: %s [%s]: %s" % (conflict.get("title", conflict["id"]),
                                         conflict["id"], conflict["reason"]), flush=True)
@@ -664,19 +832,11 @@ def run(args):
         shutil.copyfile(path, destination)
         require(digest(destination) == hashes[path], "Transcript changed while backing up: " + path)
     binary = find_codex(args.codex_bin)
+    rebuild_histories(binary, root, stores, plan, home, args.snapshot_timeout)
+    save_json(root / "plan.json", report)
     with tempfile.TemporaryDirectory(prefix="codex-chat-probe-") as temporary:
         probe = Path(temporary)
-        snapshot(root / "local", probe / "db", timeout=args.snapshot_timeout)
-        merge(probe / "db", stores, plan)
-        verify_rows(probe / "db", stores, plan)
-        shutil.copytree(root / "transcripts", probe / "home")
-        with contextlib.closing(connect(probe / "db" / DATABASES[0], writable=True)) as connection:
-            for row in connection.execute("SELECT id,rollout_path FROM threads").fetchall():
-                path = Path(row["rollout_path"]).resolve()
-                require(path.is_relative_to(home), "Rollout outside Codex home: " + str(path))
-                connection.execute("UPDATE threads SET rollout_path=? WHERE id=?",
-                                   (str(probe / "home" / path.relative_to(home)), row["id"]))
-            connection.commit()
+        prepare_probe(probe, root, stores, plan, home, args.snapshot_timeout)
         validate_app_server(binary, probe, verify_ids, root / "validation.json")
     check_transcripts(hashes)
     if not args.apply:

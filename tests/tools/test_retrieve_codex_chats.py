@@ -22,7 +22,7 @@ spec.loader.exec_module(recovery)
 STATE_SCHEMA = """
 CREATE TABLE threads (
     id TEXT PRIMARY KEY, rollout_path TEXT, title TEXT, name TEXT, source TEXT,
-    updated_at INTEGER, updated_at_ms INTEGER, history_mode TEXT,
+    updated_at INTEGER, updated_at_ms INTEGER, recency_at INTEGER, recency_at_ms INTEGER, history_mode TEXT,
     project_id TEXT, thread_section_id TEXT, section_position INTEGER,
     section_entered_at_ms INTEGER, is_pinned INTEGER DEFAULT 0,
     archived INTEGER DEFAULT 0, archived_at INTEGER);
@@ -117,6 +117,32 @@ class RetrievalTests(unittest.TestCase):
         plan, conflicts, _ = recovery.make_plan(self.stores(), set())
         self.assertEqual(plan, [])
         self.assertEqual(len(conflicts), 1)
+
+    def test_recency_only_changes_do_not_schedule_imports(self):
+        add_chat(self.local)
+        add_chat(self.remote, timestamp=100)
+        with sqlite3.connect(self.remote / recovery.DATABASES[0]) as connection:
+            connection.execute("UPDATE threads SET updated_at_ms=100001,recency_at=100,recency_at_ms=100001")
+        self.assertEqual(recovery.make_plan(self.stores(), set())[:2], ([], []))
+        # Actual history still imports together with its source timestamps.
+        add_turn(self.remote)
+        stores = self.stores()
+        plan, conflicts, _ = recovery.make_plan(stores, set())
+        self.assertEqual(conflicts, [])
+        self.assertEqual(len(plan), 1)
+        recovery.merge(self.local, stores, plan)
+        recovery.verify_rows(self.local, stores, plan)
+        self.assertEqual(recovery.Store(self.local).thread("chat")["recency_at_ms"], 100001)
+
+    def test_real_metadata_changes_still_schedule_imports(self):
+        add_chat(self.local)
+        add_chat(self.remote, timestamp=100)
+        with sqlite3.connect(self.remote / recovery.DATABASES[0]) as connection:
+            connection.execute("UPDATE threads SET title='Updated title'")
+        plan, conflicts, _ = recovery.make_plan(self.stores(), set())
+        self.assertEqual(conflicts, [])
+        self.assertEqual(len(plan), 1)
+        self.assertTrue(plan[0]["metadata_only"])
 
     def test_split_new_turns_need_manual_merge(self):
         add_chat(self.local)
@@ -351,7 +377,8 @@ class RetrievalTests(unittest.TestCase):
             metadata = {"id": owner, "history_mode": "paginated"}
             if number:
                 metadata["history_base"] = {"thread_id": (owner, middle)[number - 1],
-                                            "end_ordinal_exclusive": number, "end_byte_offset": 100}
+                                            "end_ordinal_exclusive": number,
+                                            "end_byte_offset": paths[-1].stat().st_size}
             path.write_text(json.dumps({"type": "session_meta", "payload": metadata}) + "\n")
             paths.append(path)
         for directory, path, timestamp in ((self.local, paths[0], 100), (self.remote, paths[-1], 2)):
@@ -362,6 +389,96 @@ class RetrievalTests(unittest.TestCase):
         for segment in (middle, latest):
             add_turn(self.remote, thread_id=segment)
         return home, (owner, middle, latest), paths
+
+    def test_automatic_continuation_preserves_segments_and_repeats_without_flag(self):
+        home, (owner, middle, latest), paths = self.continuation_fixture()
+        stores = self.stores()
+        plan, conflicts, _ = recovery.make_plan(stores, set(), home=home)
+        self.assertEqual(conflicts, [])
+        self.assertEqual({entry["id"] for entry in plan}, {owner, middle, latest})
+        entry = next(entry for entry in plan if entry["id"] == owner)
+        # The stale local index has a newer timestamp, but ancestry wins.
+        self.assertEqual(entry["node"], "remote")
+        self.assertEqual(set(entry["verified_continuation_paths"]), {str(path) for path in paths})
+        self.assertTrue(all(boundary["tail_records"] == 0 for boundary in entry["continuation_boundaries"]))
+        self.assertEqual(recovery.collect_transcripts(stores, plan, home)[0], [owner])
+        recovery.merge(self.local, stores, plan)
+        recovery.verify_rows(self.local, stores, plan)
+        self.assertEqual(recovery.Store(self.local).thread(owner)["rollout_path"], str(paths[-1]))
+        self.assertEqual(recovery.make_plan(self.stores(), set(), home=home)[:2], ([], []))
+        # A third node retaining the old index must not demand a flag every pull.
+        repeated = self.stores()
+        repeated["stale"] = stores["local"]
+        self.assertEqual(recovery.make_plan(repeated, set(), home=home)[:2], ([], []))
+
+    def test_automatic_continuation_reports_and_preserves_parent_tail(self):
+        home, (owner, _, _), paths = self.continuation_fixture()
+        tail = {"type": "event_msg", "payload": {"type": "task_started", "turn_id": "old-tail"}}
+        with paths[0].open("a") as stream:
+            stream.write(json.dumps(tail) + "\n")
+        for directory in (self.local, self.remote):
+            add_turn(directory, thread_id=owner, turn="old-tail", content="older branch message")
+        stores = self.stores()
+        plan, conflicts, _ = recovery.make_plan(stores, set(), home=home)
+        self.assertEqual(conflicts, [])
+        entry = next(entry for entry in plan if entry["id"] == owner)
+        boundary = next(b for b in entry["continuation_boundaries"] if b["path"] == str(paths[0]))
+        self.assertEqual(boundary["tail_records"], 1)
+        self.assertEqual(boundary["tail_turn_ids"], ["old-tail"])
+        original = {str(path): path.read_bytes() for path in paths}
+        _, hashes = recovery.collect_transcripts(stores, plan, home)
+        self.assertEqual(set(hashes), set(original))
+        recovery.merge(self.local, stores, plan)
+        recovery.verify_rows(self.local, stores, plan)
+        self.assertEqual(len(recovery.Store(self.local).records("thread_turns", owner)), 2)
+        self.assertEqual({str(path): path.read_bytes() for path in paths}, original)
+
+    def test_automatic_continuation_cannot_discard_ancestor_rows(self):
+        home, (owner, middle, _), _paths = self.continuation_fixture()
+        for segment in (owner, middle):
+            with self.subTest(segment=segment):
+                add_turn(self.local, thread_id=segment, turn="local-only")
+                plan, conflicts, _ = recovery.make_plan(self.stores(), set(), home=home)
+                self.assertIn(segment, {entry["id"] for entry in conflicts})
+
+    def test_automatic_continuation_rejects_bad_boundaries(self):
+        home, (owner, _, _), paths = self.continuation_fixture()
+        original = json.loads(paths[-1].read_text())
+        for column, value in (("end_byte_offset", 1), ("end_ordinal_exclusive", 999),
+                              ("end_byte_offset", None), ("end_ordinal_exclusive", -1)):
+            with self.subTest(column=column, value=value):
+                record = json.loads(json.dumps(original))
+                record["payload"]["history_base"][column] = value
+                paths[-1].write_text(json.dumps(record) + "\n")
+                plan, conflicts, _ = recovery.make_plan(self.stores(), set(), home=home)
+                self.assertIn(owner, {entry["id"] for entry in conflicts})
+                self.assertNotIn(owner, {entry["id"] for entry in plan})
+                self.assertIn("boundary", conflicts[0]["reason"])
+
+    def test_automatic_continuation_rejects_unrelated_missing_and_cyclic_paths(self):
+        home, (owner, _, latest), paths = self.continuation_fixture()
+        for metadata, error in (
+            ({"id": owner}, "does not descend"),
+            ({"id": owner, "history_base": {"thread_id": "missing"}}, "Missing ancestor"),
+            ({"id": "another-chat"}, "another chat"),
+            ({"id": owner, "history_base": {"thread_id": latest}}, "Cyclic"),
+        ):
+            with self.subTest(error=error):
+                paths[-1].write_text(json.dumps({"type": "session_meta", "payload": metadata}) + "\n")
+                plan, conflicts, _ = recovery.make_plan(self.stores(), set(), home=home)
+                conflict = next(entry for entry in conflicts if entry["id"] == owner)
+                self.assertIn(error, conflict["reason"])
+                self.assertNotIn(owner, {entry["id"] for entry in plan})
+
+    def test_automatic_continuation_detects_transcript_changes(self):
+        home, _, paths = self.continuation_fixture()
+        stores = self.stores()
+        plan, conflicts, _ = recovery.make_plan(stores, set(), home=home)
+        self.assertEqual(conflicts, [])
+        with paths[0].open("a") as stream:
+            stream.write('{}\n')
+        with self.assertRaisesRegex(recovery.RecoveryError, "Transcript changed"):
+            recovery.collect_transcripts(stores, plan, home)
 
     def test_reviewed_continuation_preserves_all_segments_and_repeat(self):
         home, (owner, middle, latest), paths = self.continuation_fixture()
@@ -450,6 +567,84 @@ class RetrievalTests(unittest.TestCase):
             with sqlite3.connect(directory / recovery.DATABASES[1]) as connection:
                 connection.execute("INSERT INTO thread_history_projection_state VALUES ('chat',?,?)", (offset, offset))
         self.assertEqual(recovery.make_plan(self.stores(), set())[:2], ([], []))
+
+    def uncached_fixture(self):
+        owner = "00000000-0000-0000-0000-000000000001"
+        home = self.root / "home"
+        (home / "sessions").mkdir(parents=True)
+        path = home / "sessions" / ("rollout-" + owner + ".jsonl")
+        path.write_text(json.dumps({"type": "session_meta", "payload": {"id": owner, "history_mode": "paginated"}})
+                        + "\n" + json.dumps({"type": "event_msg", "payload": {"type": "task_started", "turn_id": "turn"}}) + "\n")
+        add_chat(self.remote, owner)
+        with sqlite3.connect(self.remote / recovery.DATABASES[0]) as connection:
+            connection.execute("UPDATE threads SET rollout_path=?", (str(path),))
+        return home, owner, path
+
+    def test_missing_cache_is_rebuilt_without_changing_source_or_history_mode(self):
+        home, owner, path = self.uncached_fixture()
+        stores = self.stores()
+        plan, conflicts, _ = recovery.make_plan(stores, set(), home=home)
+        self.assertEqual(conflicts, [])
+        self.assertEqual(plan[0]["rebuild_history_paths"], {str(path): recovery.digest(path)})
+        # Model the isolated engine's projection, including one appended
+        # settings record. Only rows from the original transcript may import.
+        projected = self.root / "projected"
+        create(projected)
+        add_turn(projected, owner)
+        original = path.read_bytes()
+        settings = json.dumps({"type": "event_msg", "payload": {"type": "thread_settings_applied"}}).encode() + b"\n"
+        with sqlite3.connect(projected / recovery.DATABASES[1]) as connection:
+            connection.execute("INSERT INTO thread_history_projection_state VALUES (?,?,?)",
+                               (owner, len(original + settings), 3))
+        plan[0]["recovered_history"] = recovery.recovered_history(
+            recovery.Store(projected), owner, original, original + settings)
+        recovery.merge(self.local, stores, plan)
+        recovery.verify_rows(self.local, stores, plan)
+        actual = recovery.Store(self.local)
+        self.assertEqual(actual.thread(owner)["history_mode"], "paginated")
+        self.assertEqual(len(actual.records("thread_turns", owner)), 1)
+        projection = next(iter(actual.records("thread_history_projection_state", owner).values()))
+        self.assertEqual((projection["next_rollout_byte_offset"], projection["next_rollout_ordinal"]), (len(original), 2))
+        self.assertEqual(recovery.Store(self.remote).records("thread_turns", owner), {})
+        self.assertEqual(path.read_bytes(), original)
+        self.assertEqual(recovery.make_plan(self.stores(), set(), home=home)[:2], ([], []))
+
+    def test_history_rebuild_rejects_transcript_changes_and_new_content(self):
+        home, owner, path = self.uncached_fixture()
+        original = path.read_bytes()
+        for resumed in (b"changed\n", original + b'{"type":"event_msg","payload":{"type":"task_started"}}\n'):
+            with self.subTest(resumed=resumed):
+                with self.assertRaisesRegex(recovery.RecoveryError, "rewrote|appended conversation"):
+                    recovery.recovered_history(recovery.Store(self.remote), owner, original, resumed)
+        stores = self.stores()
+        plan, _, _ = recovery.make_plan(stores, set(), home=home)
+        path.write_bytes(original + b'{}\n')
+        with self.assertRaisesRegex(recovery.RecoveryError, "Transcript changed"):
+            recovery.collect_transcripts(stores, plan, home)
+
+    def test_partial_caches_and_continuations_are_not_rebuilt(self):
+        home, owner, path = self.uncached_fixture()
+        with sqlite3.connect(self.remote / recovery.DATABASES[1]) as connection:
+            connection.execute("INSERT INTO thread_history_projection_state VALUES (?,0,0)", (owner,))
+        plan, _, _ = recovery.make_plan(self.stores(), set(), home=home)
+        self.assertNotIn("rebuild_history_paths", plan[0])
+        with sqlite3.connect(self.remote / recovery.DATABASES[1]) as connection:
+            connection.execute("DELETE FROM thread_history_projection_state")
+        path.write_text(json.dumps({"type": "session_meta", "payload": {
+            "id": owner, "history_base": {"thread_id": "ancestor"}}}) + "\n")
+        plan, _, _ = recovery.make_plan(self.stores(), set(), home=home)
+        self.assertNotIn("rebuild_history_paths", plan[0])
+
+    def test_history_rebuild_rejects_rows_outside_original_bytes(self):
+        _home, owner, path = self.uncached_fixture()
+        add_turn(self.remote, owner)
+        original = path.read_bytes()
+        with sqlite3.connect(self.remote / recovery.DATABASES[1]) as connection:
+            connection.execute("ALTER TABLE thread_turns ADD COLUMN rollout_end_byte_offset INTEGER")
+            connection.execute("UPDATE thread_turns SET rollout_end_byte_offset=?", (len(original) + 1,))
+            connection.execute("INSERT INTO thread_history_projection_state VALUES (?,?,2)", (owner, len(original)))
+        with self.assertRaisesRegex(recovery.RecoveryError, "beyond original rollout"):
+            recovery.recovered_history(recovery.Store(self.remote), owner, original, original)
 
     def test_snapshot_contains_committed_wal_rows(self):
         with sqlite3.connect(self.remote / recovery.DATABASES[0]) as writer:

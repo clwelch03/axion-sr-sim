@@ -27,14 +27,17 @@ end
 
 Evaluate the dimensionless scalar potential `U(field)`.
 
-Select `:cosine`, `:quartic`, or `:sextic`. Exclude the overall factor
+Select `:quadratic` (no self-interaction), `:cosine`, `:quartic`, or `:sextic`.
+Exclude the overall factor
 `alpha^2`, which the energy calculation supplies separately. Evaluate
 the cosine potential without small-field cancellation.
 
 See also [`potential_remainder`](@ref).
 """
 function potential_value(field::Real, potential::Symbol=:cosine)
-    if potential === :cosine
+    if potential === :quadratic
+        return field^2 / 2
+    elseif potential === :cosine
         return 2sin(field / 2)^2
     elseif potential === :quartic
         return field^2 / 2 - field^4 / 24
@@ -42,7 +45,7 @@ function potential_value(field::Real, potential::Symbol=:cosine)
         return field^2 / 2 - field^4 / 24 + field^6 / 720
     end
 
-    throw(ArgumentError("potential must be :cosine, :quartic, or :sextic"))
+    throw(ArgumentError("potential must be :quadratic, :cosine, :quartic, or :sextic"))
 end
 
 """
@@ -58,7 +61,9 @@ evaluation of the cosine case near zero.
 See also [`potential_value`](@ref).
 """
 function potential_remainder(field::Real, potential::Symbol=:cosine)
-    if potential === :cosine
+    if potential === :quadratic
+        return zero(field)
+    elseif potential === :cosine
         return sine_remainder(field)
     elseif potential === :quartic
         return field^3 / 6
@@ -66,5 +71,5 @@ function potential_remainder(field::Real, potential::Symbol=:cosine)
         return field^3 / 6 - field^5 / 120
     end
 
-    throw(ArgumentError("potential must be :cosine, :quartic, or :sextic"))
+    throw(ArgumentError("potential must be :quadratic, :cosine, :quartic, or :sextic"))
 end

@@ -90,16 +90,34 @@ and the installed Codex executable. It uses only the Python standard library.
 3. Records the proposed changes and any conflicts. It preserves existing
    destination names, pins, archive state, organization, and read/unread receipts.
    A new chat keeps the source's archive state and receipts. Receipt differences
-   alone do not trigger imports or history conflicts. Review/helper threads are
-   included in counts.
-   New project/section memberships and changed continuation paths require manual
-   review rather than an incomplete automatic import. A reviewed continuation can
-   be selected explicitly as described below; it must descend from every known
-   rollout and retain every known database content row.
+   alone do not trigger imports or history conflicts. Updated/recency timestamp
+   differences alone also leave an existing chat untouched; those timestamps are
+   imported when its content or other metadata changes. Review/helper threads
+   are included in counts.
+   New project/section memberships require manual review. Different continuation
+   paths are resolved automatically when one eligible source descends from every
+   known rollout of the same chat through `history_base`. The script checks the
+   ancestor identities and byte/ordinal boundaries, rather than choosing a path
+   by timestamp. Unrelated or competing branches still stop the import.
+   A continuation can branch before the end of an older segment. The terminal
+   and `plan.json` report those older records and turn IDs; the entire ancestor
+   rollout is backed up and all known database rows are retained. The chat opens
+   with the selected source's continuation history, so an older tail outside its
+   boundary may not appear in that view. The script does not splice it into the
+   continuation or rewrite shared rollouts.
 4. Backs up affected rollouts and their ancestors with SHA-256 hashes. It merges
    into temporary database copies and verifies the exact imported rows. An
    isolated Codex app-server reads every affected chat, including the owners of
-   continuation-only history. Validation does not start model turns. A zero-turn
+   continuation-only history. If an imported paginated chat has no cached history
+   or projection state, and its rollout is a complete original segment, the
+   engine rebuilds the cache by resuming a disposable copy. Only rows within the
+   original transcript's byte/ordinal bounds are retained. Any settings events
+   appended to the copy are discarded, and the rebuilt cache is validated again
+   against a fresh copy of the original transcript. Partial caches and
+   continuation segments are not rebuilt this way. Legacy chats also require
+   resuming a copy before this engine can read their turns.
+   Validation and cache rebuilding do not start model turns or resume live chats.
+   A zero-turn
    response is accepted only for a guardian placeholder whose database has no
    history rows and whose rollout contains only its header, initial compaction,
    and settings events, with no ancestor history. Other empty reads stop recovery.
@@ -121,8 +139,8 @@ locks protect the conversations being imported.
 
 The validation API is described in the
 [official OpenAI app-server documentation](https://learn.chatgpt.com/docs/app-server).
-The installed engine used for the October 21 recovery supports
-`thread/read` with `includeTurns: true` for both history modes. Current
+The installed engine supports `thread/read` with `includeTurns: true` for
+paginated chats; legacy chats need an isolated `thread/resume` first. Current
 documentation deprecates that full-history option for paginated chats in favor
 of `thread/turns/list` and `thread/items/list`. If a future engine removes it,
 update the validator to page through the full history; do not skip validation.
@@ -142,9 +160,10 @@ suffix. The directory retains:
 | Artifact | Meaning |
 |---|---|
 | `local/`, source-node directories | Initial database snapshots |
-| `plan.json` | Proposed changes, source labels, excluded IDs, and conflicts |
+| `plan.json` | Proposed changes, source labels, excluded IDs, conflicts, verified continuation hashes and boundary reports |
 | `transcripts/`, `transcripts.json` | Affected rollouts, ancestors, and hashes |
 | `validation.json`, `validation.stderr.log` | Isolated app-server results and diagnostics |
+| `rebuild-validation.json`, `rebuild-validation.stderr.log` | Isolated cache rebuild results, when needed; recovered rows are recorded in `plan.json` |
 | source directories ending in `-recheck/` | Source snapshots taken just before applying |
 | `before-apply/` | Destination backup immediately before the import |
 | `apply-started.json` | Marker that the script reached the write phase |
@@ -192,11 +211,14 @@ retention policies. The script never automatically deletes recovery artifacts.
 - **Divergent records:** inspect `plan.json` and saved databases. Do not choose a
   winner by timestamp or use `INSERT OR REPLACE` indiscriminately. Separate
   histories may need preservation as separate conversations.
-- **Different rollout/continuation paths:** the terminal prints the conflicting
-  title and ID; `plan.json` also lists each source's path. Review the shared
-  rollout headers and their `history_base` links, including the content around
-  continuation boundaries. After confirming the intended chain, select that
-  specific chat and source with
+- **Different rollout/continuation paths:** rerun the normal command with the
+  corrected script. A stale node indexing an earlier segment of a verified chain
+  no longer requires a flag, including on repeated pulls. If verification fails,
+  the terminal prints the conflicting title, ID, and reason; `plan.json` also
+  lists each source's path. Review the shared rollout headers and their
+  `history_base` links, including the content around continuation boundaries.
+  For an explicitly reviewed chain whose boundary format the automatic check
+  cannot verify, select that specific chat and source with
   `--reviewed-continuation THREAD_ID=SOURCE` (repeatable), using the source label
   from `plan.json`, such as `n0003_scs00`. Add this to the normal command with
   `--apply`. The utility still requires the selected source to contain all known
@@ -205,16 +227,18 @@ retention policies. The script never automatically deletes recovery artifacts.
   stop recovery. The reviewed files are hashed, backed up, and checked again;
   intermediate continuation records are imported and the owning chat is read
   through the isolated app-server. This is explicit acknowledgement of a reviewed
-  chain, not a general force-import option. Retain the flag on subsequent pulls
-  while a source still indexes an older segment of that chat.
+  chain, not a general force-import option. It bypasses automatic byte/ordinal
+  boundary checks, but still verifies same-chat ancestry and content preservation.
 - **New schema, changed lineage, project membership, missing ancestor, or failed
   app-server read:** keep the artifacts and investigate that explicit condition.
   The dated October 21 recovery scripts provide implementation history, not a
   reason to remove a failing check from the reusable utility.
 - **Validation returned no turns:** inspect both the saved history rows and the
   rollout. A paginated index with no cached rows can return an empty history even
-  when the transcript contains messages. Do not accept that as a successful
-  recovery. An unrelated existing chat can be left untouched with
+  when the transcript contains messages. The script now rebuilds a wholly absent
+  cache for an imported original segment using the installed engine on isolated
+  copies, then validates it again. Other empty histories still stop recovery;
+  do not accept those as a successful import. An unrelated existing chat can be left untouched with
   `--exclude-thread THREAD_ID` while other chats are retrieved; report the
   exclusion and retain its transcript and database backups for separate repair.
 - **Process interrupted during apply:** check `receipt.json`. An
@@ -258,9 +282,12 @@ python3.12 -m unittest discover -s tests/tools -v
 
 They cover content conflicts, split histories, continuation-only rows, active
 session exclusions, schema changes, concurrent destination changes and rollback,
-organization preservation, repeat imports, WAL backups, writer locks, and reviewed
-continuation chains (including missing ancestors, cycles, transcript changes, and
-attempts to select an older or incomplete source).
+organization preservation, repeat imports, WAL backups, writer locks, and automatic
+and reviewed continuation chains (including parent tails, invalid boundaries,
+missing ancestors, cycles, transcript changes, and attempts to select an older
+or incomplete source).
+They also cover timestamp-only differences, missing-cache recovery, preservation
+of source storage, and rejection of rebuilt rows outside the original transcript.
 Before changing merge behavior, also replay it on isolated copies of real saved
 databases and rollouts and validate the resulting chats with the installed Codex
 engine. Keep all live database paths out of that test.
@@ -270,3 +297,11 @@ copies of that day's snapshots imported 12 new records (11 user chats and one
 helper thread), six history updates, and six metadata updates; all 24 chats
 loaded through app-server. Repeating the command made no changes. An SSH preview
 against n0001 and n0003 also passed without writing live chat records.
+
+Validated on October 29, 2026 against isolated copies of the failed
+`20261029T163304Z-_fkw5c5w` snapshots: imported 13 new chats, eight updates, and
+two continuation records without a reviewed-continuation flag. All 21 affected
+chats loaded through the installed engine, including the rebuilt guardian review.
+The older turn outside the radial BVP continuation boundary remained in the
+destination history tables. A second pull made no changes. Live stores and
+shared rollouts were not modified by this replay.

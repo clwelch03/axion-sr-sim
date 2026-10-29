@@ -1,9 +1,10 @@
 # Multiphase learning map
 
 Use this checklist to understand how the joint two-cloud calculation fits
-together, then work through its functions one at a time. It covers all 34
-top-level functions and four structs in `src/adiabatic/multiphase/` as of
-October 26, 2026. The diagrams describe the current implementation; the
+together, then work through its functions one at a time. It covers the source,
+stationary profiles, collocation, observables, response, and evolution helpers
+as of October 28, 2026, including the shared physical profile type. The
+diagrams describe the current implementation; the
 [organization proposal](multiphase-profile-organization.md) records the
 completed profile/coordinate migration and deferred interface changes.
 [HANDOFF.md](../HANDOFF.md) records implementation progress.
@@ -23,8 +24,9 @@ $J$ are the two charges used to determine the two amplitude rates.
 flowchart TD
     SETUP["Choose components and fixed problem settings"]
     AMPLITUDES["Prescribe the two cloud amplitudes"]
-    SOLVE["Adjust frequencies and boundary coefficients<br/>until radial profiles match"]
-    RADIAL["For each trial: build endpoint data,<br/>integrate radially, measure the mismatch"]
+    SOLVE["Solve stationary profiles<br/>at the two prescribed outer amplitudes"]
+    RADIAL["Shooting: build endpoint data,<br/>integrate radially, measure the mismatch"]
+    COLLOCATION["Collocation: adjust the full mesh,<br/>frequencies, and free boundary coefficients"]
     CHARGES["Evaluate total E, J and boundary losses<br/>from the matched joint field"]
     RESPONSE["Differentiate matching and charges<br/>with respect to both amplitudes"]
     BALANCE["Solve E/J balance for amplitude rates"]
@@ -32,7 +34,9 @@ flowchart TD
     SETUP --> SOLVE
     AMPLITUDES --> SOLVE
     SOLVE --> RADIAL
+    SOLVE --> COLLOCATION
     RADIAL -->|mismatch for the next correction| SOLVE
+    COLLOCATION -->|collocation and endpoint residuals| SOLVE
     SOLVE -->|matched profile| CHARGES
     SOLVE --> RESPONSE
     CHARGES --> RESPONSE
@@ -46,15 +50,17 @@ amplitudes. Amplitude evolution advances in time and repeatedly solves a new
 radial matching problem. These are separate integration loops.
 
 The current deliverable is the primary/secondary radial-profile overlay with
-joint nonlinear deformation. Its next calculation follows the setup and
-matching route. The charge, response, and evolution stages show the wider
+joint nonlinear deformation, using the optional collocation backend. The
+current response and evolution routines still correct and differentiate the
+shooting equations. Connecting those routines to collocation is a separate
+integration step; the charge, response, and evolution stages show the wider
 project's calculation.
 
 ## Objects to recognize first
 
 - [ ] `TwoPhaseSourceBasis` — fixed mode order, angular/phase basis matrix, quadrature weights, and squared polar nodes, built once and reused for source evaluations. It stores no radial coefficients or evaluated source. Defined in [projection.jl](../src/adiabatic/multiphase/projection.jl).
 - [ ] `TwoPhaseProblem` — fixed background, components, quadrature, source basis, integration settings, coefficient scale, free indices, and reference boundary branches. Defined in [profiles.jl](../src/adiabatic/multiphase/profiles.jl).
-- [ ] `TwoPhaseProfile` — two complex frequencies and physical boundary coefficients for a trial or matched profile; sampled radial functions are produced by integration. Defined in [profiles.jl](../src/adiabatic/multiphase/profiles.jl).
+- [ ] `TwoPhaseProfile` — complex frequencies and physical boundary coefficients for a trial or solved profile; radial samples reside in the integrator or collocation mesh. Defined in [core/profiles.jl](../src/adiabatic/core/profiles.jl).
 - [ ] `TwoPhaseMatchedSolution` — packed state, prescribed amplitudes, and convergence diagnostics. Defined in [response.jl](../src/adiabatic/multiphase/response.jl); the current corrector still returns a named tuple with these fields.
 
 The word `state` has two uses to distinguish while reading. Newton's state
@@ -62,6 +68,12 @@ contains frequencies and scaled free boundary data. A radial integrator's
 state contains the sampled profiles $R$ and slopes $Q=dR/dr_*$ at one radius,
 where $r_*$ is tortoise radius. Packing a Newton state does not produce radial
 samples.
+
+The collocation solver's augmented state contains both kinds of data:
+`[scaled fields and slopes; scaled parameter offsets]`. For 14 retained radial
+modes these blocks contain 56 real entries each. Frequencies and boundary
+coefficients are represented by zero-radial-derivative states, so Newton can
+adjust their values while enforcing constancy across the domain.
 
 ## Function checklist in reading order
 
@@ -142,6 +154,7 @@ and [test_nonlinear_matching.jl](../tests/adiabatic/multiphase/test_nonlinear_ma
 
 - [ ] `component_tortoise_operator` — assemble one component's linear radial operator, including mixing between its angular harmonics.
 - [ ] `component_boundary_state` — turn leading boundary coefficients into endpoint values and tortoise slopes.
+- [ ] `two_phase_boundary_state` — assemble every component's physical endpoint values in joint `[all R; all Q]` order; shared by shooting and collocation.
 - [ ] `nonlinear_two_phase_rhs!` — combine linear operators and the joint nonlinear source using the required source basis; verify mode order and fill the radial derivatives.
 - [X] `two_phase_matching_residual` — integrate from both boundaries and compare at the matching radius; optionally return both radial histories.
 - [ ] `solve_two_phase_mode` — solve matching at two prescribed amplitudes using the standalone complex-coordinate interface to real Newton iteration.
@@ -149,6 +162,40 @@ and [test_nonlinear_matching.jl](../tests/adiabatic/multiphase/test_nonlinear_ma
 Read the existing [radial RK4 design](multiphase-rk4-design.md) for the four
 stages inside each radial step. Its October 15 file-location notes predate the
 move of the radial functions to `radial.jl`.
+
+### 4a Adaptive collocation profiles
+
+Sources: [collocation.jl](../src/adiabatic/multiphase/collocation.jl),
+[collocation_mirk.jl](../src/adiabatic/multiphase/collocation_mirk.jl), and
+[mirk_corrections.jl](../src/adiabatic/multiphase/mirk_corrections.jl).
+Use the [collocation schematic](multiphase-collocation-design.md) alongside
+the function checklist. Load the optional backend through
+[load_collocation.jl](../src/adiabatic/multiphase/load_collocation.jl).
+
+- [ ] `two_phase_collocation_rhs!` — undo field scaling, evaluate the existing physical RHS, and return real scaled field derivatives.
+- [ ] `two_phase_collocation_profile` — reconstruct frequencies and boundary coefficients from a reference plus scaled offsets; insert the prescribed amplitudes.
+- [ ] `two_phase_augmented_rhs!` — split the augmented state, evaluate field derivatives, and set parameter derivatives to zero.
+- [ ] `two_phase_collocation_boundary!` — compare the trial endpoint field block with the scaled boundary-series prediction.
+- [ ] `two_phase_collocation_callbacks` — bind fixed settings to the RHS and two endpoint callback signatures.
+- [ ] `two_phase_collocation_scales` — choose fixed field/slope scales from reference profiles and parameter scales from endpoint influence.
+- [ ] `apply_two_phase_mirk_corrections!` — install the tested, version-guarded Jacobian-band and mesh-transfer corrections once per process.
+- [ ] `two_phase_mirk_algorithm` — configure MIRK4, sparse colored forward AD, Newton, and directional-AD backtracking.
+- [ ] `solve_two_phase_collocation` — construct and solve the BVP, then return its raw mesh solution, boundary profile, coordinates, and settings.
+- [ ] `assess_two_phase_collocation` — check endpoints, parameter constancy, frequency branches, and independent off-mesh defects, then sample physical `[R; Q]`.
+
+The assessment helper currently ships with the campaign driver in
+[assess_collocation_target.jl](../runs/adiabatic/multiphase_two_cloud/scripts/assess_collocation_target.jl);
+its tested block is ready to append to `collocation.jl`. The single end-to-end
+check covered automatic scaling, two fundamentals, both driven modes, and
+assessment on a small finite-domain quartic problem. The 14-mode cosine target
+reproduction also passed on 881 points, with independent defect `3.80e-7`
+at requested tolerance `1e-6`; the handoff records its curves and validation
+scope. Passing a solver return-code check
+alone does not establish the physical residuals or spatial convergence.
+
+**Readability follow-up:** revisit `collocation_mirk.jl` with the user. Its
+current behavior is accepted for this stage, but its validation, guess
+construction, solver configuration, and result decoding need a clearer flow.
 
 ### 5 Charges and boundary fluxes
 
@@ -176,10 +223,21 @@ The [campaign record](../runs/adiabatic/multiphase_two_cloud/README.md) describe
 neighboring-amplitude checks of response derivatives on preserved source.
 
 - [ ] `two_phase_profile_admissible` — check finite packed coordinates, fundamental frequency bounds, and component branch classification.
-- [ ] `two_phase_real_residual` — real-pack and scale the matching mismatch for Newton and differentiation.
+- [ ] `two_phase_real_matching_residual` — real-pack and scale the matching mismatch for Newton and differentiation.
 - [ ] `correct_two_phase_profile` — correct a packed guess at prescribed amplitudes with a ForwardDiff Jacobian.
 - [ ] `two_phase_trial_observables` — obtain radial histories and evaluate charges and losses using the real parts of the trial frequencies.
 - [ ] `two_phase_profile_response` — differentiate matching implicitly, then include that profile response in both charge derivatives.
+
+### 6a Amplitude continuation
+
+Source: [profiles.jl](../src/adiabatic/multiphase/profiles.jl), using the shared
+continuation machinery in [core/continuation.jl](../src/adiabatic/core/continuation.jl).
+These helpers currently use shooting corrections.
+
+- [ ] `predict_two_phase_amplitude` — scale a seed's boundary coefficients to predict another amplitude point.
+- [ ] `correct_two_phase_amplitude` — correct the predicted boundary profile at fixed amplitudes.
+- [ ] `validate_two_phase_amplitude` — inspect the newly corrected point before saving or advancing.
+- [ ] `continue_two_phase_amplitude` — connect the model's prediction, correction, validation, and saving callbacks to adaptive continuation.
 
 ### 7 Amplitude evolution from charge balance
 
@@ -201,7 +259,8 @@ arrows denote calls through locally defined closures or supplied callbacks.
 In particular, `evolve_two_phase` receives an `evaluate_sample` callback;
 the campaign binds it to `two_phase_evolution_sample`.
 
-All 34 multiphase functions appear below, grouped by source file. Selected
+The matching/response route appears below, grouped by source file; the
+collocation route has its own diagram immediately afterward. Selected
 `core/` functions explain the numerical delegation; the table below supplies
 other shared dependencies. Standard-library operations and output callbacks
 are omitted. `TwoPhaseProblem` construction is shown because it builds the
@@ -218,7 +277,7 @@ flowchart TD
     subgraph response["response.jl"]
         correct["correct_two_phase_profile"]
         admissible["two_phase_profile_admissible"]
-        realres["two_phase_real_residual"]
+        realres["two_phase_real_matching_residual"]
         trialobs["two_phase_trial_observables"]
         sensitivity["two_phase_profile_response"]
     end
@@ -229,6 +288,7 @@ flowchart TD
         pack["pack_two_phase_profile"]
         unpack["unpack_two_phase_profile"]
         matching["two_phase_matching_residual"]
+        jointboundary["two_phase_boundary_state"]
         solve["solve_two_phase_mode"]
     end
     subgraph radial["radial.jl"]
@@ -291,7 +351,7 @@ flowchart TD
     solve -. unpack_profile .-> unpack
     solve --> realnewton
     realnewton -. residual closure .-> matching
-    matching -. assemble_boundary .-> boundary
+    matching --> jointboundary --> boundary
     matching --> integrate
     integrate -. rhs callback .-> rhs
     rhs --> operator
@@ -330,6 +390,50 @@ guess, and calls `newton_solve` with a ForwardDiff Jacobian. Both reach
 `two_phase_matching_residual`. The diagram omits the standalone solver's
 local `admissible` function; it does not call `two_phase_profile_admissible`.
 
+### Collocation call diagram
+
+These arrows also point from callers to functions they use. The shared
+profile decoder supplies current frequencies to the differential equations
+and current frequencies/coefficients to the endpoint constraints.
+
+```mermaid
+flowchart TD
+    driver["Driver: initial guess, reference profile, amplitudes"]
+    scales["two_phase_collocation_scales"]
+    solve["solve_two_phase_collocation"]
+    algorithm["two_phase_mirk_algorithm"]
+    callbacks["two_phase_collocation_callbacks"]
+    augmented["two_phase_augmented_rhs!"]
+    endpoint["two_phase_collocation_boundary!"]
+    decode["two_phase_collocation_profile"]
+    unpack["unpack_two_phase_profile"]
+    scaledrhs["two_phase_collocation_rhs!"]
+    physics["nonlinear_two_phase_rhs!"]
+    boundary["two_phase_boundary_state"]
+    component["component_boundary_state"]
+    assess["assess_two_phase_collocation"]
+    driver --> scales
+    driver --> solve
+    scales --> boundary
+    solve --> algorithm
+    solve --> callbacks
+    callbacks -. radial callback .-> augmented
+    callbacks -. endpoint callbacks .-> endpoint
+    augmented --> decode --> unpack
+    augmented --> scaledrhs --> physics
+    endpoint --> decode
+    endpoint --> boundary --> component
+    driver --> assess
+    assess --> callbacks
+    assess --> decode
+```
+
+`load_collocation.jl` loads the base library, installs
+`apply_two_phase_mirk_corrections!`, and loads the solver wrapper. The base
+`load.jl` includes the coordinate helpers in `collocation.jl`; it has no
+include back to the optional loader. The corrections currently support MIRK
+1.19.2 and serial BVP solves within one process.
+
 ## Shared functions to follow when needed
 
 These live outside `multiphase/`; follow them when they explain the current
@@ -347,7 +451,7 @@ function, rather than expanding the reading list all at once.
 | [core/quadrature.jl](../src/adiabatic/core/quadrature.jl) | `integrate_uniform` | Radial integration of charge densities |
 
 [`load.jl`](../src/adiabatic/multiphase/load.jl) defines no functions. It loads
-`core/`, then components, projection, radial, profiles, observables, response,
+`core/`, then components, projection, radial, profiles, collocation helpers, observables, response,
 and evolution once into the calling module. Projection now precedes radial
 and profiles so `TwoPhaseSourceBasis` exists when their type annotations are
 evaluated. Include order is distinct from call order: function bodies can
@@ -356,12 +460,21 @@ already be defined.
 
 ## Current place to resume
 
+Updated October 28: the collocation helpers and optional MIRK wrapper are
+present, the two library corrections and small end-to-end solve passed their
+focused checks, and the current target reproduction is tracked in
+[HANDOFF.md](../HANDOFF.md). The current-source target driver preserves its
+source and input hashes. Complete the curve comparison and the separate
+spatial/systematic checks recorded there. Preserve the existing understanding
+checkboxes; all new collocation and continuation entries start unchecked.
+The MIRK wrapper readability overhaul remains an explicit follow-up.
+
 **Important architecture follow-up:** the user wants to revisit the source,
 Jacobian, and differentiation adapter together to prevent bloat. The next
 convergence test remains the immediate priority. See the persistent
 [architecture-review note](../HANDOFF.md#important-revisit-multiphase-architecture).
 
-Updated October 26: the library changes remain, but the assistant's driver
+Historical October 26 checkpoint: the library changes remained, but the assistant's driver
 additions were rolled back. The user subsequently added the reviewed one-line
 full-width batching option; v5 job 27304701 exhausted 12 corrections at
 scaled residual 1.49475e8 and saved no joint solution. Continue
@@ -410,8 +523,8 @@ The problem already holds the source basis built from its fixed mode order
 and angular/phase grids.
 One matching evaluation follows this route:
 
-1. **Build endpoint states.** The local `assemble_boundary` closure in
-   `two_phase_matching_residual` slices the coefficient arrays by component.
+1. **Build endpoint states.** `two_phase_matching_residual` calls the shared
+   `two_phase_boundary_state` helper to slice coefficients by component.
    `component_boundary_state` calculates that component's frequency and m,
    evaluates the appropriate linear asymptotic series at the finite endpoint,
    and returns its `[R; Q]` block, with `Q = dR/dr_*`. Leading coefficients
@@ -447,5 +560,6 @@ The existing [matching checks](../tests/adiabatic/multiphase/test_matching_resid
 exercise unequal angular-block ordering, agreement between saved and plain
 residuals, the single-cloud limit, and radial RK4 refinement. They provide
 numerical checks to accompany the explanation; they do not mark a helper
-understood. Boundary-assembly cleanup and adopting the matched-result type
-remain deferred. The understanding checkboxes above remain yours to mark.
+understood. The shared endpoint extraction is complete; adopting the
+matched-result type remains deferred. The understanding checkboxes above
+remain yours to mark.

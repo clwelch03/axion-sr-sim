@@ -19,6 +19,7 @@ open caveats, and next steps. Entry points reviewed 2026-10-12:
 | [Multiphase derivative verification, October 27](multiphase-ad-verification-2026-10-27.md) | Full-matrix AD comparisons, finite-difference checks, matched-seed attempt, and reproducible regression evidence |
 | [Multiphase workplan, October 26](multiphase-workplan-2026-10-26.md) | Projection block diagram, direct convergence attempt, and the linear/Omiya/joint deformation-plot specification |
 | [Multiphase radial RK4 design](multiphase-rk4-design.md) | Flowcharts for one radial RK4 step and its joint nonlinear RHS, state ordering, and function map |
+| [Multiphase radial collocation schematic](multiphase-collocation-design.md) | Augmented state, shared parameter decoding, radial and endpoint callbacks, and the MIRK/Newton solve loop |
 | [Coupled BH–cloud balance](coupled-bh-cloud-balance.md) | Fixed reference units, leading scalar-only coupled rates, metric work and angular response, and algebraic checks |
 | [QCD spin-down campaign](../runs/adiabatic/qcd_spindown/README.md) | First preliminary coupled BH/211/322 trajectory and comparison with linear nonrelativistic evolution |
 | [Piece 4 guide](multimode-piece4-guide.md) | Explainer for the driven $m = 0$ field: physics, equation, solve method, checks |

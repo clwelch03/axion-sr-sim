@@ -7,6 +7,8 @@ __pycache__/
 # Keep data tables and Julia checkpoints local, including reference results.
 *.csv
 *.jls
+# Generated campaign results, including TOML/JSON summaries and failure reports.
+/runs/**/results/
 plots/*
 # Keep the Fig. 13 comparison in the repository.
 !plots/fig13_growth_rates.png

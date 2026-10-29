@@ -1,6 +1,6 @@
 # Project handoff
 
-Updated 2026-10-28. This is the authoritative project status: what works,
+Updated 2026-10-29. This is the authoritative project status: what works,
 open caveats, and next steps. Campaign READMEs own exact commands, saved-result
 paths, and detailed validation records; design documents own equations and
 implementation decisions.
@@ -19,6 +19,268 @@ Read first: [multimode-adiabatic-design.md](docs/multimode-adiabatic-design.md)
 `docs/papers/`, not the arXiv HTML.
 
 ## Where things stand
+
+### October 29: twelve-background linear reference grid attempted
+
+At the user's request, Slurm array **27418189** attempts both linear modes at
+all 12 alpha/spin backgrounds: alpha `[0.2,0.3,0.4]` and spin
+`[0.8,0.9,0.95,0.99]`. All 12 tasks have finished (23–37 seconds each): all
+12 m=1 profiles and six m=2 profiles passed. Six tasks COMPLETED and six FAILED
+because their m=2 solve could not reduce the residual below `1e-8`. Failures
+are all four alpha=0.2 cases (residuals `1.34e-7`–`1.08e-6`) and alpha=0.3
+at spin=0.95/0.9 (`1.17e-8`/`1.48e-8`). All alpha=0.4 modes passed. The
+alpha=0.3, spin=0.99 pair exactly reproduces the saved reference frequencies.
+No tolerance was relaxed; residual scaling/precision needs a focused check
+with the user before accepting the missing secondaries.
+Each task calls the existing `solve_linear_mode` for m=1 with
+ell `[1,3,5]` and m=2 with ell `[2,4,6]`; no model-library changes were made.
+This attempts 24 dimensionless reference profiles for the proposed 36-point
+QCD catalogue; 18 accepted profiles are saved. Physical cloud populations and nonlinear QCD runs remain the
+next collaborative step with the user.
+
+Frozen source/config: campaign `work/linear_grid_20261029_v1`; outputs:
+`results/linear_grid_20261029_v1`; logs: `logs/linear-grid-27418189_TASK.out`.
+Each mode retains unit first outer coefficient and records free-field energy
+and the factor needed for unit-energy normalization, complex frequency,
+profiles/slopes, signed boundary fluxes, and matching residuals. The absolute
+matching tolerance is `1e-8`; radial steps are 0.1/0.2 for m=1/2. Domains are
+`[-100,675]` at alpha=0.2 and `[-100,300]` otherwise. These initial settings
+do not establish spatial/endpoint convergence or accurate tiny growth rates.
+The driver attempts the second mode even if the first fails and saves both
+outcomes. Shell/Python/Julia syntax checks passed before submission.
+
+### October 29: alpha, spin, and independent cloud-energy sweep submitted
+
+The user requested alpha **0.2, 0.3, 0.4**, spin **0.8, 0.9, 0.95, 0.99**,
+and five independent energy pairs `(E1/E0,E2/E0)`:
+**(1,1), (0.5,1), (1,0.5), (1.5,1), (1,1.5)**, with
+`E0=650.5419114886128 F_a^2 M`. Slurm array **27409247** submits all **60**
+configurations with at most four running, one CPU/24 GiB/four hours each.
+The user explicitly requested submitting without waiting for the new driver's
+small physical validation; validation job **27409219** runs alongside, with
+no dependency blocking the array. At submission the array was PENDING and
+validation RUNNING. Shell/Python/Julia syntax checks passed; physical validation
+and sweep outcomes remain to be checked.
+
+First status check: baseline task 1 COMPLETED; tasks 2–5 RUNNING and have each
+passed their first radial solve; tasks 6–60 queued. No production failures.
+Validation **27409219 FAILED** after 2m54s: all 153 grid/input checks and the
+small initial radial solve passed, then energy measurement raised `KeyError: 2`.
+The helper sized its shared azimuthal table from primary harmonics alone;
+the small test has only primary m=1 but secondary m=2. The production primary
+includes m=5, so its table already includes m=2. The live helper now sizes from
+both clouds. Validation **27409399** reruns the check using frozen copy
+`work/parameter_energy_20261029_validation_v2`, with an added exact-production-table
+comparison. The production snapshot/array remain unchanged. Validation outputs
+are `work/parameter_energy_20261029_validation_v2_results` in the campaign.
+
+Next status check (~25 minutes into the array): the same four energy variants
+have passed 3–4 radial solves each, with no production failures; 55 cases remain
+queued. Validation **27409399 FAILED** after 4m26s. The angular fix passed,
+and energy targeting on the coarse mesh reached relative error below `1e-6`,
+but the final radial refinement shifted the primary energy by `4.43e-4`, above
+the unchanged `1e-4` acceptance threshold. Its rejection is correct. The live
+driver now retargets after refinement at differential tolerance `1e-6` and
+energy quadrature 0.5. Validation **27410452** tests this from immutable
+`work/parameter_energy_20261029_validation_v3`; outputs append `_results`.
+The original production array continues on its original snapshot and will
+reject any analogous final energy mismatch; preserve those checkpoints for
+correction with the new driver if needed. No production tolerances were relaxed.
+
+Validation **27410452 COMPLETED** in 4m47s; its `validation.toml` reports passed.
+The refined unequal-energy test reached both targets within the unchanged
+criteria after one extra refined correction. At the subsequent ~50-minute
+status check, production tasks 2–5 had completed 7–8 accepted radial solves
+each, with no failures; only the reused baseline was final. Per-solve times
+are mostly 5–7 minutes. The driver splits half-energy changes into three
+targets and 1.5x changes into two, restarting the Broyden estimate each time.
+It also unnecessarily re-solved identical background/amplitudes at stage
+boundaries (about 4 minutes each). The live driver now skips those unchanged
+solves; the running immutable snapshot remains unchanged. This small skip
+was syntax-checked; validation 27410452 predates it. Last night's single
+refinement took 12m00s, while full equal-energy targeting took 41m53s.
+
+Frozen source/config/seed: `runs/adiabatic/multiphase_two_cloud/work/parameter_energy_20261029_v1`.
+Outputs: `runs/adiabatic/multiphase_two_cloud/results/parameter_energy_20261029_v1/`.
+Logs: campaign `logs/parameters-27409247_TASK.out` and
+`logs/parameters-27409219_4294967294.out`. See the campaign README for commands.
+The campaign driver varies both energies independently, saves every radial solve
+and accepted continuation stage, and reports full-field E/J and boundary fluxes.
+It does not modify the model library or perform time evolution. The alpha=0.2
+outer endpoint is provisionally enlarged to 675; other endpoints remain 300.
+Spatial/angular/endpoint convergence and physical branch reachability across
+this wider parameter range are not established.
+
+The October 28 equal-energy job **27401326** actually **COMPLETED** in 41m53s.
+Its accepted energies are `[650.5436220051258,650.5431992413581]`, and its
+independent defect is `3.383702626475915e-7` at tolerance `1e-6`.
+That accepted result is the sweep seed; the original equal-energy grid point
+is reused after rechecking its energy, while the other 59 points are attempted.
+
+### October 28: equal-energy joint comparison requested
+
+The user questioned why the joint primary looks closer to the linear reference
+than to Omiya's, suggested low cloud occupation, and requested matching cloud
+energies instead of outer coefficients. The original joint field has total
+finite-domain energy `1109.6799475`, whereas the two reference labels each have
+energy `650.5419114886128`. Equal outer coefficients do not fix these energies.
+
+Job **27401326** is running the bounded energy-targeting driver
+`runs/adiabatic/multiphase_two_cloud/scripts/equal_energy_target.jl`, using frozen
+snapshot `work/equal_energy_20261028_v1` and result prefix
+`results/equal_energy_20261028_v1` in that campaign. It adjusts both amplitudes
+and re-solves the full joint equations, starting from `src_target_20261028_v2`.
+The per-cloud comparison convention is exactly the reference convention:
+isolated cosine energy for the primary harmonics, and quadratic secondary
+energy on the averaged primary. These labels exclude mixed driven modes;
+the full interacting-field total energy is measured separately.
+The driver checks the reference energy calculation before solving, records
+every amplitude/energy iteration, and saves each accepted radial solution.
+Energy targeting uses differential tolerance `1e-5`, followed by `1e-6`
+refinement and a radial energy-quadrature check. Limits: eight solves, one CPU,
+24 GiB, two hours. Log: `logs/equal-energy-27401326.out`.
+Final equal-energy curves have not yet been produced.
+
+### October 28: four reference curves corrected to equal energies
+
+The common primary/secondary branch access is now used by
+`runs/adiabatic/multiphase_two_cloud/scripts/reference_profiles.jl`. It reconstructs
+both Omiya profiles and the two linear eigenmodes, then exports their radial
+samples and provenance. The first export (`v1`, job **27397837**) reproduced the
+saved radial arrays exactly, but used fixed outer coefficients for the linears.
+The user correctly identified that this normalization was wrong for Fig. 7.
+
+The current [PNG](runs/adiabatic/multiphase_two_cloud/figures/reference_curves_20261028_v2.png),
+[PDF](runs/adiabatic/multiphase_two_cloud/figures/reference_curves_20261028_v2.pdf), and
+[CSV](runs/adiabatic/multiphase_two_cloud/results/reference_curves_20261028_v2.csv)
+use **equal cloud energies**. Job **27398471** completed in **42 seconds**.
+Each linear mode is rescaled using its free-field energy with U(phi)=phi^2/2;
+all four measured energies agree with **650.5419114886128 F_a^2 M** to roundoff.
+This is the saved nonlinear point nearest the paper's approximate 660.
+The nonlinear samples are unchanged; linear peaks are now **0.1151975** and
+**0.0300686**. The correction passed 63 focused energy/branch/linear checks,
+including analytic energy and amplitude-squared scaling tests. The earlier
+interface/loader/continuation checks passed 98 assertions.
+
+The campaign README records the frozen source, normalization, settings,
+residuals, and reproduction commands. The v1 data remain as a historical
+fixed-amplitude comparison. Coupled multiphase target profiles and spatial
+refinement remain separate work.
+
+### October 28: collocation backend integration in progress
+
+The user is incorporating the radial BVP experiment into `src` through tested
+code blocks that they paste themselves. Shared endpoint assembly, scaled
+field/parameter coordinates, the augmented RHS, endpoint residuals, and the
+callback factory are now present. The user has also pasted the optional MIRK
+backend, its two version-specific library corrections, and the solve wrapper.
+**The MIRK loader/corrections/solve-wrapper stage is checked off.** All three
+new files match the tested blocks. Seventeen focused numerical checks passed:
+the corrected coupled Jacobian agrees exactly with uncompressed AD, exact
+mesh transfer is accurate to `1.11e-16`, and a two-fundamental quartic physical
+solve converges on 29 nodes with boundary residual `1.83e-15`, zero parameter
+drift, and independent off-mesh defect `3.55e-5` at requested tolerance `1e-4`.
+Fresh root-project checks also passed for the base loader, optional backend,
+repeated loading, correction idempotence, and pinned MIRK version `1.19.2`.
+
+Review found a real include cycle: `load.jl` included `load_collocation.jl`,
+which included `load.jl` before the base loader's completion flag was set.
+Removed the optional-backend include from `load.jl`. Load the backend explicitly
+through `src/adiabatic/multiphase/load_collocation.jl`; it loads the base library.
+The root Julia project and resolved manifest now contain the MIRK dependencies
+with an exact `1.19.2` compatibility pin. Validation used the experiment's
+writable depot followed by the existing user depot.
+
+Tested source blocks and `validation.json` are preserved under
+`runs/adiabatic/radial_bvp/work/src_port_20261028__3pqfftq/`.
+Initial-guess/scaling preparation and result assessment follow. The small
+physical check establishes the wrapper's operation on that finite-domain
+problem; a full target solve through the new backend remains outstanding.
+
+The user has pasted `two_phase_collocation_scales` into `collocation.jl`.
+The reviewed source and its focused checks are preserved in
+`runs/adiabatic/radial_bvp/work/scales_port_20261028_44ut6s/scales_snippet.jl`.
+All 21 focused checks passed, reproducing both state and parameter scales
+exactly for all four original experiment cases, including per-mode weak-case
+floors and the full-reference weights for a zero-driven initial guess.
+
+**Current checkpoint:** the user requested one end-to-end test, then the joint
+deformation curves, and explicitly asked to touch base between those stages.
+The single four-component quartic test completed successfully: all seven
+checks passed, using automatic scales, both fundamentals, and both driven modes.
+It finished on 38 mesh nodes with boundary residual `2.3248e-13`, zero parameter
+drift, and independent off-mesh defect `4.1154e-5 < 1e-4`. The source, test,
+result, and TOML report are preserved under
+`runs/adiabatic/radial_bvp/work/assessment_port_20261028_4qlEfV/`.
+The staged `assessment_snippet.jl` defines `assess_two_phase_collocation` for
+the user to append to `collocation.jl`. This completes the scale/solve/assessment
+test on the small finite-domain problem. The user subsequently authorized the
+joint-deformation run after this touch-base checkpoint.
+The current equal-energy linear/Omiya curves are exported as
+`results/reference_curves_20261028_v2` in the multiphase campaign; the earlier
+fixed-amplitude `v1` export is preserved separately.
+
+**Target run completed:** job **27398811 COMPLETED** in 12m00s, using frozen snapshot
+`work/src_target_20261028_v2` in the multiphase campaign and output prefix
+`results/src_target_20261028_v2`. It restarts the refined 14-mode target with
+the new optional backend at differential tolerance `1e-6`, initial spacing
+0.5, nonlinear tolerance `1e-8`, and AD chunks of 28. Limits: one CPU, 24 GiB,
+55 minutes, and a 2400-second callback solve limit. The source and all inputs
+are hash-checked. Its driver packages the tested assessment helper until the
+user pastes that helper into the model library. Log: `logs/src-target-27398811.out`.
+The 881-point result passes assessment: boundary residual `1.68835e-13`,
+parameter drift `9.69e-21`, and independent defect `3.79897e-7 < 1e-6`.
+Its maximum frequency change from the older refined checkpoint is
+`3.21794e-13`; maximum per-mode global relative profile change, including
+slopes, is `5.49e-7`. Timed solve work was 664.7 s including 127.7 s of
+compilation; peak batch memory was about 8.7 GiB. This is a current-source
+reproduction of the existing finite-domain target.
+Earlier job 27398712 failed before solving because the old refined checkpoint
+does not contain a `passed_residual_checks` summary field; v2 verifies its
+saved success flag, boundary residual, defect, and parameter drift directly.
+
+**Comparison normalization clarified by the user:** match the energies of the
+linear and Omiya reference curves. Use the `reference_curves_20261028_v2`
+metadata: reference E is `650.5419114886128`, and the linear amplitude factors
+relative to the old fixed-amplitude references are `0.7255014992542931` for
+the primary and `0.7541792626953592` for the secondary. The joint solve retains
+the Omiya outer coefficients; its cloud energies have not been independently
+retuned. The target driver exports the preserved fixed-amplitude baseline;
+`plot_collocation_comparison.py --energy-references ...v2.toml` applies the
+verified linear factors to both R and Q and labels the joint normalization.
+Keep this distinction in the plot caption and exported metadata.
+
+**Comparison artifacts generated and inspected:**
+`plots/multiphase_deformation_20261028_v1.{png,pdf}` contains the six-profile
+overlay and signed changes relative to each energy-normalized linear peak,
+including the extra joint-minus-Omiya curve. The same prefix's `-curves.csv`
+contains all six complex profiles and slopes after the linear rescaling;
+`-plot-data.csv` contains the plotted magnitudes and fractional differences;
+`-plot.json` records normalizations, linear factors, run diagnostics, and
+input/source hashes. The original target CSV remains at its original outer
+normalizations. The energy-reference conversion was checked against all
+12,008 original reference rows, agreeing within `2.78e-17` absolute.
+Joint cloud energies remain untuned; angular, boundary, and retained-support
+systematics still require separate checks. The new curves are preliminary.
+The refined target checkpoint `radial_bvp/results/target_driven_mirk4_refined_v1.jls`
+is available as a warm initial guess for a current-source target reproduction.
+
+**Required readability follow-up:** overhaul
+[`src/adiabatic/multiphase/collocation_mirk.jl`](src/adiabatic/multiphase/collocation_mirk.jl).
+The user finds the current wrapper difficult to understand and accepts it for
+this stage. Revisit the validation, coordinate setup, initial-guess callback,
+MIRK configuration, solve, and result decoding with them; make the flow easier
+to follow while preserving the tested numerical behavior. Do not treat this
+stage's numerical check-off as completion of that readability work.
+
+**Learning-map update completed October 28:** updated
+[`docs/multiphase-learning-map.md`](docs/multiphase-learning-map.md) after this
+integration work, as explicitly requested by the user. It now includes the
+collocation helpers, optional loader and corrections, scales, assessment,
+function relationships, and the outstanding MIRK readability work. Every
+existing understanding-checkbox state was preserved, and new entries start
+unchecked. Keep the map aligned when the assessment helper is pasted into
+the library or the wrapper is simplified.
 
 ### October 28: investigate a direct solve at the plot amplitudes
 

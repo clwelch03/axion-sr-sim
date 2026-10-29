@@ -1,5 +1,17 @@
 # Multiphase workplan — October 27, 2026
 
+**October 28 update:** the user authorized finishing the reference workflow
+directly. Shared primary/secondary branch access, the updated reference driver,
+and the four-curve CSV/PNG/PDF export are complete. The first export (`v1`, job
+**27397837**) reproduced the October 27 arrays but normalized linears by outer
+coefficients, which the user correctly identified as wrong for Fig. 7. The
+corrected **equal-energy** export is `reference_curves_20261028_v2` (job
+**27398471**) in the campaign's `results/` and `figures/` directories. All four
+energies are 650.5419114886128 F_a^2 M, the saved nonlinear point nearest the
+paper's approximate 660. See the campaign README for validation and reproduction.
+The older manual-insertion, fixed-amplitude, and pending-reference-export notes
+below are historical.
+
 **Today's end goal, potentially a stretch: produce the primary/secondary
 deformation plot comparing linear, Omiya, and joint nonlinear profiles at the
 target outer amplitudes.** The deliverable is the six-curve overlay, signed

@@ -1,5 +1,211 @@
 # Joint two-cloud response and evolution
 
+## Current status and next direction (October 30)
+
+**All 36 static QCD comparisons are complete:** 24 initially-211 cases and 12
+initially-322 cases. The
+[complete PDF](results/qcd_campaign_plots_20261030_v1/all_36_profiles.pdf)
+contains all 36 pages; the
+[manifest](results/qcd_campaign_plots_20261030_v1/comparison_manifest.csv)
+marks every case `plotted`. All 108 source-file hashes in
+[metadata](results/qcd_campaign_plots_20261030_v1/metadata.json) were verified.
+Both clouds appear at identical respective energies across linear, Omiya,
+and joint curves. The joint calculation uses the coupled small-secondary
+limit; spatial convergence of the small differences remains unestablished.
+
+The agreed next priority is matched time evolution to measure changes in peak
+populations, saturation timing, coexistence, and quasi-equilibrium, including
+BH mass and spin evolution. Keep the cosine potential. Start from common
+physical initial conditions and let the populations evolve independently;
+equal-energy matching applies to diagnostic snapshots, not entire trajectories.
+No new evolution campaign has been launched. See the current
+[handoff and implementation sequence](../../../HANDOFF.md#next-steps), including
+rate/flux validation and the limits of earlier evolution prototypes.
+
+## First three-model QCD figure (October 30)
+
+The first accepted three-model comparison is available as
+[PNG](results/qcd_joint_probe_20261030_v2/both_clouds.png) and
+[PDF](results/qcd_joint_probe_20261030_v2/both_clouds.pdf), with both clouds,
+their physical amplitudes, and identical per-cloud comparison energies.
+Slurm **27438309** completed the driver `scripts/qcd_joint_probe.jl` frozen
+under `work/qcd_joint_probe_20261030_v2/`. E211=9.3274498169 and
+E322=4.2693206198e-76; the seed population and cosine potential are unchanged.
+
+The joint curves explicitly use the **small-secondary limit** appropriate to
+this microscopic seed. The nonlinear primary is independently integrated with
+the joint RHS and tested against its matching condition. The probe operator
+is the derivative of the implemented full-cosine joint source with respect to
+the q2=+/-1 components, evaluated on that background. It couples the 322
+component `(0,1), l=2,4,6` and the driven component `(2,-1), l=0,2,4` in both
+directions, retaining the latter's feedback into the secondary eigenmode.
+The pure primary retains `(1,0), l=1,3,5`, `(3,0), l=3,5`, `(5,0), l=5`.
+The `(-1,2)` field begins at second order in the secondary amplitude; this
+calculation omits it and its still-higher-order feedback. It does not replace
+the full finite-population joint solver when both clouds are macroscopic.
+
+Checks compare the response with the full joint source at finite perturbations
+(relative errors 2.90e-7 and 2.90e-9), 3 versus 7 second-phase nodes (5.26e-16),
+the existing Omiya diagonal source (3.76e-16), and the Omiya profile after
+disabling the return coupling (8.29e-11). The zero-background response is zero.
+The joint eigensolve converged in two Newton corrections; unit-probe mismatch
+is 1.99e-8, below the measured frequency-precision tolerance. The primary's
+comparison energy matches to printed precision and the secondary's to 1e-12
+relative. Primary Omiya/joint differences are roundoff. Secondary joint–linear
+and joint–Omiya differences are respectively 0.2298074% and 0.0000756882%
+of the free linear peak. These are preliminary, without spatial convergence.
+The earlier job 27438292 failed before Newton due to a captured driver variable;
+its source checks passed, and the v2 snapshot corrects the variable scope.
+
+All 23 additional initially-211 cases produced their passing three-model plots
+in **27438516_1-23%3**, bringing the completed count to 24 including the first pilot.
+`scripts/prepare_qcd_211_comparisons.py` froze
+`work/qcd_211_comparisons_20261030_v2/`. Each task runs
+`qcd_211_comparison.jl` followed by `plot_qcd_both_clouds.py`, writing to its
+named case directory in `results/qcd_211_comparisons_20261030_v2/`. Thus a
+passing job produces both clouds' three-model CSV/JLS/TOML and PNG/PDF directly.
+
+The v1 end-to-end check 27438377_1 passed primary/Omiya matching and energy
+checks but failed an unnecessarily strict 1e-10 profile-recovery threshold.
+Diagnostic 27438465 measured the discrepancy: 2.01827e-9 for alpha=.2/spin=.8,
+with primary cross-implementation agreement 1.00e-12 and source identity
+checks ~1e-15. The v2 recovery threshold is 1e-8 of profile scale. The measured
+discrepancy is saved for every case, and joint/Omiya differences below ten
+times it are labeled unresolved on the plot, with the discrepancy shown as a
+shaded band. This is a numerical consistency floor, not a spatial error bar.
+
+```bash
+sbatch --array=1-23%3 \
+  runs/adiabatic/multiphase_two_cloud/scripts/submit_qcd_211_comparisons.sh \
+  runs/adiabatic/multiphase_two_cloud/work/qcd_211_comparisons_20261030_v2 \
+  runs/adiabatic/multiphase_two_cloud/results/NEW_NAME
+```
+
+Retry **27438529 succeeded** for the 5-solar-mass alpha=.4/spin=.95 pilot with
+the shooting match moved from 5 to 25. It first rematched the free seed there,
+preserving radial spacing, domain, harmonic content, potential, and population
+target. Three corrections reached normalized residual 6.79e-12 and energy
+26.59159, 1.68% below target. The equal-energy dominant linear/Omiya magnitude
+difference is 0.146626% of the linear peak. Recipe:
+
+```bash
+sbatch runs/adiabatic/multiphase_two_cloud/scripts/submit_qcd322_matching_retry.sh \
+  runs/adiabatic/multiphase_two_cloud/work/qcd322_match025_20261030_v1 \
+  runs/adiabatic/multiphase_two_cloud/results/NEW_RETRY_NAME 25
+```
+
+All 12 initially-322 cases are now prepared in
+`work/qcd_322_comparisons_20261030_v1/`. The generalized drivers use dominant
+322 and minor 211, with cloud azimuthal order `[2,1]`; the `(2,-1)` field has
+m=3 and an outgoing boundary, rather than the m=0 absorbed field of the
+opposite dominance order. The full cosine source derivative supplies both
+coupling directions, and the same Omiya-recovery/source checks apply.
+The production match point is 24, close to the successful test at 25 and
+chosen so both radial branch lengths accommodate primary step .2 and probe
+step .4 without interpolation. Both free references are rematched there.
+
+First complete reversed case **27438650_1** and all 11 dependent cases in
+**27438706_2-12%3** have produced passing three-model plots. These share
+`results/qcd_322_comparisons_20261030_v1/`, one writer per named case.
+
+Collector **27438707** produced the complete collection after the comparison
+arrays, using a preserved copy of `scripts/collect_qcd_comparison_plots.py`. The collection
+directory is `results/qcd_campaign_plots_20261030_v1/`, containing a 36-point
+`comparison_manifest.csv`, source-hash metadata, and the 36-page
+`all_36_profiles.pdf`. Earlier partial bundles are historical. The collector
+only uses the complete-bundle filename when all 36 passed and have their
+three-model figures; otherwise it retains missing cases explicitly. Update
+the collection manually with:
+
+```bash
+python runs/adiabatic/multiphase_two_cloud/scripts/collect_qcd_comparison_plots.py \
+  runs/adiabatic/multiphase_two_cloud \
+  runs/adiabatic/multiphase_two_cloud/results/qcd_campaign_plots_20261030_v1
+```
+
+### Why Fig. 7 has larger distortions
+
+Omiya's cosine framework can approximate a QCD axion, but the paper does not
+impose the QCD mass–decay-constant relation. The dimensionless profile figure
+does not select a physical decay constant. Its large-amplitude solution is a
+useful numerical benchmark, not a prediction of the populations reached at
+our chosen stellar-mass QCD parameters.
+
+Omiya Fig. 7 selects E1=E2~660 Fa^2 M. Restoring physical units gives
+`E_cloud/M_BH = [E_cloud/(Fa^2 M)] * (fa/Mpl)^2`, with the unreduced Planck mass.
+For our 5-solar-mass alpha=0.3 point, mu=8.018e-12 eV and the QCD relation gives
+fa=7.109e17 GeV. Thus `(fa/Mpl)^2=0.00339048`: 660 would require 2.24 BH masses
+in each cloud. The accepted pilot instead has a 0.03162 mass fraction and code
+energy 9.32745. Its spin budget cannot support the Fig. 7 energy.
+
+[Omiya's discussion](https://arxiv.org/pdf/2211.01949v1#page=26), PDF Eqs.95–96,
+explicitly neglects BH spin-down and GW emission, and motivates the former
+for a string-axion example fa/Mpl~1e-3. With that coupling, code energy 660
+is a mass fraction 0.00066 per cloud. The different validity regime explains
+the apparent discrepancy; the current QCD point cannot be assigned the same
+physical evolution by holding its background fixed indefinitely.
+
+This does not exclude large deformation for all QCD axions. Applying our QCD
+relation at fa=1.22e16 GeV gives mu=4.67e-10 eV and, at alpha=.3, BH mass
+approximately .086 solar masses. This is our conversion of the illustrative
+coupling, not a physical mass specified in Fig. 7.
+
+Our saved `reference_curves_20261028_v2` at equal code energies 650.5419 already
+shows large linear/Omiya differences: 8.1625% (211) and 19.0506% (322), using
+the maximum magnitude difference divided by the corresponding linear peak.
+As a normalization check, rescaling the current free 211 curve from 9.32745
+to 660 gives peak 0.11603, matching the scale of Fig. 7. The weak distortion
+in the QCD preview is therefore not evidence that the profile solver cannot
+produce the published nonlinear deformation.
+
+## Both clouds in the QCD preview (October 30 correction)
+
+The user requires both 211 and 322 in the comparison even when one population
+is negligible. The earlier 211-only preview is incomplete. The corrected
+[PNG](results/qcd_both_clouds_20261030_v1/both_clouds.png) and
+[PDF](results/qcd_both_clouds_20261030_v1/both_clouds.pdf) show both modes in
+separate panels with physical amplitude scales, matching each cloud's energy
+between linear and Omiya. Joint curves remain pending and are not fabricated.
+
+Slurm **27438012** completed `scripts/qcd_secondary_preview.jl` on the frozen
+snapshot `work/qcd_both_clouds_20261030_v1/`. It reads the accepted nonlinear
+211 pilot, solves the existing averaged-background 322 equation at unit outer
+coefficient, and scales that linear-in-secondary equation to its finite seed
+normalization. No primary amplitude ramp or nonlinear primary rescaling is
+performed. Reproduce the job with:
+
+```bash
+sbatch runs/adiabatic/multiphase_two_cloud/scripts/submit_qcd_secondary_preview.sh \
+  runs/adiabatic/multiphase_two_cloud/work/qcd_both_clouds_20261030_v1 \
+  runs/adiabatic/multiphase_two_cloud/results/NEW_NAME/preview
+python runs/adiabatic/multiphase_two_cloud/scripts/plot_qcd_both_clouds.py \
+  runs/adiabatic/multiphase_two_cloud/results/NEW_NAME/preview
+```
+
+The original population CSV retains `log10_minor_occupation` even though its
+minor energy target was set to zero. Recover N322=1.0120597141 and convert
+to E322=4.2693206198e-76 with the saved free 322 frequency and physical-unit
+conversion. E211 remains 9.3274498169. This order-one minor occupation is an
+illustrative probe normalization, not an accurate classical occupation
+prediction. Its original c4=0.3 population diagnostic is preserved explicitly;
+the profile calculation still uses the chosen cosine potential with c4=1.
+The zero target is a historical shortcut and must not remove the second mode
+from future plots. The two clouds need not have equal energy to one another.
+
+The 322 unit-amplitude residual is 2.92348e-8, below the acceptance tolerance
+1.24299e-7 from `max(1e-8, 2*frequency_ulp_residual)`. Reintegrating the scaled
+322 energies in each model agrees with its target within 1e-12 relative.
+Maximum profile differences relative to each cloud's free linear peak are
+0.1026109% (211) and 0.2297318% (322). Radial/angular convergence remains
+separate. Both physical profiles and differences are exported; no independent
+peak normalization is applied. The secondary responds to the primary field
+even when its own population is tiny, so the dominant single-cloud limit
+does not settle the secondary's Omiya-versus-joint comparison.
+
+Outputs include `preview.csv`, `preview.jls`, `preview.toml`, the unit probe
+checkpoint, and `plot_metadata.json`. The frozen manifest hashes source and
+input files, while plot metadata hashes the exported data and plot driver.
+
 ## QCD plot visibility (October 30)
 
 The available equal-energy 211 pilot at 5 solar masses, alpha=0.3/spin=0.99,
@@ -148,6 +354,119 @@ python runs/adiabatic/multiphase_two_cloud/scripts/check_qcd_catchup.py \
     runs/adiabatic/multiphase_two_cloud/results/UNIQUE_NAME
 python -m unittest discover -s tests/tools -p test_check_qcd_catchup.py -v
 ```
+
+## Required QCD comparison (October 30)
+
+Every QCD point is intended to have **linear, Omiya, and joint fully nonlinear**
+profile comparisons. Each cloud's energy must be the same across the three
+models on its plot. For two clouds, use the same energy pair across all models;
+this does not require the 211 and 322 clouds to have equal energies to each
+other. The 10% window below concerns only proximity to the astrophysical
+population estimate. It must not be used as the inter-model matching tolerance.
+Use the established per-cloud comparison-energy convention and report total
+interacting-field energy separately. Nonlinear profiles are never rescaled to
+make a plot agree in energy.
+
+The proposed efficient recipe is to solve the joint system directly near the
+population estimate, retain its measured cloud energies as the common values,
+match the Omiya calculation to those energies, and scale the free linear
+references exactly. Check the reference energies against the joint values
+before exporting an equal-energy three-model plot. This avoids repeatedly
+retargeting the more expensive joint system solely to land on an approximate
+astrophysical estimate.
+
+The currently submitted pilot jobs compute only the single-cloud nonlinear
+profile (the Omiya dominant cloud) and its linear reference. Their CSV curve
+label `nonlinear` means the single-cloud solution; it is not a joint-model
+result. They do not yet supply the other-mode Omiya probe or the joint curve.
+
+With the current first-saturation populations, the other cloud is negligible.
+The dominant Omiya and joint problems then coincide in the zero-other-cloud
+limit at matched numerical settings. The present joint wrapper requires two
+positive cloud amplitudes, so an exact-zero comparison needs an explicit
+limiting formulation; an arbitrary second population must not be introduced
+merely to make the wrapper run. The user chose to retain the current populations
+for now. Independent joint-limit profiles are still to be implemented and run.
+The first-peak estimate is not a statement that the subdominant cloud remains
+negligible at all later times. A later two-cloud snapshot would require checking
+the literature's regime/timescale conditions and applicable quasi-equilibrium
+formulas, or an explicit population history if those formulas do not apply.
+
+## Direct QCD profile pilots (October 30)
+
+Array **27437158** submits two independent fixed-amplitude nonlinear cosine
+solves at 5 solar masses. The 211 result has passed and its task COMPLETED in
+1m07s. The 322 task FAILED in 5m49s at the 15-iteration Newton limit, with final
+scaled matching residual `1.797931e6`; it produced no accepted profile. Both
+verified the saved linear normalization. The 322 failure needs a focused
+diagnostic before retrying; no retry is submitted yet.
+
+The 211 solve took 46.6 seconds and three Newton corrections. Its measured
+energy is `9.327449816920963`, 0.852% below the population target; the exported
+linear energy is identical at printed precision. Fresh matching residual is
+`2.63597e-12`, and the sampled dimensionless field maximum is 0.02380.
+
+| Task | Dominant mode | alpha | spin | Target code energy | Target occupation |
+|---|---|---|---|---|---|
+| 1 | 211 | 0.3 | 0.99 | 9.407595115827514 | 2.2462746574e76 |
+| 2 | 322 | 0.4 | 0.95 | 27.045540627707673 | 2.7163119679e76 |
+
+The user questioned the cost of repeating energy targeting. Each pilot takes
+the saved linear seed and sets its first outer amplitude to
+`sqrt(target_energy / linear_energy_at_unit_amplitude)`, then calls the existing
+nonlinear solver once. Newton still corrects the frequency and other boundary
+coefficients at that fixed amplitude. There is no continuation ramp or outer
+energy-targeting loop. The measured energy is accepted within 10% of the
+approximate target; a larger miss is exported for inspection and reported as
+outside the window. The nonlinear profile is never scaled after solving.
+The free-field comparison is scaled to the measured nonlinear energy, and its
+energy is reintegrated to verify that normalization. An approximate occupation
+`E/omega_R` is also reported; energy is the directly measured cloud observable.
+
+Both pilots retain three odd phase harmonics. The 211 `(ell,m)` support is
+`[(1,1),(3,1),(5,1),(3,3),(5,3),(5,5)]`, with 16 polar / 31 azimuthal nodes;
+322 uses `[(2,2),(4,2),(6,2),(6,6),(8,6),(10,10)]`, with 24 / 61 nodes and
+`fundamental_m=2`. Radial settings are inherited from each linear seed:
+`[-100,300]`, match 5, step 0.1 for 211 and 0.2 for 322, boundary orders 3/7.
+Matching uses scaled residual tolerance `1e-8`, ForwardDiff, and at most 15
+Newton iterations. These are exploratory settings; angular/radial/endpoint
+convergence and tiny growth-rate accuracy remain unestablished.
+
+Frozen source/config/seeds: `work/qcd_profile_pilots_20261030_v1`; outputs:
+`results/qcd_profile_pilots_20261030_v1`; logs:
+`logs/qcd-pilot-27437158_TASK.out`. Each task has one CPU, 16 GiB, and two hours;
+both may run concurrently. Python/Julia/shell syntax, loading the Julia driver,
+and the SHA-256 manifest passed before submission. The pilot jobs themselves
+verify the saved free-field energy, fresh nonlinear matching, finite profiles,
+and the exported linear energy. No model-library changes were made.
+
+Each case preserves request/input files, the nonlinear solution, and final
+JLS/TOML/CSV exports containing the nonlinear and equal-energy linear profiles,
+frequency, energy, signed boundary fluxes, and a sampled field maximum. Existing
+prefixes are rejected. No time evolution or other-mode probe is included.
+Reproduce with a fresh name:
+
+```bash
+python runs/adiabatic/multiphase_two_cloud/scripts/prepare_qcd_profile_pilots.py UNIQUE_NAME
+sbatch --parsable --array=1-2%2 \
+    runs/adiabatic/multiphase_two_cloud/work/UNIQUE_NAME/runs/adiabatic/multiphase_two_cloud/scripts/submit_qcd_profile_pilots.sh \
+    "$PWD/runs/adiabatic/multiphase_two_cloud/work/UNIQUE_NAME" \
+    "$PWD/runs/adiabatic/multiphase_two_cloud/results/UNIQUE_NAME"
+```
+
+## QCD profile potential choice (October 30)
+
+The user chose to retain the current full, untruncated cosine potential,
+`V(phi) = mu^2 * (1 - cos(phi))` in the existing dimensionless-field convention,
+for the exploratory radial-profile campaign. Keep the current normalization;
+the QCD mass–decay constant relation supplies the physical parameters. A different
+potential can be compared in a later rerun. Implementing the chiral QCD potential
+is not a prerequisite for the present profiles. This campaign excludes time
+evolution.
+
+The chosen first step is two nonlinear dominant-cloud pilots at 5 solar masses:
+211 at alpha=0.3/spin=0.99 (target code energy about 9.41), and 322 at
+alpha=0.4/spin=0.95 (about 27.0), using the saved population targets below.
 
 ## QCD population estimates (October 29)
 

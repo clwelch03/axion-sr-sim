@@ -1,5 +1,10 @@
 # Multiphase adiabatic evolution: implementation plan
 
+Current two-cloud comparison design (October 30): see
+[QCD time evolution](qcd-two-cloud-evolution-design.md) for reuse of the
+implemented Omiya/joint machinery, changing-BH balance, and the next pilot.
+The October 19 sequence below preserves the earlier fixed-background plan.
+
 Updated 2026-10-19. The joint matching solver and finite-domain E/J observables
 are implemented. The opt-in loader now includes observables, implicit
 amplitude responses, and short E/J-balanced evolution. The user authorized

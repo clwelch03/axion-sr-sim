@@ -13,6 +13,7 @@ open caveats, and next steps. Entry points reviewed 2026-10-12:
 | [Adiabatic source guide](../src/adiabatic/README.md) | Physical-model folders, dependency boundaries, loaders, and current commands |
 | [Adiabatic reproduction](adiabatic-repro.md) | Validation records and observable conventions |
 | [Multimode adiabatic design](multimode-adiabatic-design.md) | Sec. III reproduction (2211.01949): equations, decisions, component map, extension ideas |
+| [QCD two-cloud evolution design](qcd-two-cloud-evolution-design.md) | Current linear-profile/Omiya/joint comparison plan: reusable evolution code, BH balance, populations, validation, and staged pilot |
 | [Multiphase implementation plan](multiphase-implementation-plan.md) | Proposed mutual-deformation and three-cloud milestones, closure checks, and repository/branch organization |
 | [Fixed-target profile investigation, October 28](multiphase-target-solve-investigation-2026-10-28.md) | Matching-location and Jacobian diagnostics at the plot amplitudes; decisions for a direct solve or shorter shooting segments |
 | [Multiphase workplan, October 27](multiphase-workplan-2026-10-27.md) | End goal: linear/Omiya/joint deformation plot; run outcomes, seed retry, derivative checks, continuation, references, and architecture review |

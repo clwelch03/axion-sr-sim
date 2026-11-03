@@ -22,6 +22,12 @@ function sine_remainder(field::Real)
     return field - sin(field)
 end
 
+PION_MASS = 134.9768
+PION_DECAY_CONSTANT = 130.0
+UP_QUARK_MASS = 2.2
+DOWN_QUARK_MASS = 4.79
+CHIRAL_SQRT_PREFACTOR = 4 * UP_QUARK_MASS * DOWN_QUARK_MASS / (UP_QUARK_MASS + DOWN_QUARK_MASS)^2
+
 """
     potential_value(field::Real, potential::Symbol=:cosine)
 
@@ -39,6 +45,10 @@ function potential_value(field::Real, potential::Symbol=:cosine)
         return field^2 / 2
     elseif potential === :cosine
         return 2sin(field / 2)^2
+    elseif potential === :chiral
+        sine_squared = sin(field / 2)^2
+        root = sqrt(1 - CHIRAL_SQRT_PREFACTOR * sine_squared)
+        return 4 * sine_squared / (1 + root)
     elseif potential === :quartic
         return field^2 / 2 - field^4 / 24
     elseif potential === :sextic
@@ -65,6 +75,11 @@ function potential_remainder(field::Real, potential::Symbol=:cosine)
         return zero(field)
     elseif potential === :cosine
         return sine_remainder(field)
+    elseif potential === :chiral
+        sine_squared = sin(field / 2)^2
+        correction = CHIRAL_SQRT_PREFACTOR * sine_squared
+        root = sqrt(1 - correction)
+        return sine_remainder(field) - sin(field) * correction / (root * (1 + root))
     elseif potential === :quartic
         return field^3 / 6
     elseif potential === :sextic

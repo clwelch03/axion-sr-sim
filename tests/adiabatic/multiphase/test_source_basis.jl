@@ -28,7 +28,7 @@
         return alpha^2 .* pack_complex([projected[label] for label in mode_labels])
     end
 
-    for amplitude in (0.0, 1e-4, 1.0), potential in (:cosine, :quartic, :sextic)
+    for amplitude in (0.0, 1e-4, 1.0), potential in (:cosine, :chiral, :quartic, :sextic)
         parameters = vcat(pack_complex(amplitude .* sample_coefficients), [8.0, 0.7, 0.2])
         reference = values -> direct_source(values; potential)
         basis_source = values -> nonlinear_two_phase_source(values, source_basis; potential)

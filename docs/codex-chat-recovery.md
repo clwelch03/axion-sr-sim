@@ -13,7 +13,7 @@ command runs; source chat databases are opened read-only.
 
 ## Normal procedure
 
-From this repository, using Python 3.12:
+From this repository, using Python 3.12 (no Conda activation is needed):
 
 ```bash
 # Preview: take backups, compare histories, and validate proposed imports.
@@ -127,10 +127,17 @@ and the installed Codex executable. It uses only the Python standard library.
    before scratch cleanup. A scratch directory that cannot be removed is reported
    with a warning and its retained path; it does not invalidate successful history
    checks or hide a validation failure.
-   A zero-turn
-   response is accepted only for a guardian placeholder whose database has no
-   history rows and whose rollout contains only its header, initial compaction,
-   and settings events, with no ancestor history. Other empty reads stop recovery.
+   A zero-turn response needs independent evidence from the saved history:
+   a guardian placeholder with only initialization records, or a spawned
+   subagent whose `subagent_history_start_ordinal` puts all conversation records
+   before its visible history. The latter requires matching chat and parent
+   identities, no stored turns/items, a consistent projection cursor if present,
+   no continuation, and no conversation records after the boundary. Its full
+   transcript and original boundary are preserved; the report records the hidden
+   context turn IDs and record count. This preserves the source's visibility;
+   it does not make hidden subagent context appear as turns. Other empty reads
+   still stop recovery. Failed validation retains the completed checks, failing
+   chat ID, and error in `validation.json`.
 5. With `--apply`, acquires coordination and conversation writer locks, checks the
    transcript hashes again, and takes fresh source snapshots to check that the
    affected records have not changed. It then backs up the destination again.
@@ -247,7 +254,15 @@ retention policies. The script never automatically deletes recovery artifacts.
   rollout. A paginated index with no cached rows can return an empty history even
   when the transcript contains messages. The script now rebuilds a wholly absent
   cache for an imported original segment using the installed engine on isolated
-  copies, then validates it again. Other empty histories still stop recovery;
+  copies, then validates it again. A spawned subagent can instead have a stored
+  `subagent_history_start_ordinal` at the end of its transcript: all its records
+  are outside the visible turn history. Resetting the cache does not change that
+  boundary. Recovery verifies and reports this specific state, preserves the
+  full transcript, and imports its metadata without resetting the boundary or
+  resuming the subagent. This fixes the November 3 failure on
+  `01a19dce-35c3-7391-ae24-26bf4291f4fb` and the two other subagents in that batch.
+  A visible message or turn after the boundary, or any stored history rows,
+  prevents this exception. Other empty histories still stop recovery;
   do not accept those as a successful import. An unrelated existing chat can be left untouched with
   `--exclude-thread THREAD_ID` while other chats are retrieved; report the
   exclusion and retain its transcript and database backups for separate repair.
@@ -302,7 +317,7 @@ node-local storage before the next pull; no periodic job is installed here.
 Run the data-preservation tests with:
 
 ```bash
-python3.12 -m unittest discover -s tests/tools -v
+python3.12 -m unittest discover -s tests/tools -p test_retrieve_codex_chats.py -v
 ```
 
 They cover content conflicts, split histories, continuation-only rows, active
@@ -343,3 +358,24 @@ rechecks of n0001 and n0002. Its backups and successful receipt are in
 `recovery/chat-retrieval/20261102T173455Z-gtfte2ue/`. Repeating the same command
 reported `Already up to date; no live databases changed`, with the repeat receipt
 in `recovery/chat-retrieval/20261102T173530Z-0aahsuif/`.
+
+Validated on November 3, 2026: all 62 recovery tests passed, including invalid
+visibility boundaries, stored/visible history rejection, preservation of context,
+repeat imports, and retained failure diagnostics. Reproduced the zero-turn failure from
+`20261103T173128Z-i2w74xq_` with the installed engine. All three affected spawned
+subagents had their visibility boundary at EOF; resetting their projection
+cursors and resuming isolated copies still yielded zero visible turns. The
+corrected validator checks that boundary explicitly and retains the context.
+The complete isolated apply/repeat validated 52 chats and 332 visible turns,
+imported 42 new records, ten updates, and two continuations, and then reported
+already up to date. Original snapshots, copied source databases, and every
+copied transcript remained unchanged. Replay evidence is in
+`recovery/chat-retrieval/20261103-context-boundary-replay-f3r12z_c/`.
+
+The normal live `--apply` command on n0001 then completed with those same
+counts after fresh snapshots and source rechecks. Its validation results matched
+the isolated replay, and all affected shared transcript hashes were unchanged.
+The successful receipt and before-apply backups are in
+`recovery/chat-retrieval/20261103T174530Z-47we91zd/`. Repeating the normal command
+reported `Already up to date; no live databases changed`; that receipt is in
+`recovery/chat-retrieval/20261103T174625Z-490illrp/`.

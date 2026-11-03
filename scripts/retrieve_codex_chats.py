@@ -287,7 +287,8 @@ def uncached_history_path(source, thread_id, home, *, history_mode=None):
     require(metadata.get("id") == thread_id, "Rollout belongs to another chat: " + str(path))
     if metadata.get("history_base") or UUID_PATTERN.findall(path.name)[-1:] != [thread_id]:
         return None
-    if thread_id in empty_helper_threads(source, [thread_id]):
+    if (thread_id in empty_helper_threads(source, [thread_id])
+            or thread_id in context_only_subagents(source, [thread_id])):
         return None
     check_transcripts({str(path): expected})
     return path, expected
@@ -595,6 +596,59 @@ def empty_helper_threads(store, thread_ids):
     return empty
 
 
+def context_only_subagents(store, thread_ids):
+    """Audit subagent rollouts with no history after their visibility boundary.
+
+    The engine excludes records before subagent_history_start_ordinal from the
+    visible turn list. That boundary can be at EOF even when the file contains
+    conversation context. Preserve that context and the boundary verbatim;
+    neither an empty UI history nor a projection cursor proves missing data.
+    """
+    result = {}
+    for thread_id in thread_ids:
+        row = store.thread(thread_id)
+        if not row or any(store.records(table, thread_id) for table in
+                          ("thread_turns", "thread_items", "thread_realtime_items")):
+            continue
+        try:
+            source = json.loads(row.get("source") or "null")
+        except (TypeError, ValueError):
+            continue
+        subagent = source.get("subagent") if isinstance(source, dict) else None
+        spawn = subagent.get("thread_spawn") if isinstance(subagent, dict) else None
+        parent = spawn.get("parent_thread_id") if isinstance(spawn, dict) else None
+        if not isinstance(parent, str) or not parent or parent == thread_id:
+            continue
+        raw = Path(row["rollout_path"]).read_bytes()
+        records = [json.loads(line) for line in raw.splitlines()]
+        if not records or records[0].get("type") != "session_meta":
+            continue
+        metadata = records[0]["payload"]
+        start = metadata.get("subagent_history_start_ordinal")
+        if (metadata.get("id") != thread_id or metadata.get("source") != source
+                or metadata.get("history_mode") != "paginated" or metadata.get("history_base")
+                or metadata.get("parent_thread_id") != parent or metadata.get("forked_from_id") != parent
+                or type(start) is not int or not 1 <= start <= len(records)):
+            continue
+        # A partial or inconsistent cursor is not evidence of an empty history.
+        projections = list(store.records("thread_history_projection_state", thread_id).values())
+        if projections and (len(projections) != 1
+                            or projections[0]["next_rollout_byte_offset"] != len(raw)
+                            or projections[0]["next_rollout_ordinal"] != len(records)):
+            continue
+        if any(record.get("type") != "event_msg"
+               or record.get("payload", {}).get("type") != "thread_settings_applied"
+               for record in records[start:]):
+            continue
+        context_turns = {record["payload"]["turn_id"] for record in records[1:start]
+                         if record.get("type") == "event_msg"
+                         and record.get("payload", {}).get("type") == "task_started"
+                         and record["payload"].get("turn_id")}
+        result[thread_id] = {"history_start_ordinal": start, "rollout_records": len(records),
+                             "context_turn_ids": sorted(context_turns)}
+    return result
+
+
 @contextlib.contextmanager
 def temporary_probe(prefix):
     """Dispose of isolated copies without making scratch cleanup an import gate."""
@@ -622,7 +676,9 @@ def temporary_probe(prefix):
 def validate_app_server(binary, probe, thread_ids, report_path, resume_ids=()):
     """Read isolated histories; resuming copies starts no model turns."""
     store = Store(probe / "db")
+    thread_ids = tuple(thread_ids)
     empty_helpers = empty_helper_threads(store, thread_ids)
+    context_only = context_only_subagents(store, thread_ids)
     environment = dict(os.environ, CODEX_HOME=str(probe / "home"), CODEX_SQLITE_HOME=str(probe / "db"))
     environment.pop("CODEX_THREAD_ID", None)
     with report_path.with_suffix(".stderr.log").open("w") as errors:
@@ -654,6 +710,7 @@ def validate_app_server(binary, probe, thread_ids, report_path, resume_ids=()):
             raise RecoveryError("Validation timed out: " + method)
 
         results = []
+        thread_id = None
         try:
             request("initialize", {"clientInfo": {"name": "chat_recovery_check", "version": "1"},
                                    "capabilities": {"experimentalApi": True}})
@@ -671,12 +728,23 @@ def validate_app_server(binary, probe, thread_ids, report_path, resume_ids=()):
                 require(thread.get("id") == thread_id and "turns" in thread,
                         "Validation did not return the requested chat history: " + thread_id)
                 turns = thread["turns"]
-                require(turns or thread_id in empty_helpers, "Validation returned no turns: " + thread_id)
+                require(turns or thread_id in empty_helpers or thread_id in context_only,
+                        "Validation returned no turns: " + thread_id)
                 results.append({"id": thread_id, "turn_ids": [turn["id"] for turn in turns], "turns": len(turns)})
+                if not turns and thread_id in context_only:
+                    results[-1]["context_only_subagent"] = context_only[thread_id]
+                    print("Validated %s: 0 visible turns; stored subagent boundary hides %d context records "
+                          "(full transcript preserved)." %
+                          (thread_id, context_only[thread_id]["history_start_ordinal"] - 1), flush=True)
+                    continue
                 if not turns:
                     results[-1]["empty_helper"] = True
                 print("Validated %s: %d turns" % (thread_id, len(turns)), flush=True)
-            save_json(report_path, {"binary": str(binary), "threads": results})
+            save_json(report_path, {"status": "passed", "binary": str(binary), "threads": results})
+        except Exception as error:
+            save_json(report_path, {"status": "failed", "binary": str(binary), "threads": results,
+                                    "failed_thread": thread_id, "error": str(error)})
+            raise
         finally:
             try:
                 with contextlib.suppress(BrokenPipeError):

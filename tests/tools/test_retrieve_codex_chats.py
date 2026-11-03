@@ -76,6 +76,34 @@ def add_turn(directory, thread_id="chat", turn="turn", content="message"):
         connection.execute("INSERT INTO thread_items VALUES (?,?,?,?)", (thread_id, turn, "item", content))
 
 
+def project_to_end(directory, path, thread_id="chat"):
+    with sqlite3.connect(directory / recovery.DATABASES[1]) as connection:
+        connection.execute("INSERT OR REPLACE INTO thread_history_projection_state VALUES (?,?,?)",
+                           (thread_id, path.stat().st_size, len(path.read_bytes().splitlines())))
+
+
+def context_only_rollout(directory, home, thread_id="chat"):
+    """A spawned chat whose stored visibility boundary hides its whole context."""
+    source = {"subagent": {"thread_spawn": {"parent_thread_id": "parent", "depth": 1}}}
+    records = [
+        {"type": "session_meta", "payload": {
+            "id": thread_id, "source": source, "history_mode": "paginated",
+            "forked_from_id": "parent", "parent_thread_id": "parent",
+            "subagent_history_start_ordinal": 4}},
+        {"type": "event_msg", "payload": {"type": "task_started", "turn_id": "context-turn"}},
+        {"type": "response_item", "payload": {"type": "message", "role": "assistant",
+                                               "content": [{"type": "output_text", "text": "Keep this context"}]}},
+        {"type": "event_msg", "payload": {"type": "task_complete", "turn_id": "context-turn"}},
+    ]
+    path = home / ("rollout-" + thread_id + ".jsonl")
+    path.write_text("".join(json.dumps(record) + "\n" for record in records))
+    with sqlite3.connect(directory / recovery.DATABASES[0]) as connection:
+        connection.execute("UPDATE threads SET source=?,rollout_path=? WHERE id=?",
+                           (json.dumps(source), str(path), thread_id))
+    project_to_end(directory, path, thread_id)
+    return path, records
+
+
 class ProbeTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -97,7 +125,7 @@ class ProbeTests(unittest.TestCase):
             except ProcessLookupError:
                 pass
 
-    def fake_server(self, fail_reads=False):
+    def fake_server(self, fail_reads=False, empty_reads=False):
         # Exercise real pipes, EOF shutdown and an orphaned writer. The helper
         # deliberately ignores TERM, as a stalled plugin clone can do.
         self.binary.write_text("#!" + sys.executable + "\n" + textwrap.dedent('''\
@@ -132,13 +160,18 @@ class ProbeTests(unittest.TestCase):
                 if "id" not in request:
                     continue
                 result = {}
+                if method == "thread/resume" and EMPTY_READS:
+                    print(json.dumps({"id": request["id"], "error": {"message": "unexpected resume"}}), flush=True)
+                    continue
                 if method == "thread/read":
                     if FAIL_READS:
                         print(json.dumps({"id": request["id"], "error": {"message": "broken history"}}), flush=True)
                         continue
-                    result = {"thread": {"id": request["params"]["threadId"], "turns": [{"id": "turn"}]}}
+                    empty = EMPTY_READS and request["params"]["threadId"] == "chat"
+                    result = {"thread": {"id": request["params"]["threadId"], "turns": [] if empty else [{"id": "turn"}]}}
                 print(json.dumps({"id": request["id"], "result": result}), flush=True)
-            ''').replace("FAIL_READS", repr(fail_reads)).replace("HELPER_PID_FILE", repr(str(self.pid_file))))
+            ''').replace("FAIL_READS", repr(fail_reads)).replace("EMPTY_READS", repr(empty_reads))
+            .replace("HELPER_PID_FILE", repr(str(self.pid_file))))
         self.binary.chmod(0o700)
         return self.binary
 
@@ -162,7 +195,39 @@ class ProbeTests(unittest.TestCase):
         report = self.root / "validation.json"
         with self.assertRaisesRegex(recovery.RecoveryError, "broken history"):
             recovery.validate_app_server(self.fake_server(fail_reads=True), self.probe, ["chat"], report)
-        self.assertFalse(report.exists())
+        result = json.loads(report.read_text())
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["failed_thread"], "chat")
+        self.assertIn("broken history", result["error"])
+        self.assert_helper_stopped()
+
+    def test_validation_reports_context_only_subagent_without_resuming(self):
+        path, _ = context_only_rollout(self.probe / "db", self.probe / "home")
+        original = path.read_bytes()
+        report = self.root / "validation.json"
+        recovery.validate_app_server(self.fake_server(empty_reads=True), self.probe, ["chat"], report)
+        result = json.loads(report.read_text())
+        self.assertEqual(result["status"], "passed")
+        self.assertEqual(result["threads"][0]["turns"], 0)
+        self.assertEqual(result["threads"][0]["context_only_subagent"], {
+            "history_start_ordinal": 4, "rollout_records": 4, "context_turn_ids": ["context-turn"]})
+        self.assertEqual(path.read_bytes(), original)
+        self.assert_helper_stopped()
+
+    def test_empty_read_with_visible_subagent_turn_still_fails(self):
+        path, _ = context_only_rollout(self.probe / "db", self.probe / "home")
+        with path.open("a") as stream:
+            stream.write(json.dumps({"type": "event_msg", "payload": {
+                "type": "task_started", "turn_id": "visible-turn"}}) + "\n")
+        project_to_end(self.probe / "db", path)
+        add_chat(self.probe / "db", "first")
+        report = self.root / "validation.json"
+        with self.assertRaisesRegex(recovery.RecoveryError, "Validation returned no turns"):
+            recovery.validate_app_server(self.fake_server(empty_reads=True), self.probe, ["first", "chat"], report)
+        result = json.loads(report.read_text())
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["failed_thread"], "chat")
+        self.assertEqual(result["threads"], [{"id": "first", "turn_ids": ["turn"], "turns": 1}])
         self.assert_helper_stopped()
 
     def test_probe_cleanup_retries_a_directory_still_becoming_idle(self):
@@ -749,6 +814,109 @@ class RetrievalTests(unittest.TestCase):
         with sqlite3.connect(self.local / recovery.DATABASES[0]) as connection:
             connection.execute("UPDATE threads SET source='vscode'")
         self.assertEqual(recovery.empty_helper_threads(recovery.Store(self.local), [owner]), set())
+
+    def test_context_only_subagent_import_preserves_context_and_repeats(self):
+        home = self.root / "home"
+        home.mkdir()
+        add_chat(self.remote)
+        path, _ = context_only_rollout(self.remote, home)
+        original = path.read_bytes()
+        stores = self.stores()
+        plan, conflicts, _ = recovery.make_plan(stores, set(), home=home)
+        self.assertEqual(conflicts, [])
+        self.assertNotIn("rebuild_history_paths", plan[0])
+        recovery.merge(self.local, stores, plan)
+        recovery.verify_rows(self.local, stores, plan)
+        self.assertEqual(path.read_bytes(), original)
+        self.assertEqual(recovery.make_plan(self.stores(), set(), home=home)[:2], ([], []))
+        self.assertIn("chat", recovery.context_only_subagents(recovery.Store(self.local), ["chat"]))
+
+    def test_context_only_subagent_requires_verified_boundary_and_identity(self):
+        home = self.root / "home"
+        home.mkdir()
+        add_chat(self.remote)
+        path, records = context_only_rollout(self.remote, home)
+        for key, value in (
+            ("id", "wrong-chat"), ("history_mode", "legacy"),
+            ("source", "vscode"), ("source", {"subagent": {"other": "guardian"}}),
+            ("parent_thread_id", "wrong-parent"), ("forked_from_id", "wrong-parent"),
+            ("history_base", {"thread_id": "ancestor"}),
+            ("subagent_history_start_ordinal", None), ("subagent_history_start_ordinal", True),
+            ("subagent_history_start_ordinal", -1), ("subagent_history_start_ordinal", 0),
+            ("subagent_history_start_ordinal", 2), ("subagent_history_start_ordinal", 5),
+        ):
+            with self.subTest(key=key, value=value):
+                changed = json.loads(json.dumps(records))
+                changed[0]["payload"][key] = value
+                path.write_text("".join(json.dumps(record) + "\n" for record in changed))
+                project_to_end(self.remote, path)
+                self.assertEqual(recovery.context_only_subagents(recovery.Store(self.remote), ["chat"]), {})
+        path.write_text("".join(json.dumps(record) + "\n" for record in records))
+        project_to_end(self.remote, path)
+        with sqlite3.connect(self.remote / recovery.DATABASES[0]) as connection:
+            connection.execute("UPDATE threads SET source='vscode'")
+        self.assertEqual(recovery.context_only_subagents(recovery.Store(self.remote), ["chat"]), {})
+
+    def test_context_only_boundary_cannot_hide_cached_history_or_visible_content(self):
+        home = self.root / "home"
+        home.mkdir()
+        add_chat(self.remote)
+        path, records = context_only_rollout(self.remote, home)
+        original = path.read_bytes()
+        for record in (
+            {"type": "event_msg", "payload": {"type": "task_started", "turn_id": "visible"}},
+            {"type": "response_item", "payload": {"type": "message", "role": "user"}},
+            {"type": "response_item", "payload": {"type": "function_call"}},
+            {"type": "unknown", "payload": {}},
+        ):
+            with self.subTest(record=record):
+                path.write_bytes(original + (json.dumps(record) + "\n").encode())
+                project_to_end(self.remote, path)
+                self.assertEqual(recovery.context_only_subagents(recovery.Store(self.remote), ["chat"]), {})
+        path.write_bytes(original)
+        project_to_end(self.remote, path)
+        for table in ("thread_turns", "thread_items", "thread_realtime_items"):
+            with self.subTest(table=table):
+                with sqlite3.connect(self.remote / recovery.DATABASES[1]) as connection:
+                    if table == "thread_turns":
+                        connection.execute("INSERT INTO thread_turns VALUES ('chat','turn','completed')")
+                    elif table == "thread_items":
+                        connection.execute("INSERT INTO thread_items VALUES ('chat','turn','item','message')")
+                    else:
+                        connection.execute("INSERT INTO thread_realtime_items VALUES ('chat','item','message')")
+                self.assertEqual(recovery.context_only_subagents(recovery.Store(self.remote), ["chat"]), {})
+                with sqlite3.connect(self.remote / recovery.DATABASES[1]) as connection:
+                    connection.execute("DELETE FROM " + table)
+
+    def test_context_only_subagent_requires_consistent_cursor_and_allows_settings(self):
+        home = self.root / "home"
+        home.mkdir()
+        add_chat(self.remote)
+        path, records = context_only_rollout(self.remote, home)
+        for byte_offset, ordinal in ((0, 0), (path.stat().st_size + 1, len(records)),
+                                     (path.stat().st_size, len(records) + 1)):
+            with self.subTest(byte_offset=byte_offset, ordinal=ordinal):
+                with sqlite3.connect(self.remote / recovery.DATABASES[1]) as connection:
+                    connection.execute("UPDATE thread_history_projection_state SET "
+                                       "next_rollout_byte_offset=?,next_rollout_ordinal=?", (byte_offset, ordinal))
+                self.assertEqual(recovery.context_only_subagents(recovery.Store(self.remote), ["chat"]), {})
+        with path.open("a") as stream:
+            stream.write(json.dumps({"type": "event_msg", "payload": {"type": "thread_settings_applied"}}) + "\n")
+        project_to_end(self.remote, path)
+        audit = recovery.context_only_subagents(recovery.Store(self.remote), ["chat"])["chat"]
+        self.assertEqual(audit["history_start_ordinal"], 4)
+        self.assertEqual(audit["rollout_records"], 5)
+
+    def test_context_only_subagent_without_cursor_needs_no_rebuild(self):
+        home, owner, _ = self.uncached_fixture()
+        context_only_rollout(self.remote, home, owner)
+        with sqlite3.connect(self.remote / recovery.DATABASES[1]) as connection:
+            connection.execute("DELETE FROM thread_history_projection_state")
+            connection.commit()
+        self.assertIn(owner, recovery.context_only_subagents(recovery.Store(self.remote), [owner]))
+        plan, conflicts, _ = recovery.make_plan(self.stores(), set(), home=home)
+        self.assertEqual(conflicts, [])
+        self.assertNotIn("rebuild_history_paths", plan[0])
 
     def test_newer_metadata_cannot_rewind_projection_state(self):
         for directory, timestamp, offset in ((self.local, 1, 100), (self.remote, 20, 50)):

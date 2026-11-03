@@ -18,6 +18,60 @@ evolution comparison. See the
 [multiphase campaign](runs/adiabatic/multiphase_two_cloud/README.md) for current
 outputs and [adiabatic-repro.md](docs/adiabatic-repro.md) for the primary input.
 
+**November 3: fresh-checkout validation before the Perlmutter move.**
+All **1,399 Julia unit checks** passed in Slurm job **27537972**: 17 loader,
+508 core, 257 single-cloud, 62 primary/secondary, and 555 multiphase checks.
+The stale test for the standalone AD diagnostic retired in `5698692` was
+removed; current source/response derivative regressions remain in the suite.
+All 72 Python tools tests and 23 Dolan tests also passed. The environment
+export, NERSC wrapper and transfer procedure are in the
+[Perlmutter handoff](docs/perlmutter-handoff.md); remote execution remains
+subject to the status recorded with the transfer artifacts.
+
+**November 2: accelerated chiral continuation and four-model plot.**
+The user clarified that they intended the faster run for chiral, and requested
+switching its remaining steps. Job 27508586 resumes after step 970 under
+`chiral_growth_averaged_resume_20261102_v1`. The unchanged inherited history,
+original time grid and new rates were checked before cancelling old job
+27501595. The continuation completed successfully in 7m03s, preserving the
+original time grid at all 1,001 samples. The completed four-model plot uses
+this continuation, the accelerated cosine run, the faithful Omiya control,
+and the user's chosen independent exponential linear control. Chiral ends
+0.41356% (211) and 0.38214% (322) above linear in outer amplitude. See the
+[continuation record](runs/adiabatic/multiphase_two_cloud/README.md#november-2-chiral-continuation-and-four-model-comparison)
+for source provenance, handoff checks, PNG/PDF plots and exported linear/combined
+trajectories (`growth_four_models_inner80_20261102_v1`). The old chiral report
+may still say `running` despite cancellation; use the completed new prefix.
+
+**November 2: cosine speedup run 27507601 completed in 49m01s.**
+The user requested a complete trajectory with the averaged evaluator. It
+reuses the previous inner80 seeds, numerical settings and time grid, with
+new snapshot/output prefix `cosine_growth_averaged_inner80_20261102_v1`.
+The snapshot verifies all 264 files. The previous direct cosine job 27501596
+completed in 2h51m47s; other trajectories were left intact. See the
+[run record](runs/adiabatic/multiphase_two_cloud/README.md#november-2-cosine-evolution-with-analytic-phase-averaging)
+for the final comparison and plots. Slurm confirms COMPLETED, exit 0:0;
+all 1,000 steps reached the same final time. The whole-run speedup is 3.50x,
+including startup, checkpoints and plotting. Maximum relative amplitude
+differences are 6.67e-15 (211) and 1.88e-10 (322); maximum rate differences
+are 1.17e-13 and 1.44e-7. The final E/J budget errors are about 1.735e-5.
+
+**November 2: analytic phase averaging implemented for joint responses.**
+`multiphase/averaged_observables.jl` is now the default observable path for
+fresh response/evolution samples, with `observable_method=:direct` preserving
+the original tensor/phase sums. The nonlinear potential retains its quadrature;
+matching, AD chunk sizes, balance equations and Omiya physics are unchanged.
+No running trajectory was restarted for this change. All 555 available
+multiphase checks (82 new) and 17 loader checks passed; the full runner has a
+then-pre-existing missing include, documented with the excluded test and saved logs
+in the [benchmark record](runs/adiabatic/multiphase_two_cloud/README.md#november-2-analytic-phase-averaging).
+Both benchmark jobs completed, with all eight domain/potential/profile cases
+passing. On [-80,180], complete steps are 1.62–1.88x faster for chiral and
+3.56–4.63x for cosine; the largest relative rate difference is 3.65e-7 in the
+weak late 322 cloud. The record owns detailed timings and frozen-source
+provenance. The kernel accepts longer phase labels, but the profile solver
+and E/J closure still describe two independent clouds.
+
 **November 2: outer boundary changed to 180 for fresh growth runs.**
 The user selected `r_*^out/M=180` after the isolated boundary checks. The
 chiral/joint-cosine growth driver now overrides the old seed's outer boundary

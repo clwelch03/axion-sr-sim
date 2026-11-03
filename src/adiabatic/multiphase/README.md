@@ -14,7 +14,8 @@ profile types, coordinate conversions, and matching in `profiles.jl`,
 and two-phase field reconstruction, projection, and nonlinear-source evaluation
 in `projection.jl`, without importing the other models.
 The root adiabatic loader leaves this library opt-in.
-The loader now also includes `observables.jl`, `response.jl`, and `evolution.jl`.
+The loader also includes `observables.jl`, `averaged_observables.jl`,
+`response.jl`, and `evolution.jl`.
 
 Amplitude continuation is available as
 `continue_two_phase_amplitude(seed, output_prefix; target_amplitude, kwargs...)`.
@@ -66,6 +67,33 @@ Its top-level helpers are `ordered_radial_branch` and
 `integrate_two_phase_branch_observables`. A radial branch means spatial
 profile samples, not time evolution or a family of amplitude values.
 
+Response and evolution samples now default to `observable_method=:averaged`.
+`averaged_observables.jl` contracts the quadratic stress-tensor terms using
+phase orthogonality, retaining interference among angular modes with the
+same Fourier label. The full nonlinear potential still uses the original
+polar/phase quadrature. Its first derivatives use the equivalent local chain
+rule, `U'(Phi) = Phi - potential_remainder(Phi)`. Geometry and angular data
+are cached only within a fixed-problem response calculation; profile values
+and frequencies are always reevaluated and differentiated. AD chunk sizes,
+radial matching, boundary conditions, integration and balance equations are
+unchanged.
+
+Use `two_phase_evolution_sample(problem, amplitudes, guess;
+observable_method=:direct)` to select the original tensor/phase sums.
+The same keyword is available on `two_phase_profile_response` and
+`two_phase_trial_observables`; the original low-level observable functions
+remain available. The averaged path rejects phase grids that alias quadratic
+products, zero labels and separately stored conjugate/duplicate labels.
+Keep all angular harmonics of one Fourier label in one component. Cached
+backgrounds, grids and bases must be treated as read-only.
+
+The averaging kernel accepts arbitrary-length phase labels and is checked
+against an explicit three-phase tensor sum. The nonlinear potential quadrature
+still grows with the number of phases, and the matching/evolution system
+remains two-cloud; this change does not supply additional balance equations.
+See the [benchmark record](../../../runs/adiabatic/multiphase_two_cloud/README.md#november-2-analytic-phase-averaging)
+for measured complete-step timings and rate comparisons.
+
 These evaluators require real carrier frequencies and omit slow profile time
 derivatives; they do not interpret the matching solver's complex trial
 frequencies as a physical growth law. No tail correction or converged physical
@@ -112,7 +140,8 @@ The completed pilot reaches t/M=199406.62 with amplitude changes of +3.04542%
 and +0.00126903%. Neighbor E/J derivatives agree within 9.50e-9 relative;
 charge-budget errors improve fourfold when the time step is halved. This tests
 the discretized finite-domain family, not spatial convergence or the physical
-slow-growth closure. The historical pilot source passed all 985 Julia unit checks. For validation
-of the edited October 21 interfaces, see the current handoff; the full suite
-has not been rerun and a pre-existing evolution-test return-field mismatch
-remains unresolved.
+slow-growth closure. The historical pilot source passed all 985 Julia unit
+checks. On November 3 the complete current suite passed 1,399 assertions,
+including all 555 multiphase checks, after removal of a stale regression for
+the retired standalone AD diagnostic. See the campaign's analytic
+phase-averaging record for the preserved historical checks and timings.

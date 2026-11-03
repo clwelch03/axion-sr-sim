@@ -7,6 +7,7 @@ if !isdefined(@__MODULE__, :ADIABATIC_MULTIPHASE_LOADED)
     include(joinpath(@__DIR__, "profiles.jl"))
     include(joinpath(@__DIR__, "collocation.jl"))
     include(joinpath(@__DIR__, "observables.jl"))
+    include(joinpath(@__DIR__, "averaged_observables.jl"))
     include(joinpath(@__DIR__, "response.jl"))
     include(joinpath(@__DIR__, "evolution.jl"))
     const ADIABATIC_MULTIPHASE_LOADED = true

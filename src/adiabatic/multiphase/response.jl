@@ -70,17 +70,30 @@ function correct_two_phase_profile(problem::TwoPhaseProblem, amplitudes, packed_
 end
 
 """
-    two_phase_trial_observables(packed_state, amplitudes, problem)
+    two_phase_trial_observables(packed_state, amplitudes, problem;
+        observable_method=:averaged, observable_cache=nothing)
 
-TODO: describe finite-domain charges, signed losses, and the real-carrier choice.
+Evaluate finite-domain charges and signed boundary losses using real carrier
+frequencies. `:averaged` uses analytic quadratic phase averages and the original
+nonlinear potential quadrature. `:direct` retains the reference tensor/phase
+sums. A cache may be shared within one fixed-problem response calculation.
 """
-function two_phase_trial_observables(packed_state, amplitudes, problem::TwoPhaseProblem)
+function two_phase_trial_observables(packed_state, amplitudes, problem::TwoPhaseProblem;
+        observable_method=:averaged, observable_cache=nothing)
+    observable_method in (:averaged, :direct) || throw(ArgumentError("unknown observable method"))
     profile = unpack_two_phase_profile(packed_state, amplitudes, problem)
     radial_matching_result = two_phase_matching_residual(profile, problem; save_radial_result=true)
     # The matching frequencies are complex trial eigenvalues. The frozen-field
     # stress tensor uses their REAL parts, omitting slow profile time derivatives.
     # This explicit adapter does not establish the physical slow-growth closure.
     carrier_frequencies = real.(profile.frequencies)
+    if observable_method == :averaged
+        cache = isnothing(observable_cache) ? phase_averaged_observable_cache(problem) : observable_cache
+        cache.basis === problem.source_basis && cache.spin == problem.spin && cache.alpha == problem.alpha ||
+            throw(ArgumentError("observable cache belongs to a different fixed problem"))
+        return phase_averaged_integrated_observables(radial_matching_result,
+            carrier_frequencies, cache; potential=problem.potential)
+    end
     return two_phase_integrated_observables(radial_matching_result, problem.spin, problem.alpha,
         carrier_frequencies, problem.components, problem.cloud_m,
         problem.polar_values, problem.grid, problem.phase1_nodes, problem.phase2_nodes;
@@ -92,7 +105,8 @@ end
 
 TODO: describe the E/J derivative rows and matching-response diagnostics.
 """
-function two_phase_profile_response(problem::TwoPhaseProblem, solution; tolerance=1e-9)
+function two_phase_profile_response(problem::TwoPhaseProblem, solution;
+        tolerance=1e-9, observable_method=:averaged)
     packed_state, amplitudes = solution.state, solution.amplitudes
     isfinite(tolerance) && tolerance > 0 || throw(ArgumentError("require positive tolerance"))
     two_phase_profile_admissible(packed_state, problem) || error("inadmissible response state")
@@ -101,11 +115,14 @@ function two_phase_profile_response(problem::TwoPhaseProblem, solution; toleranc
     residual_norm = norm(residual(packed_state, amplitudes))
     isfinite(residual_norm) && residual_norm <= tolerance ||
         error("profile must be converged before differentiation: residual=$residual_norm")
+    observable_cache = observable_method == :averaged ? phase_averaged_observable_cache(problem) : nothing
+    observe = (state, amplitudes) -> two_phase_trial_observables(state, amplitudes, problem;
+        observable_method, observable_cache)
     charges = (trial_packed_state, trial_amplitudes) -> begin
-        observables = two_phase_trial_observables(trial_packed_state, trial_amplitudes, problem)
+        observables = observe(trial_packed_state, trial_amplitudes)
         [observables.energy, observables.angular_momentum]
     end
     response = implicit_observable_derivatives(residual, charges, packed_state, amplitudes)
-    observables = two_phase_trial_observables(packed_state, amplitudes, problem)
+    observables = observe(packed_state, amplitudes)
     return (; response..., observables, residual_norm)
 end

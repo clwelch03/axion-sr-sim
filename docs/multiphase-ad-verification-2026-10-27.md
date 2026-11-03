@@ -22,7 +22,10 @@ independent source tests. This work does not increase the secondary amplitude.
   `two_phase_real_matching_residual` is incorporated.
 
 The standalone experiment is
-[`autodiff_vs_optimized_test.jl`](../src/adiabatic/multiphase/autodiff_vs_optimized_test.jl).
+[`autodiff_vs_optimized_test.jl` at its historical revision](https://github.com/clwelch03/axion-sr-sim/blob/e29b40c22c6e0ba518e0dfe2a21bae086e33566d/src/adiabatic/multiphase/autodiff_vs_optimized_test.jl).
+That standalone diagnostic was subsequently retired in `5698692`; its frozen
+source is also preserved with the campaign inputs. The stale test and runner
+reference were removed during the November 3 checkout validation.
 It is not loaded by the multiphase library loader. It has `initial`, `seed`,
 and `matched` execution stages. The existing Newton solver and matching/source
 functions supply the numerical work. The seed stage allows 20 corrections at

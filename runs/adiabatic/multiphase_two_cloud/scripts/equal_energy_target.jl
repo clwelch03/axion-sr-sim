@@ -1,6 +1,7 @@
 # Match the Omiya per-cloud energy convention by changing boundary amplitudes
 # and solving the full nonlinear equations after every change.
 include("collocation_target.jl")
+include("comparison_secondary_energy.jl")
 
 function cloud_energy_tables(problem)
     labels = problem.source_basis.mode_labels
@@ -18,7 +19,7 @@ function cloud_energy_tables(problem)
         grid, polar, azimuthal, mode_count=length(labels))
 end
 
-# E1 is the full single-cloud cosine energy of the pure-primary harmonics.
+# E1 is the full single-cloud energy of the pure-primary harmonics.
 # E2 is quadratic in the secondary on the phase-averaged primary background.
 # This is the SAME convention as reference_profiles.jl; it is a comparison
 # coordinate, not a unique decomposition of the interacting field's total E.
@@ -35,9 +36,9 @@ function comparison_cloud_energies(sampler, frequencies, problem, tables; step=1
         e1 = energy_per_tortoise_radius(primary, position, frequencies[1],
             problem.spin, problem.alpha, tables.primary_modes, tables.polar,
             tables.azimuthal, tables.grid; potential=problem.potential)
-        e2 = secondary_energy_per_tortoise_radius(secondary, position, primary_values,
+        e2 = comparison_secondary_energy_density(secondary, position, primary_values,
             frequencies[2], problem.spin, problem.alpha, tables.secondary_modes,
-            tables.polar, tables.azimuthal, tables.grid)
+            tables.polar, tables.azimuthal, tables.grid; potential=problem.potential)
         [e1,e2]
     end
     return [integrate_uniform(getindex.(densities,i),step) for i in 1:2]

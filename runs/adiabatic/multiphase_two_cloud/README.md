@@ -1,5 +1,187 @@
 # Joint two-cloud response and evolution
 
+## November 3 four-model energy evolution
+
+The energy comparison reuses the completed trajectories from the November 2
+outer-amplitude comparison, including the completed chiral continuation:
+[PNG](results/energy_four_models_inner80_20261103_v1.png),
+[PDF](results/energy_four_models_inner80_20261103_v1.pdf),
+[energies and ratios](results/energy_four_models_inner80_20261103_v1-trajectories.csv),
+[plot metadata](results/energy_four_models_inner80_20261103_v1-comparison.json), and
+[postprocessing checks and hashes](results/energy_four_models_inner80_20261103_v1-postprocessing.toml).
+
+The top panels show energies in `Fa^2 M` for both clouds. The bottom panels show
+`[E_i(t)/E_i(0)] / exp(2 Im(omega_i) t/M)`, using each model's own initial energy
+and the same saved free-mode growth rates. Thus the bottom panels compare growth
+without the constant offset from unequal initial energies. The CSV also exports
+the absolute ratios to the common linear reference, `E_i(t)/E_linear_i(t)`.
+
+The cloud-energy convention follows the existing energy-target comparisons:
+
+- `E211` is the isolated primary energy, including its own nonlinear potential.
+- `E322` is quadratic in the secondary, with mass term determined by the
+  phase-averaged `U''(Phi211)` of the corresponding cosine or chiral potential.
+- Mixed modes are excluded from these labels. The sum is not a unique partition
+  of total interacting energy; the joint exports retain total energy and the
+  unassigned difference explicitly.
+
+`scripts/export_growth_energies.jl` reconstructs the radial profiles at every
+accepted checkpoint without rematching or evolving the trajectories. It uses
+the existing primary/secondary energy routines on each native radial branch.
+At the initial, middle, and final samples it checks the reconstructed total
+against the stored total and compares the cloud energies with finer radial
+quadrature. Free quadratic profiles on the joint domain provide the initial
+linear energies; their exponential energy growth has twice the amplitude rate.
+Real carrier frequencies are used for joint/linear energies, consistently with
+the joint charge evaluator. Omiya energies come directly from its saved CSV.
+
+These remain preliminary fixed-BH results with matched outer-amplitude seeds,
+not matched initial energies. Joint/linear use `[-80,180]`, while Omiya uses
+`[-100,100]` in `r*/M`. These domain differences limit interpretation of the
+method comparison, including the different initial 322 energies.
+
+Reproduce the energy export (choose a fresh output prefix for recomputation):
+
+```bash
+comparison=runs/adiabatic/multiphase_two_cloud/results
+sbatch runs/adiabatic/multiphase_two_cloud/scripts/submit_growth_energies.sh \
+  "$comparison/cosine_growth_averaged_inner80_20261102_v1" \
+  "$comparison/chiral_growth_averaged_resume_20261102_v1" \
+  "$comparison/energy_four_models_inner80_20261103_v1"
+```
+
+After the export finishes, render from the validated energy tables:
+
+```bash
+comparison=runs/adiabatic/multiphase_two_cloud/results
+PYTHONPATH=src MPLCONFIGDIR=/tmp/axion-energy-comparison \
+  /global/home/users/clwelch/.conda/envs/BHsuper/bin/python \
+  runs/adiabatic/multiphase_two_cloud/scripts/plot_energy_comparison.py \
+  --comparison "$comparison/growth_four_models_inner80_20261102_v1-comparison.json" \
+  --energy-prefix "$comparison/energy_four_models_inner80_20261103_v1" \
+  --output "$comparison/energy_four_models_inner80_20261103_v1"
+```
+
+## November 2 chiral continuation and four-model comparison
+
+The user clarified that the accelerated continuation was intended for chiral,
+then requested switching the remaining accepted-step evolution to the new
+evaluator. Job **27508586** resumes the original chiral history after **step
+970**, under prefix `results/chiral_growth_averaged_resume_20261102_v1`.
+Its frozen source is `work/chiral_growth_averaged_resume_20261102_v1`
+(263 verified files), with driver `scripts/resume_averaged_growth.jl`.
+Only the four validated averaging source changes differ in the loaded core,
+single-cloud and multiphase libraries. The separate primary/secondary library
+has an unrelated comment correction and is not loaded by this driver.
+
+The driver saves the exact inherited binary history as `-resume-source.jls`,
+hashes the parent checkpoint/configuration/initial data, and records both
+source manifests in the new configuration. It verifies the new response at
+the handoff before advancing. Earlier samples remain intact; each remaining
+midpoint step lands on the original global output grid, preserving its 1,000
+intervals and accumulated charge budgets.
+
+At step 970 the relative rate differences were 1.23e-15 (211) and 1.63e-7
+(322). Four independently advanced overlapping points agreed in amplitudes
+within 3.05e-11 and rates within 1.08e-7 relative. All earlier CSV rows and
+shared time coordinates matched exactly. This is recorded in the
+[handoff check](results/chiral_growth_averaged_resume_20261102_v1-handoff-check.json).
+Only after those checks, the original job **27501595** was cancelled after
+4h43m44s. Its files remain available; its report may still say `running`.
+The accelerated continuation subsequently **completed in 7m03s**, exit 0:0,
+including startup and handoff validation. All 30 remaining steps finished;
+its complete time grid agrees exactly with the cosine run at all 1,001
+samples. Final relative E/J budget errors are approximately 1.691e-5.
+
+The requested linear control is **independent exponential growth**, explicitly
+chosen by the user: `A_i(t)=A_i(0)*exp(Im(omega_i)*t/M)`. It uses the saved
+free-mode rates, not the initial nonlinear E/J rates; the energy exponent
+would be twice the amplitude exponent. No new long integration is needed on
+this fixed BH background. `scripts/plot_growth_comparison.py` exports that
+trajectory and plots it alongside Omiya cosine, joint cosine and joint chiral.
+It checks seeds, backgrounds, grids, potentials, domains and completion, with
+an explicit `--allow-partial` mode for previews. It saves PNG/PDF plots,
+linear and combined CSVs, plus input hashes and numerical summaries in JSON.
+The comparison uses the current outer-amplitude convention, not matched
+physical occupations. The faithful Omiya domain remains [-100,100], while
+the joint/linear domain is [-80,180].
+
+The full comparison is complete:
+[PNG](results/growth_four_models_inner80_20261102_v1.png),
+[PDF](results/growth_four_models_inner80_20261102_v1.pdf),
+[linear trajectory](results/growth_four_models_inner80_20261102_v1-linear.csv),
+[all trajectories](results/growth_four_models_inner80_20261102_v1-trajectories.csv),
+and [metadata/summary](results/growth_four_models_inner80_20261102_v1-comparison.json).
+The top panels show growth relative to the initial outer amplitudes; the
+bottom panels show percentage deviations from the independent linear control.
+
+| Model | Final 211 amplitude / seed | Final 322 amplitude / seed | 211 above linear | 322 above linear |
+|---|---:|---:|---:|---:|
+| Linear, no interactions | 22026.83269 | 1.00424540 | 0% | 0% |
+| Omiya cosine | 22289.03256 | 1.01835819 | 1.19037% | 1.40531% |
+| Joint cosine | 22289.14066 | 1.01909439 | 1.19086% | 1.47862% |
+| Joint chiral | 22117.92773 | 1.00808304 | 0.41356% | 0.38214% |
+
+Generate the completed comparison with the project's Python plotting environment:
+
+```bash
+comparison=runs/adiabatic/multiphase_two_cloud/results
+PYTHONPATH=src MPLCONFIGDIR=/tmp/axion-growth-comparison python \
+  runs/adiabatic/multiphase_two_cloud/scripts/plot_growth_comparison.py \
+  --cosine "$comparison/cosine_growth_averaged_inner80_20261102_v1" \
+  --chiral "$comparison/chiral_growth_averaged_resume_20261102_v1" \
+  --omiya "$comparison/omiya_growth_domains_20261102_v1" \
+  --output "$comparison/growth_four_models_inner80_20261102_v1"
+```
+
+## November 2 cosine evolution with analytic phase averaging
+
+At the user's request, submitted a fresh joint-cosine trajectory as Slurm
+**27507601**, using the new averaged evaluator to measure the full-run speedup.
+It retains the [-80,180] domain, alpha=0.42, spin=0.99, outer seeds
+A211=1e-6/A322=1e-7, 1,000 midpoint steps and end time
+t/M=6.649525029285335e7. The previous trajectories are preserved.
+
+Snapshot: `work/cosine_growth_averaged_inner80_20261102_v1` (**264 verified
+files**). Both input files are byte-identical to the previous inner80
+snapshot, and all 69 Julia library source files match the validated
+phase-averaging benchmark snapshot. The existing `submit_growth_control.sh`
+wrapper requests one CPU, 8 GiB and eight hours. Outputs use
+`results/cosine_growth_averaged_inner80_20261102_v1`; the log is
+`logs/growth-control-27507601.out`.
+
+**Completed successfully:** Slurm reports COMPLETED, exit 0:0, after
+**49m01s**, including initialization, checkpoints and final plotting. This
+is **3.50x faster overall** than the direct run's 2h51m47s, with a whole-run
+mean of 2.94 s/step versus 10.31 s/step. All 1,000 steps reached the same
+final time on an identical time grid. Across the trajectory, the largest
+relative amplitude differences are 6.67e-15 (211) and 1.88e-10 (322); the
+largest rate differences are 1.17e-13 and 1.44e-7 respectively. Final amplitude
+growth factors are 22,289.14 and 1.01909439. Relative E/J budget errors are
+approximately 1.735e-5. This checks agreement between evaluators on the same
+finite-domain model; physical convergence remains a separate question.
+The [completion comparison](results/cosine_growth_averaged_inner80_20261102_v1-completion-comparison.json)
+records runtime, numerical differences and trajectory hashes. The
+[PNG](results/cosine_growth_averaged_inner80_20261102_v1-growth.png) and
+[PDF](results/cosine_growth_averaged_inner80_20261102_v1-growth.pdf) plots are saved.
+
+The job reached RUNNING on n0061.lr7. Its direct-evaluator baseline,
+**27501596**, completed all 1,000 steps on the same node in **2h51m47s**,
+including initialization and final plotting. The new run passed the initial
+linear-rate check (322 relative difference -3.94916e-5) and had accepted
+**59 steps** at the timing check. Steps 25–59 took **70 seconds**, or
+**2.06 s/step**, including checkpoint writes. This is about five times faster
+than the previous whole-run mean of 10.31 s/step; it is an early-window
+comparison, not the eventual total-runtime ratio. The
+[matched-stage benchmark](#november-2-analytic-phase-averaging) gives 4.63x
+for dilute cosine.
+
+Through those 59 steps, amplitudes agree with the previous trajectory within
+5.56e-15 relative, and log-amplitude rates within 1.97e-12. The timing window
+and comparison values are saved in
+[`results/cosine_growth_averaged_inner80_20261102_v1-speed-check.json`](results/cosine_growth_averaged_inner80_20261102_v1-speed-check.json).
+These were early measurements; the completed-run comparison is recorded above.
+
 ## November 2 inner-boundary -80 restart (current comparison)
 
 At the user's request, stopped the remaining old joint chiral job **27498870**
@@ -43,6 +225,94 @@ threshold. Initial matching residuals are 1.35e-12. Both saved initial states,
 and cosine had already accepted its first step at the startup check. Inspect
 these logs and the new prefixes' reports for progress. These boundary choices
 remain exploratory.
+
+## November 2 analytic phase averaging
+
+Fresh source snapshots now use analytic phase averages for the quadratic
+stress-tensor terms in joint E/J responses. The full nonlinear potential keeps
+the original finite quadrature, with its equivalent local derivative evaluated
+explicitly. Each response owns a cache of fixed geometry/angular data. Radial
+matching, boundary conditions, AD chunk sizes, midpoint evolution and the
+Omiya implementation are unchanged. Existing frozen growth jobs keep their
+original evaluator. Select `observable_method=:direct` on
+`two_phase_evolution_sample` or `two_phase_profile_response` for the original
+tensor/phase sums; the default is `:averaged`. See the
+[library notes](../../../src/adiabatic/multiphase/README.md) for phase-grid
+requirements and the limits of the multiple-phase extension.
+
+Validation passed all **555 available multiphase checks**, including 82 new
+checks for direct-tensor agreement, AD derivatives, same-label angular
+interference, potential Hessians, flux signs, radial orientation and an explicit
+three-phase tensor comparison. All **17 loader checks** also passed. The
+unmodified full runner at that checkpoint stopped at a pre-existing missing include:
+`test_autodiff_comparison.jl` references
+`src/adiabatic/multiphase/autodiff_vs_optimized_test.jl`, which is absent from
+the repository. Only that test file was excluded from the 555-check run;
+the runner itself was not changed to hide the failure. Logs and the exact
+temporary runner are saved in `work/phase_averaging_checks_20261102_v1/`.
+
+November 3 portability check: the obsolete regression and its runner include
+were removed, following the intentional retirement of the diagnostic in
+`5698692`. Slurm **27537972** then passed the complete current Julia suite:
+**1,399 assertions**, including all **555 multiphase** checks and the
+potential-consistent comparison-energy test. All 72 Python tools and 23 Dolan
+tests also passed. The original diagnostic's source remains in the historical
+commit and preserved frozen snapshots.
+
+The reproducible benchmark is `scripts/benchmark_phase_averaging.jl`. It takes
+the absolute campaign data directory and a fresh absolute output prefix, and
+uses the saved inner80 initial states plus the earlier late-profile seeds,
+correcting those seeds on the new domain. It measures complete response
+samples and complete midpoint steps, including both profile corrections.
+Each method runs three times in alternating order; timing summaries use the
+best of the two warm runs. Both methods start from the same corrected state
+and use one CPU with Julia/BLAS threading set to one.
+
+On the current **[-80,180]** domain, job **27502605** completed in 7m30s from
+`work/phase_averaging_inner80_20261102_v1` (262 verified files). All four
+cases and their midpoint endpoints passed. The dilute amplitudes are
+(1e-6,1e-7); the late fixed-amplitude checks use (0.01,1e-7).
+
+| Potential / profile | Direct step | Averaged step | Speedup |
+|---|---:|---:|---:|
+| Chiral / dilute | 15.58 s | 8.28 s | 1.88x |
+| Chiral / late | 18.78 s | 11.57 s | 1.62x |
+| Cosine / dilute | 9.69 s | 2.09 s | 4.63x |
+| Cosine / late | 10.57 s | 2.97 s | 3.56x |
+
+The 211 log-amplitude rates agree within 8.05e-14 relative. Dilute 322 rates
+agree within 1.71e-12; the largest late 322 difference is 3.65e-7 relative,
+including the independently evolved endpoint. At the common late chiral state,
+the difference is 8.05e-17/M absolute (3.08e-7 relative), despite charges,
+fluxes and response columns agreeing near floating-point precision: the
+small 322 rate is sensitive to cancellation in the balance equations.
+The largest one-step amplitude difference is 7.86e-12 relative. These tests
+compare evaluators on the same discretized model; they do not establish
+domain convergence or a long-trajectory error bound. Detailed results are in
+[`results/phase_averaging_inner80_20261102_v1.toml`](results/phase_averaging_inner80_20261102_v1.toml).
+
+To repeat this benchmark on an allocated compute CPU, from the repository root
+with the campaign Julia depot configured:
+
+```bash
+campaign="$PWD/runs/adiabatic/multiphase_two_cloud"
+phase_snapshot="$campaign/work/phase_averaging_inner80_20261102_v1"
+JULIA_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 julia --startup-file=no \
+  --compiled-modules=existing --project="$phase_snapshot" \
+  "$phase_snapshot/runs/adiabatic/multiphase_two_cloud/scripts/benchmark_phase_averaging.jl" \
+  "$campaign" "$campaign/results/NEW_PHASE_BENCHMARK"
+```
+
+The earlier-domain check on [-30,180] completed as Slurm **27502559** from
+`work/phase_averaging_20261102_v1` (262 verified files). All four dilute/late,
+chiral/cosine cases passed charges, response derivatives, fluxes, rates and
+one-step amplitude comparisons. Complete-step speedups were 1.63–1.87x for
+chiral and 3.40–4.60x for cosine. The largest relative rate difference,
+including step endpoints, was 2.09e-8 for the weak late 322 cloud; the largest
+one-step amplitude difference was 4.91e-12 relative. This is an evaluator
+equivalence check on that finite domain, not evidence for its physical adequacy.
+Detailed timings, input hashes and numerical differences are in
+[`results/phase_averaging_20261102_v1.toml`](results/phase_averaging_20261102_v1.toml).
 
 ## November 2 previous three-run evolution submission
 

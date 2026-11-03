@@ -24,7 +24,9 @@ function write_comparison_rows(path, rows)
     end
 end
 
-function omiya_branch_point(amplitude, problem, linear_primary, linear_secondary)
+function omiya_branch_point(amplitude, problem, linear_primary, linear_secondary;
+        radiative_options=(; far_position=problem.integration.outer, far_step=0.2,
+            far_order=problem.integration.outer_order))
     (; spin, alpha, grid, polar_values, couplings) = problem
     azimuthal = build_azimuthal_values(3, grid.azimuth_nodes)
     primary_modes, secondary_modes = [(1, 1)], [(2, 2)]
@@ -54,12 +56,12 @@ function omiya_branch_point(amplitude, problem, linear_primary, linear_secondary
     dissipative = solve_dissipative_mode(2omega1 - omega2, secondary, profiles,
         primary_modes, spin, alpha, secondary_modes, [(0, 0)], couplings,
         polar_values, azimuthal, grid; horizon_order, outer_order)
-    # Match the joint pilot's outer-series prescription at r*=80. The old
-    # Fig. 6 reproduction instead propagates the outgoing solution from far out.
+    # Historical matched-domain comparisons use the finite outer series by
+    # default. The Omiya growth reference supplies the established far-zone leg.
     radiative = solve_radiative_mode(2omega2 - omega1, secondary, profiles,
         primary_modes, spin, alpha, secondary_modes, [(3, 3)], couplings,
         polar_values, azimuthal, grid; horizon_order, outer_order,
-        far_position=outer, far_step=0.2, far_order=outer_order)
+        radiative_options...)
     current(branch) = outward_secondary_flux(branch.states[:, 1],
         first(branch.positions), primary.frequency, spin, 1)
     primary_flux = -current(profiles.from_horizon) + current(profiles.from_outer)

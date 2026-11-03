@@ -1,5 +1,284 @@
 # Joint two-cloud response and evolution
 
+## November 2 inner-boundary -80 restart (current comparison)
+
+At the user's request, stopped the remaining old joint chiral job **27498870**
+(Slurm confirms cancellation after 2h28m; last saved step 677). The old joint
+cosine **27498913** and Omiya **27498914** jobs had already completed. Their
+outputs and snapshots are retained; a cancelled job's last report can still
+say `termination = "running"`, so use this record and Slurm for its final status.
+
+The fixed-amplitude [balance diagnostic](work/balance_cancellation_20261102_v1/REPORT.txt)
+found that moving the inner boundary from -30 to -80 reverses the late 322
+rate's sign. Fresh joint trajectories now use **[-80,180]**. Both initial linear
+modes and the corrected nonlinear profiles use these endpoints. Radial step
+0.4, boundary orders 3/7, support, quadrature, matching tolerance 1e-9,
+alpha=0.42, spin=0.99 and seeds A211=1e-6/A322=1e-7 remain unchanged.
+
+| Model | Slurm job | Output prefix under `results/` | Cloud domain r*/M |
+|---|---|---|---|
+| Joint chiral | 27501595 | `chiral_growth_inner80_20261102_v1` | [-80,180] |
+| Joint cosine | 27501596 | `cosine_growth_inner80_20261102_v1` | [-80,180] |
+| Omiya cosine, completed control reused | 27498914 | `omiya_growth_domains_20261102_v1` | [-100,100] |
+
+Both new runs start again from the small seeds. Their common end time remains
+**t/M=6.649525029285335e7**, with 1,000 midpoint steps, allowing reuse of the
+completed Omiya control on exactly the previous time grid. Omiya's reproduction,
+including its own radial domain and outgoing prescription, is unchanged.
+
+The new frozen snapshot is `work/growth_inner80_20261102_v1` (261 verified
+files). All 99 library source files, the dependency files and the pilot seed
+are byte-identical to the previous controls snapshot. Only the joint growth
+driver and batch wrapper changed among its 166 source/script files: explicit
+inner-boundary selection and optional shared-reference input for chiral.
+`inputs/reference.toml` is a comparison contract with the old time grid and new
+joint endpoints, not a measured initial-state report. Its origin is hashed.
+
+The new jobs use the shared `submit_growth_control.sh` wrapper with model
+`chiral` or `cosine`; each requests one CPU, 8 GiB and eight hours. Logs are
+`growth-control-27501595.out` and `growth-control-27501596.out`. Both reached
+running state and passed the initial linear-rate check: the 322 relative
+differences are -3.95365e-5 (chiral) and -3.94916e-5 (cosine), below the 1%
+threshold. Initial matching residuals are 1.35e-12. Both saved initial states,
+and cosine had already accepted its first step at the startup check. Inspect
+these logs and the new prefixes' reports for progress. These boundary choices
+remain exploratory.
+
+## November 2 previous three-run evolution submission
+
+The user requested all three evolutions again using the rerun recipe below.
+Fresh outputs and source snapshots preserve the earlier runs and diagnostics.
+
+| Model | Slurm job | Output prefix under `results/` | Cloud domain r*/M |
+|---|---|---|---|
+| Joint chiral | 27498870 | `chiral_growth_outer180_20261102_v1` | [-30,180] |
+| Joint cosine | 27498913 | `cosine_growth_domains_20261102_v1` | [-30,180] |
+| Omiya cosine | 27498914 | `omiya_growth_domains_20261102_v1` | [-100,100] |
+
+The common end time is **t/M=6.649525029285335e7**, computed from the new
+chiral initial rate; all three retain the selected alpha=0.42/spin=0.99,
+outer seeds A211=1e-6/A322=1e-7, and 1,000 output intervals. The joint runs
+retain 1,000 fixed midpoint steps and the existing log-step guard. Omiya uses
+the documented far-zone outgoing construction, 213 branch points, and the
+existing time/table refinement checks. Each job requests one CPU, 8 GiB and
+eight hours. These remain exploratory domain choices, not a convergence claim.
+
+Snapshots are `work/chiral_growth_outer180_20261102_v1` (260 verified files)
+and `work/growth_controls_domains_20261102_v1` (261 verified files). All 169
+source/script, dependency and seed hashes compared across the snapshots match.
+The controls include the fresh chiral report as `inputs/reference.toml`.
+The documented physics and numerical defaults were used without further edits;
+both batch wrappers passed shell syntax checks before submission.
+
+Chiral initialized successfully with matching residual 1.76e-13. Its initial
+211/322 log-amplitude rates are 1.503866810931421e-7 and
+6.370517444029513e-11; relative differences from the fresh linear references
+are -4.0830e-6 and -9.7293e-5, within the required 1% check. Inspect logs
+`chiral-growth-27498870.out`, `growth-control-27498913.out` and
+`growth-control-27498914.out`, plus each prefix's `-report.toml` and CSV
+checkpoints, for current progress. Submission and initialization do not imply
+completed trajectories.
+
+All three jobs reached running state. At the startup check, chiral had saved
+10 accepted steps, joint cosine had passed its initial linear-rate check and
+saved t=0, and Omiya had saved 24 of 213 branch points. The cosine initial
+322 rate differs from its linear reference by -9.7248e-5 relative. No startup
+failure was present in any of these three runs.
+
+The earlier joint jobs 27495927 and 27496847 both stopped at step 794,
+t/M=5.2776066681898706e7, on the midpoint log-step guard. Their 322 depletion
+must not be treated as a physical result given the boundary sensitivity found
+in the separate validation. Earlier Omiya job 27496848 completed its original
+[-30,80] comparison in 3m05s; the new Omiya run has different boundary settings.
+
+## November 2 outer-boundary default for fresh growth runs
+
+At the user's request, fresh chiral and joint-cosine growth runs now use
+`outer=180.0`, overriding the old pilot seed's `outer=80.0`. Both the initial
+linear modes and corrected joint profiles use the new boundary. The inner
+boundary, radial step, boundary orders, mode support, quadrature, seeds and
+time-step count retain their previous settings. This is the selected working
+boundary, not a claim of complete domain convergence; the validation record is
+in [the isolated report](work/validation_20261102_v1/REPORT.md).
+
+The Omiya control **continues to use the cosine potential and has its own
+domain `[-100,100]`**, as specified for alpha=0.42 on p. 11 of
+[Omiya et al. 2211.01949v1](../../../docs/papers/2211.01949v1.pdf), following
+Eqs. (58)-(59). Its seeds, background and end time match the joint reference;
+its radial endpoints do not. The outgoing m=3 boundary state uses the existing
+reproduction prescription: start the outgoing solution at 5000 with order 16
+and propagate inward at step 0.25 to the cloud boundary. This source-free leg
+is separate from the cloud domain. The reports record both numerical domains
+and the radiative boundary settings. Other retained approximations, including
+the restricted angular support, remain; these boundary choices alone do not
+establish a full paper reproduction.
+
+The joint-cosine control retains cosine and uses the same domain as the chiral
+run. A new chiral report is required for that control at 180: the old report
+records 80 and is rejected by its spatial-configuration check.
+
+Verification: 27 configuration assertions and 61 existing Omiya
+energy/amplitude/time checks passed. These check the separate domains,
+unchanged potential choices and analytic evolution bookkeeping; they do not
+constitute a new physical trajectory at these settings. The rerun command
+blocks below passed shell syntax checks.
+
+Create fresh snapshots and output prefixes for these reruns. Existing frozen
+snapshots and checkpoints retain their original settings. From the repository
+root, for example:
+
+```bash
+campaign=runs/adiabatic/multiphase_two_cloud
+python3 "$campaign/scripts/freeze_source.py" \
+  chiral_growth_outer180_20261102_v1 \
+  "$campaign/results/cosine_pilot_20261015_v2-initial.jls"
+sbatch "$campaign/work/chiral_growth_outer180_20261102_v1/$campaign/scripts/submit_chiral_growth.sh" \
+  "$PWD/$campaign/work/chiral_growth_outer180_20261102_v1" \
+  "$PWD/$campaign/results/chiral_growth_outer180_20261102_v1"
+```
+
+Once the new chiral `-report.toml` exists, prepare and submit the controls:
+
+```bash
+campaign=runs/adiabatic/multiphase_two_cloud
+python3 "$campaign/scripts/freeze_source.py" \
+  growth_controls_domains_20261102_v1 \
+  "$campaign/results/cosine_pilot_20261015_v2-initial.jls" \
+  "$campaign/results/chiral_growth_outer180_20261102_v1-report.toml"
+for control_model in cosine omiya; do
+  sbatch "$campaign/work/growth_controls_domains_20261102_v1/$campaign/scripts/submit_growth_control.sh" \
+    "$PWD/$campaign/work/growth_controls_domains_20261102_v1" \
+    "$control_model" "$PWD/$campaign/results/${control_model}_growth_domains_20261102_v1"
+done
+```
+
+## November 2 matched cosine evolution controls
+
+At the user's request, submitted **27496847** (joint cosine) and **27496848**
+(Omiya cosine) alongside the running chiral job **27495927**. The three runs
+share alpha=0.42, spin=0.99, initial outer coefficients A211=1e-6/A322=1e-7,
+and the exact chiral end time **t/M=6.646859783614447e7**. Matching outer
+coefficients does not impose equal total charges across approximations.
+
+Both controls use frozen source `work/growth_controls_20261102_v1` (261
+verified files), including the original pilot seed and a frozen copy of the
+chiral reference report. Output prefixes are `results/cosine_growth_20261102_v1`
+and `results/omiya_growth_20261102_v1`; logs are
+`logs/growth-control-27496847.out` and `logs/growth-control-27496848.out`.
+Each requests one CPU, 8 GiB and eight hours. Check the queue and each
+`-report.toml` for progress or failure; submission does not imply completion.
+Both jobs started successfully. Joint cosine passed its initial linear-rate
+check (relative differences +0.03969% for 211 and -0.17336% for 322), then
+saved its first corrected endpoint with matching residual 2.20e-13. Omiya
+saved its first 27 of 213 branch points without failure; these are startup
+observations, not a completed-trajectory validation.
+
+The joint cosine control reuses the chiral driver's initialization and 1,000
+corrected midpoint steps, with cosine selected and the reference end time fixed.
+The original running chiral snapshot is unchanged. `cosine_growth.jl` is the
+entry point; `chiral_growth.jl` now exposes the shared `run_joint_growth`.
+The cosine report, trajectory and checkpoint suffixes match the chiral run's.
+
+`omiya_growth.jl` reuses the unchanged `omiya_branch_point`, `omiya_trajectory`
+and `two_cloud_rates` routines. It solves 213 primary/secondary/driven profile
+sets on an amplitude grid from A211(0)*exp(-0.1) to A211(0)*exp(10.5), spaced
+by 0.05 in log amplitude. The exact initial amplitude is included; neither
+the coefficient nor amplitude maps extrapolate. Primary energy must increase
+along the branch. The energy evolution uses eight RK4 substeps per output
+interval, with the same 1,001 output times as the joint runs. Acceptance checks
+require relative amplitude changes below 1e-8 on halving the number of substeps
+and below 1e-5 when thinning the profile table. The `-branch.csv`/`.jls` and
+`-report.toml` record profile progress; `-trajectory.csv` and `-summary.jls`
+are written after the trajectory passes these checks. Exceptions preserve
+branch checkpoints and write `-failure.txt`.
+
+This is the established Omiya approximation **on the pilot's finite domain**,
+not a new full-domain Figure 6 reproduction. It retains the cosine potential,
+one harmonic per component, boundary orders 3/7, and domain [-30,80]. Primary
+radial spacing 0.1 and secondary/driven spacing 0.2 align the RK4 stages; the
+joint runs use maximum spacing 0.4. The outgoing series is imposed at 80.
+Potential effects can be compared using joint chiral versus joint cosine;
+joint cosine versus Omiya cosine also retains these numerical discretization
+differences. Spatial convergence is not established.
+
+Before submission, **85 checks passed**: the existing 18 Omiya conversion/time
+checks, 43 analytic long-interval checks spanning ten amplitude e-folds, and
+24 control-configuration checks. Shell/Python syntax and cosine plot generation
+also passed. The physical profile solves run on Slurm.
+
+```bash
+python3 runs/adiabatic/multiphase_two_cloud/scripts/freeze_source.py \
+  growth_controls_20261102_v1 \
+  runs/adiabatic/multiphase_two_cloud/results/cosine_pilot_20261015_v2-initial.jls \
+  runs/adiabatic/multiphase_two_cloud/results/chiral_growth_20261102_v1-report.toml
+# Use a new snapshot/prefix for fresh runs; do not submit concurrent writers.
+sbatch --job-name=axion_cosine_growth \
+  runs/adiabatic/multiphase_two_cloud/work/growth_controls_20261102_v1/runs/adiabatic/multiphase_two_cloud/scripts/submit_growth_control.sh \
+  "$PWD/runs/adiabatic/multiphase_two_cloud/work/growth_controls_20261102_v1" \
+  cosine "$PWD/runs/adiabatic/multiphase_two_cloud/results/cosine_growth_20261102_v1"
+sbatch --job-name=axion_omiya_growth \
+  runs/adiabatic/multiphase_two_cloud/work/growth_controls_20261102_v1/runs/adiabatic/multiphase_two_cloud/scripts/submit_growth_control.sh \
+  "$PWD/runs/adiabatic/multiphase_two_cloud/work/growth_controls_20261102_v1" \
+  omiya "$PWD/runs/adiabatic/multiphase_two_cloud/results/omiya_growth_20261102_v1"
+```
+
+## November 2 chiral growth pilot
+
+Submitted **Slurm 27495927** for the user-selected exploratory fixed-BH run.
+New joint evolution uses the leading-order chiral potential; the Omiya
+reproduction retains its original cosine potential. This supersedes the
+potential choice in the historical October 30 status below.
+
+- Fixed alpha=0.42 and spin=0.99; no physical BH mass or spin-down is assigned.
+- Initial outer amplitudes A211=1e-6 and A322=1e-7, 100 times smaller than the
+  October 15 pilot. These are small classical seeds, not occupation-one seeds.
+- Quark-mass ratio z=2.2/4.79, c4=0.352968986964824. The dimensionless chiral
+  potential has U(0)=0 and U''(0)=1, with a cancellation-safe nonlinear remainder.
+- Fresh linear modes seed an independently corrected chiral profile. Initial
+  amplitude rates must agree with linear growth within 1% before integration.
+- Duration is 10 divided by the freshly computed initial 211 log-amplitude
+  rate (approximately t/M=6.65e7 from the old pilot), with 1,000 midpoint steps.
+  Growth stalling is not a stop condition. The existing 0.05 log-step guard
+  remains; this run does not introduce adaptive local time-error control.
+- Original spatial settings: r* in [-30,80], match=5, step=0.4, 8 polar nodes,
+  9 nodes per phase, and four components 211/322/m=0/m=3. Boundary orders are
+  3/7. Matching tolerance is 1e-9 and the original fixed coefficient scale is 1e-5.
+- One CPU, 8 GiB, and an eight-hour batch limit. The driver checkpoints every
+  accepted state and preserves the last accepted state if a solve fails.
+
+The driver is `scripts/chiral_growth.jl`, composing the existing profile,
+response, balance, midpoint integration, and checkpoint writers. The source
+snapshot is `work/chiral_growth_20261102_v1` (257 verified files); the output
+prefix is `results/chiral_growth_20261102_v1`. Before submission, all **214**
+focused/configuration checks passed (159 potential/source, 47 evolution, 8
+configuration); the shell and plot writer passed smoke checks. Those checks
+do not establish spatial convergence or a physical long-time history.
+
+Inspect `logs/chiral-growth-27495927.out` and the output prefix's
+`-report.toml`, `-steps1000.csv`, and `-steps1000.jls`. The CSV retains both
+amplitudes, charges, frequencies, rates, separate horizon/outer fluxes,
+conditioning, matching/response residuals, and independent charge budgets.
+`-growth.png`/`.pdf` plot both clouds against dilute linear growth and show
+their rates and charge budgets; `-failure.txt` records an exception if one occurs.
+Submission does not yet establish completion; check Slurm and the report.
+
+For a fresh run, use a new snapshot/output prefix:
+
+```bash
+python3 runs/adiabatic/multiphase_two_cloud/scripts/freeze_source.py \
+  chiral_growth_20261102_v1 \
+  runs/adiabatic/multiphase_two_cloud/results/cosine_pilot_20261015_v2-initial.jls
+sbatch runs/adiabatic/multiphase_two_cloud/work/chiral_growth_20261102_v1/runs/adiabatic/multiphase_two_cloud/scripts/submit_chiral_growth.sh \
+  "$PWD/runs/adiabatic/multiphase_two_cloud/work/chiral_growth_20261102_v1" \
+  "$PWD/runs/adiabatic/multiphase_two_cloud/results/chiral_growth_20261102_v1"
+```
+
+Resume only with the same frozen source/configuration and no concurrent writer.
+After an abrupt batch termination, verify that the job is no longer running
+before removing a stale `.lock` directory. A completed trajectory is loaded
+without rerunning its steps. Potential differences must be labeled in any later
+comparison with the faithful cosine Omiya reproduction.
+
 ## Current status and next direction (October 30)
 
 **All 36 static QCD comparisons are complete:** 24 initially-211 cases and 12

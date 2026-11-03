@@ -26,3 +26,29 @@ include(joinpath(@__DIR__, "../../../runs/adiabatic/multiphase_two_cloud/scripts
     @test_throws ErrorException omiya_trajectory(rows, [0.91, 0.01], times)
     @test_throws DomainError omiya_trajectory(rows, initial_amplitudes, [0.0, 100.0])
 end
+
+@testset "Omiya comparison across ten amplitude e-folds" begin
+    initial_amplitudes = [1e-6, 1e-7]
+    growth1, growth2 = 0.03, 0.005
+    times = collect(range(0, 10/growth1; length=1001))
+    amplitudes = initial_amplitudes[1] .* exp.(collect(-2:210) ./ 20)
+    # A wide, geometric branch exercises the long-run interpolation while the
+    # exact energies grow exponentially and the secondary normalization varies.
+    # Disparate mode normalizations, as in the finite-domain pilot, keep the
+    # energy balance resolved even while the outer coefficients differ greatly.
+    rows = [(; amplitude, primary_energy=4amplitude^2,
+        secondary_energy=2e5*(1+100*4amplitude^2),
+        primary_omega=0.4, secondary_omega=0.415,
+        primary_flux_per_energy=-2growth1, secondary_flux_per_energy=-2growth2,
+        m0_flux_coefficient=0.0, m3_flux_coefficient=0.0) for amplitude in amplitudes]
+    trajectory = omiya_trajectory(rows, initial_amplitudes, times)
+    for index in 1:50:length(times)
+        row, time = trajectory[index], times[index]
+        expected_energy = 4initial_amplitudes[1]^2 * exp(2growth1*time)
+        expected_secondary = initial_amplitudes[2] * exp(growth2*time) *
+            sqrt((1+100*4initial_amplitudes[1]^2)/(1+100*expected_energy))
+        @test row.A1 ≈ initial_amplitudes[1]*exp(growth1*time) rtol=1e-10
+        @test row.A2 ≈ expected_secondary rtol=1e-10
+    end
+    @test_throws DomainError omiya_trajectory(rows, initial_amplitudes, [0.0, 12/growth1])
+end

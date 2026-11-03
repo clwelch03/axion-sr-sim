@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 
-def freeze_source(name, seed_path=None):
+def freeze_source(name, seed_path=None, reference_path=None):
     """TODO: document the snapshot name, destination, and no-overwrite behavior."""
     root = Path(__file__).resolve().parents[4]
     campaign = Path("runs/adiabatic/multiphase_two_cloud")
@@ -24,6 +24,9 @@ def freeze_source(name, seed_path=None):
     if seed_path is not None:
         (destination / "inputs").mkdir()
         shutil.copy2(seed_path, destination / "inputs" / "initial.jls")
+    if reference_path is not None:
+        (destination / "inputs").mkdir(exist_ok=True)
+        shutil.copy2(reference_path, destination / "inputs" / "reference.toml")
     revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, universal_newlines=True).strip()
     status = subprocess.check_output(["git", "status", "--short"], cwd=root, universal_newlines=True)
     diff = subprocess.check_output(["git", "diff", "HEAD", "--binary"], cwd=root)
@@ -37,6 +40,6 @@ def freeze_source(name, seed_path=None):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (2, 3):
-        raise SystemExit("usage: freeze_source.py SNAPSHOT_NAME [SEED_JLS]")
-    freeze_source(sys.argv[1], sys.argv[2] if len(sys.argv) == 3 else None)
+    if len(sys.argv) not in (2, 3, 4):
+        raise SystemExit("usage: freeze_source.py SNAPSHOT_NAME [SEED_JLS [REFERENCE_TOML]]")
+    freeze_source(*sys.argv[1:])

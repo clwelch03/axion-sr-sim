@@ -94,6 +94,11 @@ and the installed Codex executable. It uses only the Python standard library.
    differences alone also leave an existing chat untouched; those timestamps are
    imported when its content or other metadata changes. Review/helper threads
    are included in counts.
+   If a shared rollout has already migrated to paginated history but a node's
+   index still says `legacy`, the plan records a one-way index repair. The
+   rollout header must identify that chat and declare `paginated`; its hash is
+   backed up and checked again before applying. Genuine legacy rollouts remain
+   legacy. This also repairs an affected local index without rewriting rollouts.
    New project/section memberships require manual review. Different continuation
    paths are resolved automatically when one eligible source descends from every
    known rollout of the same chat through `history_base`. The script checks the
@@ -117,6 +122,11 @@ and the installed Codex executable. It uses only the Python standard library.
    continuation segments are not rebuilt this way. Legacy chats also require
    resuming a copy before this engine can read their turns.
    Validation and cache rebuilding do not start model turns or resume live chats.
+   Each probe runs from its disposable directory in a separate process session.
+   Shutdown also stops its background helpers, including plugin-clone processes,
+   before scratch cleanup. A scratch directory that cannot be removed is reported
+   with a warning and its retained path; it does not invalidate successful history
+   checks or hide a validation failure.
    A zero-turn
    response is accepted only for a guardian placeholder whose database has no
    history rows and whose rollout contains only its header, initial compaction,
@@ -241,6 +251,21 @@ retention policies. The script never automatically deletes recovery artifacts.
   do not accept those as a successful import. An unrelated existing chat can be left untouched with
   `--exclude-thread THREAD_ID` while other chats are retrieved; report the
   exclusion and retain its transcript and database backups for separate repair.
+- **`thread/resume: ... list_turns is not supported yet`:** a node can still
+  index a chat as `legacy` after another node migrates its shared rollout to
+  paginated history. Use the corrected script and rerun the same command. It
+  verifies the rollout header, repairs the index flag, and validates the full
+  history on disposable copies before importing. The failed validation occurs
+  before live imports; do not delete chat records or migrate shared rollouts
+  to work around it.
+- **`Directory not empty` under `/tmp/codex-chat-probe-*/home/.tmp/plugins-clone-*`:**
+  older versions waited for app-server alone, leaving background plugin-clone
+  processes writing during temporary-directory deletion. Use the corrected
+  script and rerun the normal command. This failure happens after validation but
+  before live import. Probe shutdown now stops its whole private process group,
+  retries scratch cleanup, and warns if disposable files must be retained.
+  Validation, source rechecks, writer locks, backups, and import verification still
+  run; a scratch warning does not bypass any of them.
 - **Process interrupted during apply:** check `receipt.json`. An
   `apply-started.json` without a successful receipt means completion is unknown.
   Inspect both databases and the saved plan before continuing. Do not copy backup
@@ -305,3 +330,16 @@ chats loaded through the installed engine, including the rebuilt guardian review
 The older turn outside the radial BVP continuation boundary remained in the
 destination history tables. A second pull made no changes. Live stores and
 shared rollouts were not modified by this replay.
+
+Validated on November 2, 2026: all 55 recovery tests passed, including real
+subprocess checks for background writers after successful and failed validation,
+and a complete import/repeat with simulated SSH and app-server responses while
+scratch deletion was forced to fail. Replaying the failed
+`20261102T172824Z-f2b9b0te` snapshots through the installed engine returned the
+same 156 chats and 1,323 turns, with identical turn IDs and successful scratch
+cleanup. The normal live `--apply` command on n0003 then completed with 40 new
+chats, 116 updates, and eight continuation records, after fresh snapshots and
+rechecks of n0001 and n0002. Its backups and successful receipt are in
+`recovery/chat-retrieval/20261102T173455Z-gtfte2ue/`. Repeating the same command
+reported `Already up to date; no live databases changed`, with the repeat receipt
+in `recovery/chat-retrieval/20261102T173530Z-0aahsuif/`.

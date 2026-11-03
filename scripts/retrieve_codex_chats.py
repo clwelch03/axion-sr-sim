@@ -8,6 +8,7 @@ See docs/codex-chat-recovery.md before changing the storage assumptions.
 import argparse
 import contextlib
 import datetime
+import errno
 import fcntl
 import hashlib
 import json
@@ -17,6 +18,7 @@ import re
 import select
 import shlex
 import shutil
+import signal
 import socket
 import sqlite3
 import subprocess
@@ -237,14 +239,40 @@ def continuation_paths(thread_id, selected, paths, home, *, audit_boundaries=Tru
     return hashes, boundaries
 
 
-def uncached_history_path(source, thread_id, home):
+def history_mode_repair(source, thread_id, home):
+    """Recognize stale legacy indexes of rollouts already migrated elsewhere.
+
+    Migration updates the shared rollout but only that node's SQLite index.
+    Keep snapshots unchanged for concurrency checks; record a verified, one-way
+    index promotion for the merge instead of migrating or rewriting rollouts.
+    """
+    row = source.thread(thread_id)
+    if home is None or not row or row.get("history_mode") != "legacy":
+        return None
+    path = Path(row["rollout_path"]).resolve()
+    require(path.is_relative_to(home.resolve()), "Rollout outside shared Codex home: " + str(path))
+    expected = digest(path)
+    with path.open() as stream:
+        first = json.loads(stream.readline())
+    require(first.get("type") == "session_meta", "Unsupported rollout header: " + str(path))
+    metadata = first["payload"]
+    require(metadata.get("id") == thread_id, "Rollout belongs to another chat: " + str(path))
+    mode = metadata.get("history_mode", "legacy")
+    require(mode in ("legacy", "paginated"), "Unsupported rollout history mode: " + str(path))
+    check_transcripts({str(path): expected})
+    if mode == "paginated":
+        return {"from": "legacy", "to": "paginated", "path": str(path), "sha256": expected}
+    return None
+
+
+def uncached_history_path(source, thread_id, home, *, history_mode=None):
     """Identify a complete rollout whose pagination cache can be rebuilt.
 
     Never fall back from a partial cache or a continuation: those need their
     database history. The isolated engine must still read the imported chat.
     """
     row = source.thread(thread_id)
-    if home is None or not row or row.get("history_mode") != "paginated":
+    if home is None or not row or (history_mode or row.get("history_mode")) != "paginated":
         return None
     if any(source.records(table, thread_id) for table in (
             "thread_turns", "thread_items", "thread_realtime_items", "thread_history_projection_state")):
@@ -336,14 +364,20 @@ def make_plan(stores, excluded, reviewed_continuations=None, home=None):
         if len({Path(path).name for path in paths}) > 1:
             verified_paths, boundaries = verified[label]
         source_row = source.thread(thread_id)
+        mode_repair = history_mode_repair(source, thread_id, home)
+        source_metadata = dict(source_row or {})
+        if mode_repair:
+            source_metadata["history_mode"] = mode_repair["to"]
         content_changed = any(source.records(table, thread_id) != target.records(table, thread_id)
                               for table in CONTENT_TABLES)
         metadata_changed = source_row and existing and any(
-            source_row.get(key) != existing.get(key)
+            source_metadata.get(key) != existing.get(key)
             for key in source.columns["threads"] if key not in ORGANIZATION + RECENCY)
-        if label == "local" or (not content_changed and not metadata_changed and bool(source_row) == bool(existing)):
+        if (label == "local" and not mode_repair) or (
+                not content_changed and not metadata_changed and bool(source_row) == bool(existing)):
             continue
-        uncached = uncached_history_path(source, thread_id, home)
+        uncached = uncached_history_path(source, thread_id, home,
+                                        history_mode=source_metadata.get("history_mode"))
         # New project/section memberships need additional tables; fail explicitly.
         if source_row and not existing and (source_row.get("project_id") or source_row.get("thread_section_id")):
             conflicts.append({"id": thread_id, "reason": "New chat belongs to a project or section; manual import required"})
@@ -353,6 +387,8 @@ def make_plan(stores, excluded, reviewed_continuations=None, home=None):
                      "title": (source_row or {}).get("name") or (source_row or {}).get("title", thread_id),
                      "source": (source_row or {}).get("source"),
                      "metadata_only": not content_changed and bool(existing)})
+        if mode_repair:
+            plan[-1]["history_mode_repair"] = mode_repair
         if verified_paths:
             plan[-1]["verified_continuation_paths"] = verified_paths
             plan[-1]["continuation_boundaries"] = boundaries
@@ -381,6 +417,9 @@ def desired_rows(stores, entry, table):
             for column in ORGANIZATION:
                 if column != "name" or existing[column] is not None:
                     row[column] = existing[column]
+    if table == "threads" and entry.get("history_mode_repair"):
+        for row in rows.values():
+            row["history_mode"] = entry["history_mode_repair"]["to"]
     return rows
 
 
@@ -461,6 +500,9 @@ def collect_transcripts(stores, plan, home):
             indexed[entry["id"]] = row
         check_transcripts(entry.get("verified_continuation_paths", {}))
         check_transcripts(entry.get("rebuild_history_paths", {}))
+        repair = entry.get("history_mode_repair")
+        if repair:
+            check_transcripts({repair["path"]: repair["sha256"]})
     verify_ids = {entry["id"] for entry in plan if entry["id"] in indexed}
     for entry in plan:
         if entry["id"] not in indexed:
@@ -553,6 +595,30 @@ def empty_helper_threads(store, thread_ids):
     return empty
 
 
+@contextlib.contextmanager
+def temporary_probe(prefix):
+    """Dispose of isolated copies without making scratch cleanup an import gate."""
+    directory = Path(tempfile.mkdtemp(prefix=prefix))
+    try:
+        yield directory
+    finally:
+        for attempt in range(3):
+            if not directory.exists():
+                break
+            try:
+                shutil.rmtree(directory)
+                break
+            except OSError as error:
+                # A just-stopped helper may still be exiting. Never mask a
+                # validation error, or discard valid results, over scratch files.
+                if attempt < 2 and error.errno in (errno.ENOTEMPTY, errno.EBUSY, errno.ENOENT):
+                    time.sleep(0.05)
+                    continue
+                print("Warning: temporary validation directory retained at %s: %s. "
+                      "Recovery checks are unaffected." % (directory, error), file=sys.stderr)
+                break
+
+
 def validate_app_server(binary, probe, thread_ids, report_path, resume_ids=()):
     """Read isolated histories; resuming copies starts no model turns."""
     store = Store(probe / "db")
@@ -562,7 +628,8 @@ def validate_app_server(binary, probe, thread_ids, report_path, resume_ids=()):
     with report_path.with_suffix(".stderr.log").open("w") as errors:
         process = subprocess.Popen([str(binary), "-c", "sqlite_home=" + json.dumps(str(probe / "db")),
                                     "app-server", "--stdio"], env=environment, stdin=subprocess.PIPE,
-                                   stdout=subprocess.PIPE, stderr=errors, bufsize=0)
+                                   stdout=subprocess.PIPE, stderr=errors, bufsize=0,
+                                   cwd=probe, start_new_session=True)
         pending = b""
         request_id = 0
 
@@ -611,17 +678,26 @@ def validate_app_server(binary, probe, thread_ids, report_path, resume_ids=()):
                 print("Validated %s: %d turns" % (thread_id, len(turns)), flush=True)
             save_json(report_path, {"binary": str(binary), "threads": results})
         finally:
-            process.stdin.close()
             try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.terminate()
+                with contextlib.suppress(BrokenPipeError):
+                    process.stdin.close()
                 try:
                     process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait()
-            process.stdout.close()
+                    with contextlib.suppress(ProcessLookupError):
+                        os.killpg(process.pid, signal.SIGTERM)
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        pass
+            finally:
+                # App-server can exit while its plugin-clone Git processes
+                # continue writing. This private session contains only our probe;
+                # stop all its remaining helpers before deleting scratch files.
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(process.pid, signal.SIGKILL)
+                process.wait()
+                process.stdout.close()
 
 
 def prepare_probe(probe, root, stores, plan, home, timeout):
@@ -671,8 +747,7 @@ def rebuild_histories(binary, root, stores, plan, home, timeout):
     entries = [entry for entry in plan if entry.get("rebuild_history_paths")]
     if not entries:
         return
-    with tempfile.TemporaryDirectory(prefix="codex-chat-rebuild-") as temporary:
-        probe = Path(temporary)
+    with temporary_probe(prefix="codex-chat-rebuild-") as probe:
         prepare_probe(probe, root, stores, plan, home, timeout)
         ids = [entry["id"] for entry in entries]
         validate_app_server(binary, probe, ids, root / "rebuild-validation.json", resume_ids=ids)
@@ -807,6 +882,8 @@ def run(args):
     save_json(root / "plan.json", report)
     for entry in plan:
         print("Planned %s: %s [%s]" % (entry["kind"], entry["title"][:100], entry["node"]), flush=True)
+        if entry.get("history_mode_repair"):
+            print("  Repairing stale legacy index; verified rollout is already paginated.", flush=True)
         if entry.get("rebuild_history_paths"):
             print("  Missing pagination cache; rebuilding and validating from an isolated rollout copy.", flush=True)
         for boundary in entry.get("continuation_boundaries", []):
@@ -834,8 +911,7 @@ def run(args):
     binary = find_codex(args.codex_bin)
     rebuild_histories(binary, root, stores, plan, home, args.snapshot_timeout)
     save_json(root / "plan.json", report)
-    with tempfile.TemporaryDirectory(prefix="codex-chat-probe-") as temporary:
-        probe = Path(temporary)
+    with temporary_probe(prefix="codex-chat-probe-") as probe:
         prepare_probe(probe, root, stores, plan, home, args.snapshot_timeout)
         validate_app_server(binary, probe, verify_ids, root / "validation.json")
     check_transcripts(hashes)

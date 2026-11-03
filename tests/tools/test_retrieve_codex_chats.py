@@ -1,5 +1,6 @@
 """Data preservation checks for the cluster chat recovery utility."""
 
+import errno
 import fcntl
 import importlib.util
 import io
@@ -9,7 +10,11 @@ from pathlib import Path
 import shlex
 import sqlite3
 import subprocess
+import signal
+import sys
 import tempfile
+import textwrap
+import time
 import unittest
 from unittest import mock
 
@@ -69,6 +74,191 @@ def add_turn(directory, thread_id="chat", turn="turn", content="message"):
     with sqlite3.connect(directory / recovery.DATABASES[1]) as connection:
         connection.execute("INSERT INTO thread_turns VALUES (?,?,?)", (thread_id, turn, "completed"))
         connection.execute("INSERT INTO thread_items VALUES (?,?,?,?)", (thread_id, turn, "item", content))
+
+
+class ProbeTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.probe = self.root / "probe"
+        self.probe.mkdir()
+        (self.probe / "home").mkdir()
+        create(self.probe / "db")
+        add_chat(self.probe / "db")
+        self.binary = self.root / "fake-codex"
+        self.pid_file = self.root / "helper.pid"
+        self.addCleanup(self.stop_helper)
+
+    def stop_helper(self):
+        if self.pid_file.exists():
+            try:
+                os.kill(int(self.pid_file.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+    def fake_server(self, fail_reads=False):
+        # Exercise real pipes, EOF shutdown and an orphaned writer. The helper
+        # deliberately ignores TERM, as a stalled plugin clone can do.
+        self.binary.write_text("#!" + sys.executable + "\n" + textwrap.dedent('''\
+            import json
+            import os
+            from pathlib import Path
+            import signal
+            import sys
+            import time
+
+            home = Path(os.environ["CODEX_HOME"])
+            pid_file = Path(HELPER_PID_FILE)
+            for line in sys.stdin:
+                request = json.loads(line)
+                method = request["method"]
+                if method == "initialize":
+                    reader, writer = os.pipe()
+                    if os.fork() == 0:
+                        os.close(reader)
+                        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+                        target = home / ".tmp/plugins-clone-test/plugins"
+                        target.mkdir(parents=True)
+                        pid_file.write_text(str(os.getpid()))
+                        os.write(writer, b"1")
+                        os.close(writer)
+                        while True:
+                            (target / "writing").write_text("background clone")
+                            time.sleep(0.005)
+                    os.close(writer)
+                    os.read(reader, 1)
+                    os.close(reader)
+                if "id" not in request:
+                    continue
+                result = {}
+                if method == "thread/read":
+                    if FAIL_READS:
+                        print(json.dumps({"id": request["id"], "error": {"message": "broken history"}}), flush=True)
+                        continue
+                    result = {"thread": {"id": request["params"]["threadId"], "turns": [{"id": "turn"}]}}
+                print(json.dumps({"id": request["id"], "result": result}), flush=True)
+            ''').replace("FAIL_READS", repr(fail_reads)).replace("HELPER_PID_FILE", repr(str(self.pid_file))))
+        self.binary.chmod(0o700)
+        return self.binary
+
+    def assert_helper_stopped(self):
+        pid = int(self.pid_file.read_text())
+        status = Path("/proc/%d/status" % pid)
+        deadline = time.monotonic() + 2
+        while status.exists() and time.monotonic() < deadline:
+            if "State:\tZ" in status.read_text():
+                return
+            time.sleep(0.01)
+        self.assertFalse(status.exists(), "Validation left a background writer running")
+
+    def test_validation_stops_background_writers_after_success(self):
+        report = self.root / "validation.json"
+        recovery.validate_app_server(self.fake_server(), self.probe, ["chat"], report)
+        self.assertEqual(json.loads(report.read_text())["threads"][0]["turns"], 1)
+        self.assert_helper_stopped()
+
+    def test_validation_stops_background_writers_after_failure(self):
+        report = self.root / "validation.json"
+        with self.assertRaisesRegex(recovery.RecoveryError, "broken history"):
+            recovery.validate_app_server(self.fake_server(fail_reads=True), self.probe, ["chat"], report)
+        self.assertFalse(report.exists())
+        self.assert_helper_stopped()
+
+    def test_probe_cleanup_retries_a_directory_still_becoming_idle(self):
+        remove = recovery.shutil.rmtree
+        with (mock.patch.object(recovery.shutil, "rmtree", side_effect=[
+                OSError(errno.ENOTEMPTY, "background clone"), None]) as cleanup,
+              mock.patch.object(recovery.time, "sleep")):
+            with recovery.temporary_probe(prefix="codex-chat-probe-test-") as probe:
+                pass
+        self.assertEqual(cleanup.call_count, 2)
+        remove(probe)
+
+    def test_probe_cleanup_failure_warns_and_preserves_validation_outcome(self):
+        for validation_fails in (False, True):
+            with self.subTest(validation_fails=validation_fails):
+                stderr = io.StringIO()
+                with (mock.patch.object(recovery.shutil, "rmtree", side_effect=OSError(errno.ENOTEMPTY, "busy")),
+                      mock.patch.object(recovery.time, "sleep"),
+                      mock.patch.object(recovery.sys, "stderr", stderr)):
+                    try:
+                        with recovery.temporary_probe(prefix="codex-chat-probe-test-") as probe:
+                            if validation_fails:
+                                raise recovery.RecoveryError("invalid chat history")
+                    except recovery.RecoveryError as error:
+                        self.assertTrue(validation_fails)
+                        self.assertEqual(str(error), "invalid chat history")
+                    else:
+                        self.assertFalse(validation_fails)
+                self.assertTrue(probe.exists())
+                self.assertIn(str(probe), stderr.getvalue())
+                self.assertIn("Warning:", stderr.getvalue())
+                recovery.shutil.rmtree(probe)
+
+    def test_apply_and_repeat_with_real_probe_and_failed_scratch_cleanup(self):
+        destination = self.root / "destination"
+        create(destination)
+        source = self.probe / "db"
+        add_turn(source)
+        home = self.probe / "home"
+        (home / "sessions").mkdir()
+        (home / "thread-writer-locks").mkdir()
+        rollout = home / "sessions/chat.jsonl"
+        rollout.write_text(json.dumps({"type": "session_meta", "payload": {
+            "id": "chat", "history_mode": "paginated"}}) + "\n")
+        with sqlite3.connect(source / recovery.DATABASES[0]) as connection:
+            connection.execute("UPDATE threads SET rollout_path=?", (str(rollout),))
+        original_rollout = rollout.read_bytes()
+        original_source = {name: recovery.digest(source / name) for name in recovery.DATABASES}
+        backups = self.root / "backups"
+        argv = ["retrieve_codex_chats.py", "--apply", "--nodes", "n0002", "--codex-home", str(home),
+                "--sqlite-home", str(destination), "--backup-root", str(backups),
+                "--codex-bin", str(self.fake_server())]
+        with mock.patch.object(recovery.sys, "argv", argv):
+            args = recovery.parse_args()
+        original_umask = os.umask(0o077)
+        self.addCleanup(os.umask, original_umask)
+
+        def ssh(command, **kwargs):
+            remote = shlex.split(command[-1])
+            recovery.snapshot(source, Path(remote[remote.index("--snapshot-to") + 1]))
+            return subprocess.CompletedProcess(command, 0)
+
+        remove = recovery.shutil.rmtree
+        retained = set()
+
+        def cleanup(path, *args, **kwargs):
+            if Path(path).name.startswith("codex-chat-probe-"):
+                retained.add(Path(path))
+                raise OSError(errno.ENOTEMPTY, "busy scratch directory")
+            return remove(path, *args, **kwargs)
+
+        stdout, stderr = io.StringIO(), io.StringIO()
+        try:
+            with (mock.patch.object(recovery.socket, "gethostname", return_value="n0001.scs00"),
+                  mock.patch.object(recovery.subprocess, "run", side_effect=ssh) as snapshots,
+                  mock.patch.object(recovery.shutil, "rmtree", side_effect=cleanup),
+                  mock.patch.object(recovery.sys, "stdout", stdout),
+                  mock.patch.object(recovery.sys, "stderr", stderr)):
+                recovery.run(args)
+                self.assertEqual(snapshots.call_count, 2)  # source audit and final recheck
+                run, = backups.iterdir()
+                self.assertEqual(json.loads((run / "receipt.json").read_text())["status"], "applied")
+                self.assertTrue((run / "before-apply").is_dir())
+                self.assert_helper_stopped()
+                recovery.run(args)
+            self.assertIn("Import verified", stdout.getvalue())
+            self.assertIn("Already up to date", stdout.getvalue())
+            self.assertIn("Warning: temporary validation directory retained", stderr.getvalue())
+            receipts = [json.loads(path.read_text())["status"] for path in backups.glob("*/receipt.json")]
+            self.assertCountEqual(receipts, ["applied", "up_to_date"])
+            self.assertEqual(len(recovery.Store(destination).records("thread_turns", "chat")), 1)
+            self.assertEqual(rollout.read_bytes(), original_rollout)
+            self.assertEqual({name: recovery.digest(source / name) for name in recovery.DATABASES}, original_source)
+        finally:
+            for path in retained:
+                remove(path)
 
 
 class RetrievalTests(unittest.TestCase):
@@ -608,6 +798,65 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(recovery.Store(self.remote).records("thread_turns", owner), {})
         self.assertEqual(path.read_bytes(), original)
         self.assertEqual(recovery.make_plan(self.stores(), set(), home=home)[:2], ([], []))
+
+    def test_stale_legacy_index_is_repaired_without_rewriting_rollout(self):
+        home, owner, path = self.uncached_fixture()
+        add_turn(self.remote, owner)
+        with sqlite3.connect(self.remote / recovery.DATABASES[0]) as connection:
+            connection.execute("UPDATE threads SET history_mode='legacy'")
+        original = path.read_bytes()
+        stores = self.stores()
+        plan, conflicts, _ = recovery.make_plan(stores, set(), home=home)
+        self.assertEqual(conflicts, [])
+        self.assertEqual(plan[0]["history_mode_repair"]["to"], "paginated")
+        self.assertNotIn("rebuild_history_paths", plan[0])
+        recovery.collect_transcripts(stores, plan, home)
+        recovery.merge(self.local, stores, plan)
+        recovery.verify_rows(self.local, stores, plan)
+        self.assertEqual(recovery.Store(self.local).thread(owner)["history_mode"], "paginated")
+        self.assertEqual(recovery.Store(self.remote).thread(owner)["history_mode"], "legacy")
+        self.assertEqual(path.read_bytes(), original)
+        self.assertEqual(recovery.make_plan(self.stores(), set(), home=home)[:2], ([], []))
+
+    def test_stale_local_index_can_be_repaired_and_missing_cache_rebuilt(self):
+        home, owner, path = self.uncached_fixture()
+        add_chat(self.local, owner)
+        with sqlite3.connect(self.local / recovery.DATABASES[0]) as connection:
+            connection.execute("UPDATE threads SET history_mode='legacy',rollout_path=?", (str(path),))
+        stores = {"local": recovery.Store(self.local)}
+        plan, conflicts, _ = recovery.make_plan(stores, set(), home=home)
+        self.assertEqual(conflicts, [])
+        self.assertEqual(plan[0]["node"], "local")
+        self.assertEqual(plan[0]["kind"], "updated")
+        self.assertIn("history_mode_repair", plan[0])
+        self.assertIn("rebuild_history_paths", plan[0])
+        self.assertEqual(stores["local"].thread(owner)["history_mode"], "legacy")
+
+    def test_genuine_legacy_rollout_is_not_promoted(self):
+        home, owner, path = self.uncached_fixture()
+        with sqlite3.connect(self.remote / recovery.DATABASES[0]) as connection:
+            connection.execute("UPDATE threads SET history_mode='legacy'")
+        path.write_text(path.read_text().replace('"history_mode": "paginated"', '"history_mode": "legacy"'))
+        plan, conflicts, _ = recovery.make_plan(self.stores(), set(), home=home)
+        self.assertEqual(conflicts, [])
+        self.assertNotIn("history_mode_repair", plan[0])
+        self.assertNotIn("rebuild_history_paths", plan[0])
+        self.assertEqual(next(iter(recovery.desired_rows(self.stores(), plan[0], "threads").values()))["history_mode"], "legacy")
+
+    def test_index_repair_rejects_changed_or_wrong_rollout(self):
+        home, owner, path = self.uncached_fixture()
+        with sqlite3.connect(self.remote / recovery.DATABASES[0]) as connection:
+            connection.execute("UPDATE threads SET history_mode='legacy'")
+        stores = self.stores()
+        plan, _, _ = recovery.make_plan(stores, set(), home=home)
+        with path.open("a") as stream:
+            stream.write('{}\n')
+        with self.assertRaisesRegex(recovery.RecoveryError, "Transcript changed"):
+            recovery.collect_transcripts(stores, plan, home)
+        path.write_text(json.dumps({"type": "session_meta", "payload": {
+            "id": "another-chat", "history_mode": "paginated"}}) + "\n")
+        with self.assertRaisesRegex(recovery.RecoveryError, "another chat"):
+            recovery.make_plan(stores, set(), home=home)
 
     def test_history_rebuild_rejects_transcript_changes_and_new_content(self):
         home, owner, path = self.uncached_fixture()

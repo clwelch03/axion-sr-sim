@@ -21,4 +21,4 @@ sha256sum --quiet -c source-manifest.sha256
     --startup-file=no --compiled-modules=existing --project=. \
     runs/adiabatic/multiphase_two_cloud/scripts/linear_reference_grid.jl \
     "$snapshot_directory/inputs/linear_grid.toml" \
-    "${SLURM_ARRAY_TASK_ID:?Submit with --array=1-12%4}" "$output_directory"
+    "${SLURM_ARRAY_TASK_ID:?Submit an array matching the config case count}" "$output_directory"

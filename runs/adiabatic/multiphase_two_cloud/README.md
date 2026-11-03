@@ -1,5 +1,56 @@
 # Joint two-cloud response and evolution
 
+## Missing linear-secondary retries (October 29)
+
+Array **27425079** retries five secondary references: alpha=0.3/spin=0.9,
+then alpha=0.2 at spins 0.99/0.95/0.9/0.8. The separately recovered spin-0.95,
+alpha-0.3 pair remains in `results/omiya_spin095_linear_20261029_v2/` below.
+There are no new primary solves. Outputs use a fresh directory and preserve
+the original grid, failed attempts, and comparison references.
+
+The opt-in precision rule follows the spin-0.95 recovery. A coarse solve at
+`1e-5` locates the root; with its boundary coefficients held fixed, the driver
+measures changes in the residual vector at frequency plus/minus one real-frequency
+ULP. A restarted final solve and fresh profile reconstruction must both pass
+`max(1e-8, 2*max(probe_changes))`. Coarse tolerance alone never accepts a
+reference. Each report retains the requested `1e-8`, actual acceptance tolerance,
+coarse root/residual, probe sizes and changes, and the existing profile/energy/flux
+diagnostics. These absolute residuals use unit first outer coefficient. This
+precision allowance does not establish spatial convergence or tiny growth rates.
+The original strict grid mode remains the default.
+
+Frozen source/config: `work/linear_grid_retry_20261029_v1`; results:
+`results/linear_grid_retry_20261029_v1`; logs: `logs/linear-grid-27425079_TASK.out`.
+All source/config hashes and Python/Julia/shell syntax passed before submission.
+At most four cases run concurrently, each with one CPU, 8 GiB, and 20 minutes.
+**Outcome:** all five tasks COMPLETED in 23–26 seconds. Fresh profile matching,
+positive free-field energies, and all solution/profile/CSV outputs were verified.
+
+| alpha | spin | Matching residual | Precision-adjusted tolerance |
+|---|---|---|---|
+| 0.3 | 0.9 | 1.47906e-8 | 1.06769e-7 |
+| 0.2 | 0.99 | 1.49161e-6 | 1.54520e-5 |
+| 0.2 | 0.95 | 3.61701e-7 | 1.50881e-5 |
+| 0.2 | 0.9 | 6.04092e-7 | 1.44533e-5 |
+| 0.2 | 0.8 | 1.35327e-6 | 1.40253e-5 |
+
+All twelve reference pairs are now available across the preserved exports:
+all primaries and six secondaries in `results/linear_grid_20261029_v1`,
+the alpha=0.3/spin=0.95 secondary in
+`results/omiya_spin095_linear_20261029_v2/linear_reference.jls`, and these five
+secondaries in `results/linear_grid_retry_20261029_v1`. The spin-0.95 combined
+export is energy-normalized (its metadata gives amplitude factors); the grid
+exports retain unit outer coefficient and record unit-energy factors. Preserve
+that distinction when loading seeds. Reproduce the retry with a fresh name:
+
+```bash
+python runs/adiabatic/multiphase_two_cloud/scripts/prepare_linear_reference_grid.py UNIQUE_NAME --retry-missing-secondaries
+sbatch --parsable --array=1-5%4 \
+    runs/adiabatic/multiphase_two_cloud/scripts/submit_linear_reference_grid.sh \
+    "$PWD/runs/adiabatic/multiphase_two_cloud/work/UNIQUE_NAME" \
+    "$PWD/runs/adiabatic/multiphase_two_cloud/results/UNIQUE_NAME"
+```
+
 ## Linear references across twelve backgrounds (October 29)
 
 Slurm array **27418189** attempts the two existing linear eigenmode solves for
@@ -184,6 +235,44 @@ The earlier linear-only figures are preserved. Reproduce with
 `scripts/submit_omiya_energy_references.sh`, then
 `scripts/plot_parameter_energy_cases.py --omiya-directory OUTPUT_DIRECTORY`;
 each script's usage lists its positional arguments and requires fresh outputs.
+
+## Spin 0.95 comparisons (October 29)
+
+Production tasks **6 and 7 COMPLETED**, accepting alpha=0.3, spin=0.95 with
+energy pairs `(1,1)` and `(0.5,1)` in units of E0. Their comparisons are in
+`plots/parameter_energy_spin095_completed_20261029_v1.{png,pdf}` at repository
+level, with individual figures, a plotted-data CSV, and input hashes alongside.
+The line styles and lower-panel definition match the first four comparisons.
+
+`omiya_background_references.jl` transports the existing multimode Omiya
+solution from spin 0.99 in increments no larger than 0.02, solving the primary
+and correcting its energy at every stage. It then solves the secondary on the
+final primary and normalizes its quadratic energy to E2. Each intermediate
+primary is checkpointed. Alpha and radial endpoints must match the seed;
+this driver does not yet transport alpha or extend the domain.
+
+The equal-energy Omiya export passed in job **27418199**, saved in
+`results/omiya_spin095_20261029_v1/`, with maximum energy error `4.04e-7`.
+That job subsequently failed during the linear-secondary export: its unit-amplitude
+absolute residual stopped at `1.17e-8`, just above the requested `1e-8`.
+The accepted Omiya files were preserved. Linear-only job **27419139 COMPLETED**
+in 33s using `work/omiya_spin095_linear_20261029_v2`, writing
+`results/omiya_spin095_linear_20261029_v2/linear_reference.{jls,toml,csv}`.
+The linear-secondary residual changes by `5.48e-8` for one representable-frequency
+step; its final residual is `1.64e-8`. The linear driver now measures this floor
+near the root and uses `max(1e-8, 2*floor)`, recording both values and the actual
+residual. Both linear energies are reintegrated after normalization and checked
+within `1e-12` relative.
+
+The half-primary-energy Omiya job **27419349 COMPLETED** in 6m17s, writing
+`results/omiya_spin095_half_20261029_v1/` from the matching frozen work directory.
+Its maximum energy error is `1.80e-7`. This job uses `--omiya-only`, reusing the
+new spin-0.95 linear references for plotting. The submission wrapper also accepts
+`--background` (both references) and `--linear-only`. Each snapshot includes the
+accepted joint metadata, seeds, source, and SHA-256 manifest. The plotting driver
+accepts repeated `--omiya-directory` arguments to combine separate reference
+batches and rejects ambiguous case matches. Spatial/angular/endpoint convergence
+remains a separate check.
 
 ## Equal-energy joint comparison (October 28)
 

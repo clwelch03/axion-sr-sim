@@ -103,8 +103,8 @@ def main():
                         help="Equal-energy export with linear profiles on a common radial grid")
     parser.add_argument("figure_prefix", type=Path)
     parser.add_argument("result_prefixes", type=Path, nargs="+")
-    parser.add_argument("--omiya-directory", type=Path,
-                        help="Accepted Omiya exports with matching case names and energy targets")
+    parser.add_argument("--omiya-directory", type=Path, action="append",
+                        help="Accepted Omiya exports; repeat to combine reference batches")
     args = parser.parse_args()
     reference_metadata = read_metadata(args.reference_prefix)
     if not reference_metadata["passed"] or reference_metadata["normalization"] != "equal_cloud_energies":
@@ -112,7 +112,7 @@ def main():
     references = read_profiles(args.reference_prefix, references=True)
     reference_energies = reference_metadata["reference_curve_metadata"]["energies_by_curve"]
     reference_energy = reference_metadata["reference_energy"]
-    cases = []
+    cases, omiya_inputs = [], []
     for prefix in args.result_prefixes:
         metadata = read_metadata(prefix)
         if not metadata["passed"]:
@@ -131,7 +131,12 @@ def main():
         displayed = (positions >= DOMAIN[0]) & (positions <= DOMAIN[1])
         omiya_metadata = None
         if args.omiya_directory is not None:
-            omiya_prefix = args.omiya_directory / prefix.name
+            matches = [directory / prefix.name for directory in args.omiya_directory
+                       if (directory / (prefix.name + ".toml")).is_file()]
+            if len(matches) != 1:
+                raise ValueError(f"Require exactly one Omiya reference for {prefix.name}; found {len(matches)}")
+            omiya_prefix = matches[0]
+            omiya_inputs.extend(Path(str(omiya_prefix) + suffix) for suffix in (".csv", ".toml"))
             omiya_metadata = read_metadata(omiya_prefix)
             if not omiya_metadata["passed"] or omiya_metadata["model"] != "omiya_multimode_primary_secondary":
                 raise ValueError(f"Require an accepted Omiya result: {omiya_prefix}")
@@ -227,13 +232,13 @@ def main():
                     case["positions"], *(curve[column] for column in columns)))
     inputs = [Path(__file__)] + [Path(str(prefix) + suffix) for prefix in
         [args.reference_prefix, *args.result_prefixes] for suffix in (".csv", ".toml")]
-    if args.omiya_directory is not None:
-        inputs += [Path(str(args.omiya_directory / case["name"]) + suffix)
-                   for case in cases for suffix in (".csv", ".toml")]
+    inputs += omiya_inputs
     report = {"cases": [{key: value for key, value in case.items() if key not in ("positions", "curves")}
                         for case in cases],
               "reference_prefix": str(args.reference_prefix), "reference_energy": reference_energy,
-              "omiya_directory": str(args.omiya_directory) if args.omiya_directory is not None else None,
+              "omiya_directory": str(args.omiya_directory[0])
+                  if args.omiya_directory is not None and len(args.omiya_directory) == 1 else None,
+              "omiya_directories": [str(path) for path in args.omiya_directory or []],
               "plotted_modes": {cloud: list(mode) for mode, cloud in MODES.items()},
               "plot_domain": list(DOMAIN), "linear_scaling": "sqrt(target_energy / saved_linear_energy)",
               "joint_scaling": "none", "deformation": "100 * (abs(R_joint) - abs(R_linear)) / max_displayed(abs(R_linear))",

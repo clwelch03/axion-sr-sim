@@ -21,10 +21,52 @@ function linear_boundary_flux(branch, frequency, spin, mode_count)
         for index in 1:mode_count)
 end
 
+# Use the same measured-frequency-precision rule as the spin-0.95 reference
+# recovery. The coarse solve only locates the root; it is never the acceptance
+# criterion. Keep this opt-in so the original grid recipe remains reproducible.
+function solve_grid_linear_reference(frequency_guess, spin, alpha, degrees,
+                                     azimuthal_number, couplings, options, config)
+    requested_tolerance = 1e-8
+    if !get(config, "frequency_precision_tolerance", false)
+        solution = solve_linear_mode(frequency_guess, spin, alpha, degrees,
+            azimuthal_number, couplings; options..., tolerance=requested_tolerance,
+            max_iterations=20)
+        return (; solution, tolerance=requested_tolerance, precision=Dict{String,Any}())
+    end
+    coarse_tolerance = Float64(config["coarse_tolerance"])
+    isfinite(coarse_tolerance) && coarse_tolerance > 0 || error("Invalid coarse tolerance")
+    coarse = solve_linear_mode(frequency_guess, spin, alpha, degrees,
+        azimuthal_number, couplings; options..., tolerance=coarse_tolerance, max_iterations=20)
+    residual_at(frequency) = matching_residual(frequency, coarse.horizon_amplitudes,
+        coarse.outer_amplitudes, spin, alpha, degrees, azimuthal_number, couplings; options...)
+    center = residual_at(coarse.frequency)
+    frequency_step = eps(real(coarse.frequency))
+    plus_change = norm(residual_at(coarse.frequency + frequency_step) - center)
+    minus_change = norm(residual_at(coarse.frequency - frequency_step) - center)
+    frequency_floor = max(plus_change, minus_change)
+    isfinite(frequency_floor) || error("Nonfinite frequency-precision diagnostic")
+    tolerance = max(requested_tolerance, 2frequency_floor)
+    precision = Dict("coarse_tolerance"=>coarse_tolerance,
+        "coarse_matching_norm"=>coarse.residual_norm,
+        "coarse_frequency_real"=>real(coarse.frequency),
+        "coarse_frequency_imaginary"=>imag(coarse.frequency),
+        "frequency_step"=>frequency_step, "plus_step_residual_change"=>plus_change,
+        "minus_step_residual_change"=>minus_change, "frequency_ulp_residual"=>frequency_floor,
+        "rule"=>"max(1e-8, 2*frequency_ulp_residual)")
+    println("PRECISION floor=",frequency_floor," acceptance_tolerance=",tolerance); flush(stdout)
+    solution = solve_linear_mode(coarse.frequency, spin, alpha, degrees,
+        azimuthal_number, couplings; options..., tolerance, max_iterations=20,
+        horizon_guess=coarse.horizon_amplitudes, outer_tail_guess=coarse.outer_amplitudes[2:end])
+    return (; solution, tolerance, precision)
+end
+
 function linear_reference_grid_main()
     length(ARGS) == 3 || error("usage: CONFIG_TOML CASE_INDEX OUTPUT_DIRECTORY")
     config_path, output_directory = abspath(ARGS[1]), abspath(ARGS[3])
     config = TOML.parsefile(config_path)
+    clouds = get(config, "clouds", ["primary", "secondary"])
+    !isempty(clouds) && all(name -> name in ("primary", "secondary"), clouds) ||
+        error("Select primary and/or secondary clouds")
     case = config["cases"][parse(Int, ARGS[2])]
     alpha, spin = case["alpha"], case["spin"]
     isfinite(alpha) && alpha > 0 && isfinite(spin) && abs(spin) < 1 || error("Invalid background")
@@ -45,19 +87,20 @@ function linear_reference_grid_main()
     cloud_reports = Dict{String,Any}()
     for (name, azimuthal_number, degrees, step) in (
             ("primary",1,[1,3,5],0.1), ("secondary",2,[2,4,6],0.2))
+        name in clouds || continue
         cloud_prefix = prefix * "-" * name
         modes = [(degree,azimuthal_number) for degree in degrees]
         principal_number = azimuthal_number + 1
         frequency_guess = complex(alpha * (1 - alpha^2 / (2principal_number^2)))
         options = (; inner=-100.0, outer=Float64(case["outer"]), match=5.0, step)
-        tolerance = 1e-8
         try
             println("SOLVING ",case["name"]," ",name," guess=",frequency_guess," options=",options)
             flush(stdout)
-            timing = @timed solve_linear_mode(frequency_guess, spin, alpha,
-                degrees, azimuthal_number, couplings; options..., tolerance, max_iterations=20)
-            solution = timing.value
-            serialize(cloud_prefix * "-solution.jls", (; solution, alpha, spin, modes, options))
+            timing = @timed solve_grid_linear_reference(frequency_guess, spin, alpha,
+                degrees, azimuthal_number, couplings, options, config)
+            (; solution, tolerance, precision) = timing.value
+            serialize(cloud_prefix * "-solution.jls", (; solution, alpha, spin, modes, options,
+                tolerance, precision))
             solution.residual_norm <= tolerance || error("Linear matching tolerance failed")
             profiles = matching_residual(solution.frequency, solution.horizon_amplitudes,
                 solution.outer_amplitudes, spin, alpha, degrees, azimuthal_number, couplings;
@@ -78,7 +121,8 @@ function linear_reference_grid_main()
                 "l_values"=>degrees,"principal_number_seed"=>principal_number,
                 "frequency_real"=>real(solution.frequency),"frequency_imaginary"=>imag(solution.frequency),
                 "frequency_guess_real"=>real(frequency_guess),"matching_norm"=>solution.residual_norm,
-                "reconstructed_matching_norm"=>norm(profiles.residual),"requested_tolerance"=>tolerance,
+                "reconstructed_matching_norm"=>norm(profiles.residual),"requested_tolerance"=>1e-8,
+                "acceptance_tolerance"=>tolerance,"frequency_precision"=>precision,
                 "iterations"=>solution.iterations,"solve_seconds"=>timing.time,
                 "normalization"=>"first outer coefficient = 1",
                 "energy"=>energy,"unit_energy_amplitude_factor"=>1/sqrt(energy),
@@ -116,7 +160,7 @@ function linear_reference_grid_main()
     end
     passed = all(report["passed"] for report in values(cloud_reports))
     write_linear_metadata(prefix * ".toml", Dict("passed"=>passed,"alpha"=>alpha,
-        "spin"=>spin,"clouds"=>cloud_reports,"provenance"=>provenance))
+        "spin"=>spin,"requested_clouds"=>clouds,"clouds"=>cloud_reports,"provenance"=>provenance))
     passed || error("At least one linear mode failed; inspect saved per-cloud diagnostics")
 end
 

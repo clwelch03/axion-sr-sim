@@ -1,5 +1,235 @@
 # Joint two-cloud response and evolution
 
+## QCD plot visibility (October 30)
+
+The available equal-energy 211 pilot at 5 solar masses, alpha=0.3/spin=0.99,
+has maximum `abs(abs(R_Omiya)-abs(R_linear))/max(abs(R_linear))` of
+**0.1026108555%**. Its common code energy is 9.3274498169. The saved
+[PNG](results/qcd_visibility_20261030_v1/available_211_pilot.png) and
+[PDF](results/qcd_visibility_20261030_v1/available_211_pilot.pdf) show the two
+nearly coincident profile curves above their percent difference. These are
+actual linear/Omiya data; no uncomputed joint curve is included.
+
+[`visibility_ranking.csv`](results/qcd_visibility_20261030_v1/visibility_ranking.csv)
+ranks all 36 current population targets using their saved linear profiles.
+Define the diagnostic `S=2*abs(E4)/(E_linear*(1-omega_R/mu))`, where E4 is the
+cosine potential's quartic energy evaluated on the linear field at the target
+energy. In the weak-field nonrelativistic interpretation, this compares the
+self-interaction frequency shift with binding energy. It is a ranking proxy,
+not a solved fractional profile difference, especially across different modes.
+
+| Rank | Mass (solar) | alpha | spin | Dominant mode | S |
+|---|---|---|---|---|---|
+| 1 | 5 | 0.4 | 0.95 | 322 | 0.001246 |
+| 2 | 5 | 0.4 | 0.9 | 322 | 0.001008 |
+| 3 | 5 | 0.3 | 0.99 | 211 | 0.000946 |
+| 4 | 5 | 0.4 | 0.99 | 211 | 0.000613 |
+| 5 | 5 | 0.3 | 0.95 | 211 | 0.000596 |
+
+Thus the selected 211 and 322 pilots remain useful candidates; the 322
+alpha=0.4/spin=0.9 point is another. The spin-0.95 322 direct solve failed and
+does not yet supply a nonlinear curve. At fixed alpha/spin the diagnostic is
+16 times smaller for 20 solar masses and 400 times smaller for 100 solar masses.
+At the current zero-other-cloud limit, the dominant Omiya and joint problems
+coincide, so none of these points is expected to give three separated curves.
+Useful plots should retain common physical energy normalization and include
+a clearly labeled percent-difference panel. Matching the tiny numerical
+difference still requires convergence checks.
+
+The diagnostic evaluates the exact azimuthal quartic average for a single
+m block: if `phi=2*Re(S(theta,r)*exp(i*m*azimuth))`, then `<phi^4>=6*abs(S)^4`.
+It integrates this with the Kerr potential-energy measure over both saved
+radial branches. Polar orthonormality and the quartic azimuthal average were
+checked; halving the radial quadrature sample density changes E4 by at most
+`1.27e-8` relative. All 36 rows and their mass scaling were verified. The script
+is `scripts/rank_qcd_profile_visibility.py`; results preserve its source and
+metadata. This calculation does not rerun radial solves or change populations.
+
+The explicitly requested subagent follow-up identified initial
+`alpha=0.2, spin=0.99, M=3 solar masses` as a nearby candidate for later
+coexistence under the chosen cosine coupling and QCD mass relation. It implies
+`mu=8.91e-12 eV, fa=6.40e17 GeV`. A separate read-only extrapolation of the
+screen below gives optimistic catch-up 1.83 years, GW half-life 4.92 years,
+and analytic gain before that half-life equal to 1.35 times the required gain.
+The post-first-saturation parameters are alpha=0.18157 and spin=0.63964.
+These modest margins are preliminary; more accurate rates and higher modes
+need checking. This point is outside the current grid and has not been added
+to the campaign. A substantial other-cloud population would not by itself
+establish a visually large difference among radial profiles.
+
+## Subdominant growth before dominant depletion (October 30)
+
+The requested 36-point screen is saved in
+[`results/qcd_catchup_20261030_v1/catchup_screen.csv`](results/qcd_catchup_20261030_v1/catchup_screen.csv).
+**No point passes the nominal optimistic growth-versus-depletion condition.**
+This is an algebraic rate screen, not a population trajectory or a claim that
+the other cloud never becomes populated later.
+
+Use the cosine coupling `lambda=mu^2/fa^2`, hence the paper's effective `f=fa`;
+retain the QCD mass–decay constant relation for physical units. Evaluate the
+rates at the algebraic first-saturation endpoint, including mass and spin loss.
+If `q=M_final/M_initial`, convert the saved endpoint occupation to
+`epsilon_final=epsilon_initial/q^2` and the occupation scale to
+`C_final=q^2*C_initial`; all dimensionless rates then use `G*M_final/c^3`.
+The selected initial dominant level is taken from the saved numerical rates.
+Post-extraction signed horizon rates use the leading hydrogenic formula with
+the binding frequency inserted in its horizon factors, not new numerical
+eigenmode solves.
+
+Define `L=ln(N_dominant_peak/N_minor_at_first_saturation)`, `g` as the other
+mode's signed horizon rate plus interaction pumping (and positive stimulated
+GW transition gain for a 211 minor mode), and
+`tau_GW=1/(2*gamma_GW*epsilon_dominant)`. The criterion is
+`t_catch=L/g <= tau_GW`, with `g>0`. The GW timescale is a half-life for
+`d epsilon/dt=-2*gamma_GW*epsilon^2`. This extends the logic of
+[Baryakhtar et al., PDF Eq. (42)](https://arxiv.org/pdf/2011.11646v2#page=15)
+to include independent horizon growth. Tables IV–VII supply the leading
+coefficients: `gamma_BH/mu=4.3e-7*alpha^11*r_plus*(M_Pl/f)^4`,
+`gamma_infinity/mu=1.1e-8*alpha^8*(M_Pl/f)^4`, and GW-annihilation
+coefficients `gamma_211/mu=1e-2*alpha^14`, `gamma_322/mu=3e-8*alpha^18`.
+An additional alpha converts these to dimensionless BH time units.
+
+The following table gives **`tau_GW/t_catch`**, which must reach one to pass.
+The alpha/spin labels identify the initial campaign point; the rates use the
+post-extraction background. “Damped” means net growth remains negative even
+including the positive pumping terms.
+
+| Initial alpha | Initial spin | Initial dominant | 5 solar masses | 20 solar masses | 100 solar masses |
+|---|---|---|---|---|---|
+| 0.2 | 0.8 | 211 | 0.0972 | 0.001002 | 0.000620 |
+| 0.2 | 0.9 | 211 | 0.2121 | 0.001152 | 0.000333 |
+| 0.2 | 0.95 | 211 | 0.2825 | 0.001360 | 0.000271 |
+| 0.2 | 0.99 | 211 | 0.3460 | 0.001569 | 0.000237 |
+| 0.3 | 0.8 | 322 | Damped | Damped | Damped |
+| 0.3 | 0.9 | 211 | 0.04046 | 0.000829 | 0.000664 |
+| 0.3 | 0.95 | 211 | 0.1533 | 0.000812 | 0.000220 |
+| 0.3 | 0.99 | 211 | 0.2733 | 0.001201 | 0.000150 |
+| 0.4 | 0.8 | 322 | Damped | Damped | Damped |
+| 0.4 | 0.9 | 322 | Damped | Damped | Damped |
+| 0.4 | 0.95 | 322 | Damped | Damped | Damped |
+| 0.4 | 0.99 | 211 | 0.09577 | 0.000526 | 0.000156 |
+
+The five closest points are at 5 solar masses: alpha=0.2/spin=0.9,0.95,0.99,
+and alpha=0.3/spin=0.95,0.99. A tenfold enhancement of the net growth rate
+relative to GW depletion changes their nominal classifications. The closest,
+alpha=0.2/spin=0.99, has an optimistic build-up time of 23.72 years versus an
+8.21-year GW half-life. Treat these five as candidates for more accurate rates,
+not as established exclusions or coexistence predictions. For the 20- and
+100-solar-mass 211-dominated points, build-up is at least about 637 times slower
+than depletion. For all 322-dominated points, positive pumping plus stimulated
+GW transitions is at most 0.00670 of the 211 horizon damping rate.
+
+The nominal criterion is deliberately optimistic: it keeps the pump at its
+peak, neglects extra depletion of the dominant cloud, and omits losses of a
+322 minor cloud from GW transitions/mixed processes. A separate analytic
+check uses `epsilon_d(t)=epsilon_d(0)/(1+t/tau_GW)` and integrates the resulting
+declining pump exactly, without solving a coupled ODE. It also has no nominal
+passes. Under the tenfold growth sensitivity, four of the five candidates
+pass that stronger half-life check; alpha=0.3/spin=0.95 does not.
+
+All 576 combinations of mass-changing/fixed-mass endpoint, seed occupation
+1/1e6, catch-up fraction 1/0.1, and including/omitting the binding correction
+remain nominal failures. Using the QCD quartic coefficient 0.3 instead of the
+chosen cosine coefficient further reduces the maximum ratio to 0.0314.
+These variations are not statistical uncertainty estimates. Small-alpha
+interaction/GW rates, the two-level truncation, and omitted self-gravity limit
+this screening calculation at alpha=0.2–0.4. No BH age limit is imposed; later
+growth after the original cloud has depleted is not excluded.
+
+`metadata.json` records assumptions, source references, and input hashes;
+`assumption_sensitivity.csv` contains the variants. The directory preserves
+the driver and its population-helper source. Four checks passed: the analytic
+gain against independent quadrature, occupation and angular-momentum units
+across mass extraction, signed rate/threshold conventions, and cosine/QCD
+coupling scaling. Reproduce using BHsuper Python and a fresh output directory:
+
+```bash
+python runs/adiabatic/multiphase_two_cloud/scripts/check_qcd_catchup.py \
+    runs/adiabatic/multiphase_two_cloud/results/UNIQUE_NAME
+python -m unittest discover -s tests/tools -p test_check_qcd_catchup.py -v
+```
+
+## QCD population estimates (October 29)
+
+The requested order-of-magnitude first pass is saved in
+[`results/qcd_populations_20261029_v1/population_targets.csv`](results/qcd_populations_20261029_v1/population_targets.csv).
+It covers alpha 0.2/0.3/0.4, spin 0.8/0.9/0.95/0.99, and masses 5/20/100 solar.
+`metadata.json` records assumptions, references, and hashes of all 24 linear
+reference inputs and calculation sources; the directory preserves the driver.
+
+Choose the stage **first dominant saturation from quantum-scale seeds**, with
+no pre-existing classical cloud. The original BH grid is retained as a set of
+approximate saturation-scale profile backgrounds. The following targets are
+not exact post-extraction states or claims about simultaneous peak populations.
+
+| alpha | spin | Dominant mode | Cloud energy / BH mass-energy | Code energy at 20 solar masses |
+|---|---|---|---|---|
+| 0.2 | 0.8 | 211 | 2.195% | 0.1799 |
+| 0.2 | 0.9 | 211 | 4.185% | 0.3429 |
+| 0.2 | 0.95 | 211 | 5.180% | 0.4244 |
+| 0.2 | 0.99 | 211 | 5.976% | 0.4896 |
+| 0.3 | 0.8 | 322 | 3.724% | 0.6864 |
+| 0.3 | 0.9 | 211 | 0.523% | 0.09639 |
+| 0.3 | 0.95 | 211 | 2.004% | 0.3695 |
+| 0.3 | 0.99 | 211 | 3.190% | 0.588 |
+| 0.4 | 0.8 | 322 | 2.186% | 0.7164 |
+| 0.4 | 0.9 | 322 | 4.167% | 1.366 |
+| 0.4 | 0.95 | 322 | 5.158% | 1.69 |
+| 0.4 | 0.99 | 211 | 0.562% | 0.1842 |
+
+At fixed alpha/spin, the leading fractions are independent of BH mass; code
+energies scale as mass^-2 along the QCD relation. Multiply the last column by
+16 for 5 solar masses or 0.04 for 100. The 36 dominant occupations span
+3.00e75–2.51e79. Zero target energy for the other cloud means its negligible
+classical limit; it does not assert an exactly empty quantum state.
+
+The calculation uses epsilon=N/(G M^2) in natural units, with the leading
+estimate epsilon=[spin-4*m*alpha/(m^2+4*alpha^2)]/m from
+[Arvanitaki, Baryakhtar & Huang, Eq. (8)](https://arxiv.org/pdf/1411.2263v3#page=3).
+Energy uses the saved real linear frequency: fraction=(M*omega_R)*epsilon.
+QCD fixes mu[eV]*fa[GeV]=5.7e6; code energy divides the fraction by
+(fa/M_Pl)^2, using unreduced M_Pl. The linear outer-amplitude estimates in the
+CSV are seeds only; a nonlinear solution must be retargeted to its energy.
+
+For the other mode, take the leading transfer rates from
+[Baryakhtar et al., Tables I/VI and Eqs. (E1)–(E3)](https://arxiv.org/pdf/2011.11646v2#page=50).
+Use their quartic convention f=fa/sqrt(0.3), not f=fa. Extending their
+exponent by independent minor-mode growth gives
+log(N_minor/N_seed)=gamma_minor*t + gamma_pump/(2*gamma_dom)
+*(epsilon_dom^2-epsilon_seed^2), with
+t=log(N_dom/N_seed)/gamma_dom. The saved numerical occupation rates are
+2*omega_I. For a damped other mode, compare peak transfer gain against damping;
+do not interpret a formal sub-particle occupation as a classical prediction.
+
+All cases remain qualitatively single-cloud at the first peak. Sensitivity
+checks vary linear rates (saved/hydrogenic), populations (leading/mass-changing
+endpoint), transfer coefficients (0.1/1/10), and seeds (1/1e6). The mass-changing
+endpoint eliminates time from energy/angular-momentum balance as in Appendix F,
+generalized to n=m+1, and changes the estimated N by factors 1.30–7.87.
+The sensitivity envelope is not a confidence interval. Exact microscopic
+ratios, later coexistence, higher modes, self-gravity, and spatial/rate
+convergence remain outside this calculation. The initial-rate growth times
+are diagnostics; they are not integrated saturation times or age cuts.
+
+Thus the population prescription favors **one nonlinear dominant cloud plus
+a linear probe of the other mode**. The two direct nonlinear pilot submissions
+with the existing cosine potential are recorded above. The population transfer
+diagnostic above uses the literature's QCD quartic coefficient; it does not
+rescale the cosine profile potential. No time evolution is needed to reproduce
+this estimate:
+
+```bash
+python runs/adiabatic/multiphase_two_cloud/scripts/estimate_qcd_populations.py \
+    runs/adiabatic/multiphase_two_cloud/results/UNIQUE_NAME
+python -m unittest discover -s tests/tools -p test_estimate_qcd_populations.py -v
+```
+
+Six tests passed: independent energy-integral/angular-momentum endpoint checks,
+weak-binding limit, QCD mass scaling, quartic convention, quadrature verification
+of the growth exponent, and damped-mode handling. All 36 unique rows, units,
+profile inputs, and source hashes were verified. Use the BHsuper Python; the
+one recovered JLS input is read through the pinned Julia executable.
+
 ## Missing linear-secondary retries (October 29)
 
 Array **27425079** retries five secondary references: alpha=0.3/spin=0.9,

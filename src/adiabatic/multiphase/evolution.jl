@@ -12,7 +12,8 @@ Solve for logarithmic rates g_i = d(log A_i)/dt, so that D * Diagonal(amplitudes
 Normalize each row and its corresponding boundary loss by that row's largest absolute coefficient.
 This makes the condition number diagnostic independent of the units used for E and J.
 
-Return dot{A}, the scaled condition number of the log_response matrix, and the residual D dot{A} + L.
+Return `log_rates = dot{A} ./ A`, `amplitude_rates = dot{A}`, the scaled
+condition number of the log_response matrix, and the residual D dot{A} + L.
 """
 function two_cloud_balance_rates(amplitudes, charge_derivatives, losses;
         max_condition=1e10)
@@ -43,7 +44,7 @@ function two_cloud_balance_rates(amplitudes, charge_derivatives, losses;
 
     all(isfinite, amplitude_rates) && all(isfinite, log_rates) || error("nonfinite amplitude rates")
     balance_residual = charge_derivatives * amplitude_rates + losses
-    return (; log_rates, scaled_condition, balance_residual)
+    return (; log_rates, amplitude_rates, scaled_condition, balance_residual)
 end
 
 """

@@ -31,6 +31,7 @@ Here and below, the $\omega$ are real phase frequencies. We distinguish them fro
 
 To write the field in terms of these components, we must introduce spatial profiles:
 \begin{equation}
+    \label{eq:spatial_profile_Fq}
     F_\mathbf{q}(r,\theta;\mathbf{A}) = \sum_{l \in L_\mathbf{q}} \tilde{R}_{l,\mathbf{q}}(r;\mathbf{A}) \bar{Y}_{l,|m_\mathbf{q}|}(\cos\theta),
 \end{equation}
 where $L_\mathbf{q}$ is the set of retained angular indices, $\tilde{R}_{l,\mathbf{q}}$ is a complex radial profile determined by the coupled field equations, and $\bar{Y}_{l,m}$ is the polar part of the corresponding spherical harmonic (with azimuthal dependence removed). With all that defined, our field can be expanded as
@@ -53,7 +54,7 @@ with
 \begin{equation}
     \Delta \equiv r^2 - 2Mr + a^2, \qquad \rho^2 \equiv r^2 + a^2 \cos^2 \theta.
 \end{equation}
-For the potential $V(\Phi)$, which we will usually take to be the QCD axion potential, define $U \equiv V/\mu^2$ for ease of calculation. Then the equation of motion is
+For the potential $V(\Phi)$, which we will usually take to be the QCD axion potential\CW{$1-\cos\theta$ or masha's form?}, define $U \equiv V/\mu^2$ for ease of calculation. Then the equation of motion is
 \begin{equation}
     \Box \Phi - \mu^2 U'(\Phi) = 0.
 \end{equation}
@@ -84,7 +85,7 @@ The nonlinear term $h$ is still a function of the total real field from all comp
 \begin{equation}
     \mathcal{D}_\mathbf{q} F_\mathbf{q} - \alpha^2 F_\mathbf{q} + \alpha^2 \langle e^{+i\mathbf{q}\cdot\boldsymbol{\psi}} h(\Phi)\rangle_\psi = 0.
 \end{equation}
-Inserting (2), the definition of $F_\mathbf{q}$, we now project onto each retained polar harmonic. Set \(x=\cos\theta\), multiply the equation by \(\rho^2\bar Y_{l,|m_{\mathbf q}|}(x)\), and integrate over \(x\in[-1,1]\). This isolates the nonlinear source term,
+Inserting \eqref{eq:spatial_profile_Fq}, the definition of $F_\mathbf{q}$, we now project onto each retained polar harmonic. Set \(x=\cos\theta\), multiply the equation by \(\rho^2\bar Y_{l,|m_{\mathbf q}|}(x)\), and integrate over \(x\in[-1,1]\). This isolates the nonlinear source term,
 \begin{equation}
     N_{l,\mathbf q} = \alpha^2\int_{-1}^{1}dx\, Y_{l,|m_{\mathbf q}|}(x)\,\rho^2 \left\langle e^{+i\mathbf q\cdot\boldsymbol\psi}h(\Phi) \right\rangle_{\boldsymbol\psi}.
 \end{equation}
@@ -94,6 +95,7 @@ The remaining terms proportional to \(x^2\) combine into \(a^2(\omega_{\mathbf q
 \end{equation}
 Collecting terms gives one radial equation for each retained pair \((l,\mathbf q)\):
 \begin{equation}
+    \label{eq:radial}
     \boxed{ \frac{d}{dr}\left(\Delta\frac{d\tilde R_{l,\mathbf q}}{dr}\right) +B_{l,\mathbf q}\tilde R_{l,\mathbf q} +a^2(\omega_{\mathbf q}^2-\alpha^2) \sum_{l'\in L_{\mathbf q}} C^{m_{\mathbf q}}_{ll'}\tilde R_{l',\mathbf q} +N_{l,\mathbf q}=0,}
 \end{equation}
 where
@@ -102,8 +104,73 @@ where
 \end{equation}
 The linear angular coupling mixes different \(l\) values within a fixed phase component, while \(N_{l,\mathbf q}\), evaluated from the joint field, couples different phase components as well.
 
-\subsection{Solving the radial equation}
-\CW{next section introduces tortoise, $Q = dR/dr$, boundary conditions, matching, solutions}
+\subsection{The radial equations}
+We wish to solve the radial equation \eqref{eq:radial} for $\tilde{R}_{l,\mathbf{q}}(r; \mathbf{A})$, for all $(l, \mathbf{q})$, at constant $a, \alpha, \mathbf{A}$. These equations must be solved jointly: the nonlinear source $N_{l,\mathbf q}$ depends on the full field, and therefore on the profiles of all retained components. Luckily, the nonlinear terms in \eqref{eq:radial} are subdominant as we approach the horizon or infinity, so we can fit asymptotic solutions there. The prescribed amplitudes $\mathbf{A}$ fix the asymptotic normalization of the fundamental profiles, while the interaction-generated components are determined as part of the solution. We require purely ingoing behavior at the horizon and, at infinity, decaying behavior for bound components and outgoing behavior for radiative components.
+
+To specify the boundary conditions, we construct asymptotic expansions of the radial profiles near the horizon and at large radius. We separate the leading wave behavior from a regular factor, which we expand in $r-r_+$ near the horizon and in $1/r$ near infinity. The leading behavior selects the physical branch, while higher-order terms provide corrections needed to impose the conditions at finite numerical endpoints.
+
+\subsubsection{Horizon boundary conditions}
+Let $r_\pm \equiv 1 \pm \sqrt{1 - a^2}$. (Note that $r_+$ corresponds to the outer horizon, and the angular velocity of the horizon is $\Omega_H = a/(r_+^2+a^2)$.) Further, let $s = r - r_+$. To construct the local boundary data, we use a Frobenius expansion: a possibly noninteger power of $s$ multiplied by a regular power series. In the linear asymptotic approximation, we write
+\begin{equation}
+    \label{eq:horizon_series}
+    \tilde R_{l,\mathbf q}
+    = s^{p_{\mathbf q}}\sum_{j=0}^{\infty}h^{(j)}_{l,\mathbf q}s^j.
+\end{equation}
+The exponent $p_{\mathbf q}$ determines the leading behavior at the horizon, while the coefficients $h^{(j)}_{l,\mathbf q}$ describe its normalization and radial corrections. We first determine which exponent corresponds to an ingoing wave, then calculate the coefficients for that branch.
+
+Near the horizon, the radial equation contains both vanishing and divergent factors of $\Delta$. To expose the resulting wave behavior, introduce the tortoise coordinate~\cite{Omiya_2022,witte2025,Baryakhtar_2021}
+\begin{equation}
+    \frac{dr_*}{dr}=\frac{r^2+a^2}{\Delta}.
+\end{equation}
+The tortoise coordinate stretches the near-horizon region, mapping $r = r_+$ to $r_* \rightarrow -\infty$. Expressing the radial derivative term in terms of $r_*$, the leading near-horizon form is
+\begin{equation}
+    \label{eq:horizon_radial_eq}
+    \frac{d^2\tilde R_{l,\mathbf q}}{dr_*^2} + (\omega_{\mathbf q}-m_{\mathbf q}\Omega_H)^2 \tilde R_{l,\mathbf q} \simeq 0.
+\end{equation}
+Despite the mess of notation, \eqref{eq:horizon_radial_eq} has clear solutions
+\begin{equation}
+    \tilde R_{l,\mathbf q} \propto e^{\pm i [(\omega_{\mathbf q}-m_{\mathbf q}\Omega_H)r_*]},
+\end{equation}
+and given our time convention $e^{-i\omega_{\mathbf q}t}$, the purely-ingoing boundary condition selects the \textit{negative} complex exponential. Integrating the tortoise coordinate near the horizon, we see
+\begin{equation}
+    r_*=\frac{r_+^2+a^2}{r_+-r_-}\ln s+c_H+O(s),
+\end{equation}
+where $c_H$ depends on the arbitrary additive constant in $r_*$.
+Comparing with \eqref{eq:horizon_series}, the purely ingoing boundary condition selects
+\begin{equation}
+    \label{eq:horizon_exponent}
+    p_{\mathbf q} =-i\frac{r_+^2+a^2}{r_+-r_-}\left(\omega_{\mathbf q}-m_{\mathbf q}\Omega_H\right).
+\end{equation}
+With $p_{\mathbf q}$ fixed, we determine the higher coefficients by substituting \eqref{eq:horizon_series} into \eqref{eq:radial}, neglecting $N_{l,\mathbf q}$ but retaining the full radial dependence and angular coupling of the linear terms. Matching successive powers of $s$ determines $h^{(1)}$ from $h^{(0)}$, then $h^{(2)}$ from the preceding coefficients, and so on. These relations couple the retained $l$ values within each phase component. The leading coefficients $h^{(0)}_{l,\mathbf q}$ remain free locally and are determined by the coupled boundary-value problem.
+
+At a finite numerical endpoint $s_{\mathrm{in}}>0$, we retain these corrections by truncating the series:
+\begin{equation}
+    \tilde R_{l,\mathbf q}(s)\simeq s^{p_{\mathbf q}}P_{l,\mathbf q}(s),
+    \qquad
+    P_{l,\mathbf q}(s)=\sum_{j=0}^{J_H}h^{(j)}_{l,\mathbf q}s^j.
+\end{equation}
+Evaluating this expression and its derivative supplies the endpoint profile and tortoise-coordinate slope,
+\begin{equation}
+    \frac{d\tilde R_{l,\mathbf q}}{dr_*}
+    \simeq \frac{\Delta}{r^2+a^2}s^{p_{\mathbf q}}
+    \left(\frac{p_{\mathbf q}}{s}P_{l,\mathbf q}+P'_{l,\mathbf q}\right),
+\end{equation}
+where $P'$ denotes differentiation with respect to $s$. Our current implementation uses $J_H=3$ and recalculates the coefficients as the trial frequencies and leading amplitudes change. These are linear asymptotic boundary data; their accuracy is checked by varying the truncation order and moving the endpoint closer to the horizon.
+
+
+\subsubsection{Outer boundary conditions}
+At large radius, define\footnote{We continue to use units where $M=1$.} the wavenumber $k_\mathbf{q}^2 = \omega_\mathbf{q}^2 - \alpha^2$. In the linear asymptotic approximation, we seek a large-radius
+expansion of the form
+\begin{equation}
+    \label{eq:outer_series}
+    \tilde R_{l,\mathbf q}
+    \sim e^{ik_{\mathbf q}r}r^{\nu_{\mathbf q}}
+    \sum_{j=0}^{\infty}\frac{b^{(j)}_{l,\mathbf q}}{r^j}.
+\end{equation}
+The exponential describes the leading propagation or decay,
+while the power of $r$ accounts for the long-range gravitational
+correction. The coefficients $b^{(j)}_{l,\mathbf q}$ supply the
+normalization and successive radial corrections.
 \vfill
 \pagebreak
 \bibliography{refs}

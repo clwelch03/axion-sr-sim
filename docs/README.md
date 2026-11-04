@@ -6,6 +6,7 @@ open caveats, and next steps. Entry points reviewed 2026-10-12:
 | Document | Purpose |
 |---|---|
 | [Project README](../README.md) | Scope, environment setup, and quickstart |
+| [Temporary Perlmutter setup](perlmutter-handoff.md) | Preserved local data, environment export, NERSC launch wrapper, and rehearsal commands |
 | [Working conventions](../CLAUDE.md) | Development workflow, commands, and module map |
 | [Codex chat recovery](codex-chat-recovery.md) | Pull missing chats and messages into the current node at the start of a session |
 | [Project handoff](../HANDOFF.md) | Authoritative project status and next steps |

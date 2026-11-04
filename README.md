@@ -26,6 +26,9 @@ for saved results and reproduction commands.
 
 ## Setup
 
+For the temporary Lawrencium-to-Perlmutter move, follow
+[the transfer and setup guide](docs/perlmutter-handoff.md).
+
 Run commands from the repository root. Python requires version 3.9 or newer
 and NumPy, SciPy, mpmath, and Matplotlib. In an activated Python environment:
 

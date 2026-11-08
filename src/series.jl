@@ -237,3 +237,197 @@ function endpoint_values(series::OuterSeries, background::KerrBackground, s)
         ((im * series.wavenumber + series.long_range_power * inverse_r) .* regular_part .+ regular_slope_dr)
     return R, Q
 end
+
+# --- integrated outer data for propagating components -------------------------
+
+"""
+    OuterBoundary(; data=:integrated, include_bound=false, convergence_margin=40.0, far_order=40,
+                  steps_per_wavelength=48)
+
+How the outer endpoint data of *propagating* components (`Re ω_q ≥ α`) are
+produced. Bound components use the truncated `OuterSeries` unless
+`include_bound` is set, in which case they are integrated the same way (inward
+integration of a decaying solution is the stable direction, and the envelope
+`T` stays `O(1)`, so this is safe; the wavelength in `steps_per_wavelength`
+then means `2π/κ`).
+
+* `data = :series`: the truncated series at the mesh endpoint (the original
+  behaviour). The series is asymptotic, and at a near-threshold wavenumber it
+  is simply inaccurate at any usable endpoint (1.9e-2 in `R` at `r = 400` for
+  the `(−1, 2)` component at `a = 0.99`, `α = 0.3`; see
+  `validation/outer_integration_check.jl`).
+* `data = :integrated`: the series is evaluated at a far radius where it
+  converges, `2 k r_far ≥ |η|² + convergence_margin` with the Coulomb parameter
+  `η = −(2ω² − α²)/k`, and the *linear* outer system is integrated inward to the
+  endpoint. The integration is done for the slowly varying envelope
+  `T = R e^{−ikr} r^{−ν}` with a 3-stage Gauss–Legendre collocation step
+  (order 6, A-stable), `steps_per_wavelength` steps per `2π/k`; with the
+  default settings the endpoint data are accurate to ≈ 1e-11 relative.
+  `far_order` is the truncation order of the far series.
+"""
+struct OuterBoundary
+    data::Symbol
+    include_bound::Bool
+    convergence_margin::Float64
+    far_order::Int
+    steps_per_wavelength::Int
+    function OuterBoundary(; data::Symbol=:integrated, include_bound::Bool=false, convergence_margin=40.0, far_order::Int=40,
+                           steps_per_wavelength::Int=48)
+        data in (:integrated, :series) || throw(ArgumentError("outer data must be :integrated or :series, got $data"))
+        new(data, include_bound, Float64(convergence_margin), far_order, steps_per_wavelength)
+    end
+end
+
+"""Are this component's endpoint data produced by inward integration under `settings`?"""
+uses_integrated_data(settings::OuterBoundary, frequency, mass_coupling) =
+    settings.data == :integrated && (settings.include_bound || is_propagating(frequency, mass_coupling))
+
+"""Does a component with this frequency propagate to infinity (outgoing branch of `outer_wavenumber`)?"""
+is_propagating(frequency, mass_coupling) = real(frequency) >= mass_coupling
+
+"""Plain floating-point value of a possibly dual real or complex number (used only to size the integration)."""
+_plain_value(x::Real) = ForwardDiff.value(x)
+_plain_value(z::Complex) = complex(_plain_value(real(z)), _plain_value(imag(z)))
+
+"""
+    IntegratedOuterData
+
+Endpoint profile `R` and tortoise slope `Q` of one component's channels obtained
+by integrating the linear outer system inward from `far_radius`, where the
+outer series was evaluated (`far_series_tail` is the relative size of the last
+retained series term there, a convergence diagnostic), with `n_steps` Gauss
+steps.
+"""
+struct IntegratedOuterData{T<:Number}
+    profiles::Vector{T}
+    slopes::Vector{T}
+    far_radius::Float64
+    far_series_tail::Float64
+    n_steps::Int
+end
+
+# 3-stage Gauss–Legendre collocation (order 6): nodes, coefficients and weights.
+const _GAUSS_NODES = (0.5 - sqrt(15.0) / 10, 0.5, 0.5 + sqrt(15.0) / 10)
+const _GAUSS_COEFFICIENTS = [5/36  2/9-sqrt(15.0)/15  5/36-sqrt(15.0)/30;
+                             5/36+sqrt(15.0)/24  2/9  5/36-sqrt(15.0)/24;
+                             5/36+sqrt(15.0)/30  2/9+sqrt(15.0)/15  5/36]
+const _GAUSS_WEIGHTS = (5/18, 4/9, 5/18)
+
+"""
+    gauss_legendre_integrate(system_matrix, start, stop, state, n_steps)
+
+Integrate the linear system `y' = M(x) y` from `start` to `stop` in `n_steps`
+equal steps of the 3-stage Gauss–Legendre method (order 6, A-stable; each step
+solves one dense linear system of three times the state size). `system_matrix(x)`
+returns `M(x)`. Generic in the number types, so dual numbers flow through.
+"""
+function gauss_legendre_integrate(system_matrix, start, stop, state::AbstractVector, n_steps::Int)
+    n_steps == 0 && return state
+    width = (stop - start) / n_steps
+    dimension = length(state)
+    position = start
+    for _ in 1:n_steps
+        stage_matrices = [system_matrix(position + node * width) for node in _GAUSS_NODES]
+        T = promote_type(eltype(state), eltype(stage_matrices[1]), typeof(width))
+        collocation = Matrix{T}(I, 3dimension, 3dimension)
+        for i in 1:3, j in 1:3
+            rows, cols = (i - 1) * dimension .+ (1:dimension), (j - 1) * dimension .+ (1:dimension)
+            collocation[rows, cols] .-= (width * _GAUSS_COEFFICIENTS[i, j]) .* stage_matrices[j]
+        end
+        stages = collocation \ repeat(state, 3)
+        increment = zeros(T, dimension)
+        for i in 1:3
+            increment .+= (width * _GAUSS_WEIGHTS[i]) .* (stage_matrices[i] * stages[(i - 1) * dimension .+ (1:dimension)])
+        end
+        state = state .+ increment
+        position += width
+    end
+    return state
+end
+
+"""
+System matrix of the envelope form of the linear outer equation. With
+`R = W T`, `W = e^{ikr} r^ν`, `φ' = W'/W = ik + ν/r`, the radial equation
+`(ΔR')' + V R = 0` (`V = diag(B_l) + a²(ω²−α²) C`) becomes
+
+    T'' = −(2φ' + Δ'/Δ) T' − [φ'² + φ'' + (Δ'/Δ) φ' + V/Δ] T,
+
+whose solution of interest varies on the scale of `r` rather than `1/k`. The
+state is `(T, T')` over the component's channels.
+"""
+function _envelope_system_matrix(background::KerrBackground, mass_coupling, frequency, m, ls, mixing, k, long_range_power, r)
+    a = background.a
+    n_chan = length(ls)
+    horizon_function = r^2 - 2r + a^2
+    log_delta_slope = (2r - 2) / horizon_function
+    phase_slope = im * k + long_range_power / r
+    phase_curvature = -long_range_power / r^2
+    T = promote_type(typeof(phase_slope), typeof(horizon_function), eltype(mixing), typeof(mass_coupling))
+    system = zeros(T, 2n_chan, 2n_chan)
+    for channel in 1:n_chan
+        system[channel, n_chan + channel] = one(T)
+        system[n_chan + channel, n_chan + channel] = -(2phase_slope + log_delta_slope)
+    end
+    scalar_part = phase_slope^2 + phase_curvature + log_delta_slope * phase_slope
+    coupling_strength = a^2 * (frequency^2 - mass_coupling^2)
+    for (row, l) in enumerate(ls)
+        B = ((r^2 + a^2) * frequency - a * m)^2 / horizon_function + 2a * m * frequency - a^2 * frequency^2 -
+            mass_coupling^2 * r^2 - l * (l + 1)
+        system[n_chan + row, row] -= scalar_part + B / horizon_function
+        for column in 1:n_chan
+            system[n_chan + row, column] -= coupling_strength * mixing[row, column] / horizon_function
+        end
+    end
+    return system
+end
+
+"""
+    integrated_outer_values(background, α, ω, m, ls, mixing, leading, settings, endpoint_offset)
+
+Endpoint data of a propagating component by the far-series-plus-inward-
+integration scheme described under `OuterBoundary`. The far radius and step
+count are chosen from plain values, so dual numbers in the frequency, leading
+coefficients or background only flow through the arithmetic.
+"""
+function integrated_outer_values(background::KerrBackground, mass_coupling, frequency, m::Int, ls::AbstractVector{Int},
+                                 mixing::AbstractMatrix, leading::AbstractVector, settings::OuterBoundary, endpoint_offset)
+    k = outer_wavenumber(frequency, mass_coupling)
+    long_range_power = outer_exponent(frequency, mass_coupling, k)
+    coulomb_parameter = -(2frequency^2 - mass_coupling^2) / k
+    endpoint_radius = radius(background, endpoint_offset)
+
+    plain_k = abs(_plain_value(k))      # |k| = κ for a bound component
+    plain_endpoint = _plain_value(endpoint_radius)
+    far_radius = max(plain_endpoint, (abs2(_plain_value(coulomb_parameter)) + settings.convergence_margin) / (2plain_k))
+    n_steps = ceil(Int, (far_radius - plain_endpoint) * plain_k * settings.steps_per_wavelength / (2pi))
+    n_steps == 0 && (far_radius = plain_endpoint)
+
+    far_series = OuterSeries(background, mass_coupling, frequency, m, ls, mixing, leading, settings.far_order)
+    far_offset = n_steps == 0 ? endpoint_offset : far_radius - background.rplus
+    far_profiles, far_slopes = endpoint_values(far_series, background, far_offset)
+    n_steps == 0 && return IntegratedOuterData(far_profiles, far_slopes, far_radius, _series_tail(far_series, far_radius), 0)
+
+    far_r = radius(background, far_offset)
+    envelope_factor(r) = exp(im * k * r + long_range_power * log(r))
+    phase_slope(r) = im * k + long_range_power / r
+    envelope = far_profiles ./ envelope_factor(far_r)
+    envelope_slope = far_slopes ./ (dr_drstar(background, far_offset) * envelope_factor(far_r)) .- phase_slope(far_r) .* envelope
+    system_matrix(r) = _envelope_system_matrix(background, mass_coupling, frequency, m, ls, mixing, k, long_range_power, r)
+    state = gauss_legendre_integrate(system_matrix, far_r, endpoint_radius, vcat(envelope, envelope_slope), n_steps)
+
+    n_chan = length(ls)
+    profiles = envelope_factor(endpoint_radius) .* state[1:n_chan]
+    slopes = dr_drstar(background, endpoint_offset) .* envelope_factor(endpoint_radius) .*
+             (state[n_chan + 1:end] .+ phase_slope(endpoint_radius) .* state[1:n_chan])
+    return IntegratedOuterData(profiles, slopes, far_radius, _series_tail(far_series, far_radius), n_steps)
+end
+
+"""Relative size of the last retained term of the outer series at radius `r` (largest over channels)."""
+function _series_tail(series::OuterSeries, r)
+    coefficients = _plain_value.(series.coefficients)
+    order = size(coefficients, 1) - 1
+    plain_r = _plain_value(r)
+    powers = plain_r .^ (-(0:order))
+    return maximum(abs(coefficients[end, channel] * powers[end]) / abs(sum(coefficients[:, channel] .* powers))
+                   for channel in axes(coefficients, 2))
+end

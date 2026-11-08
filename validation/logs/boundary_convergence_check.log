@@ -1,0 +1,18 @@
+integrated calibrated: converged = true  |F| = 1.21e-15  iterations = 3  E = [649.9998550921451, 650.0004342389187]  ω = ComplexF64[0.29595242665901855 - 3.888696866222183e-6im, 0.2983528812883759 + 5.962107225594979e-7im]
+integrated re-solve:   converged = true  |F| = 1.21e-15  iterations = 1  Δω = ComplexF64[0.0 + 3.8116482626443515e-20im, 0.0 - 1.418780186650953e-20im]
+integrated outer-boundary Jacobian block: 0.264 s
+series     calibrated: converged = true  |F| = 2.52e-15  iterations = 3  E = [649.9998559497143, 650.0004323663414]  ω = ComplexF64[0.29595243732648674 - 3.901866601813114e-6im, 0.2983528950739662 + 6.245713142605386e-7im]
+series     re-solve:   converged = true  |F| = 2.52e-15  iterations = 1  Δω = ComplexF64[0.0 + 0.0im, 0.0 + 2.117582368135751e-22im]
+series     outer-boundary Jacobian block: 0.081 s
+┌ Warning: solve_radial did not converge: |F| = 1.9675261436757907e-7 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-boundary-worktree/AxionCloud/src/bvp.jl:518
+┌ Warning: solve_radial did not converge: |F| = 0.00013714073505266544 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-boundary-worktree/AxionCloud/src/bvp.jl:518
+┌ Warning: solve_radial did not converge: |F| = 6.539471553157483e-8 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-boundary-worktree/AxionCloud/src/bvp.jl:518
+┌ Warning: solve_radial did not converge: |F| = 1.9670862422271895e-7 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-boundary-worktree/AxionCloud/src/bvp.jl:518
+┌ Warning: solve_radial did not converge: |F| = 0.00013714043589677094 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-boundary-worktree/AxionCloud/src/bvp.jl:518
+┌ Warning: solve_radial did not converge: |F| = 6.538454877524913e-8 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-boundary-worktree/AxionCloud/src/bvp.jl:518

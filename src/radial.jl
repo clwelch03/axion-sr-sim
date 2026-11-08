@@ -64,9 +64,16 @@ with the quantities that set them (all from hydrogenic frequency estimates):
   imposed through the leading outer coefficients, so past this radius the
   boundary condition no longer constrains the amplitude at the Newton
   tolerance and the system turns singular (the eigenvalue comes out wrong);
-* `rstar_max`: the tortoise coordinate of the larger of the containment and
-  asymptotic radii, limited by the normalization radius; `capped` is true when
-  that limit (or `max_radius`) cut the asymptotic requirement short;
+* `far_radius`: radius from which the integrated outer data of the
+  propagating components start (`2 k r ≥ |η|² + convergence_margin`); it is not
+  part of the mesh but sets the cost of the inward integration, which grows
+  like `1/k²` towards threshold;
+* `rstar_max`: with `integrated_outer` (the default, matching
+  `OuterBoundary()`), the tortoise coordinate of the containment radius; with
+  the series at the endpoint, that of the larger of the containment and
+  asymptotic radii, limited by the normalization radius. `capped` is true when
+  the series would have needed a larger radius than that limit (or
+  `max_radius`) allowed;
 * `slowest_decay`: smallest bound decay constant `κ`, `smallest_wavenumber`:
   smallest propagating `k` (`Inf` if no component propagates), and
   `peak_radius`: largest `ν/κ` among bound components (where to start stretching).
@@ -77,6 +84,7 @@ struct DomainEstimate{T<:Real}
     containment_radius::T
     asymptotic_radius::T
     normalization_radius::T
+    far_radius::T
     capped::Bool
     slowest_decay::T
     smallest_wavenumber::T
@@ -101,17 +109,22 @@ end
 
 """
     domain_estimate(background, mass_coupling, mode_set; containment=1e-4, horizon_offset_ratio=1e-6,
-                    asymptotic_margin=10, max_radius=5000, normalization_floor=1e-8)
+                    asymptotic_margin=10, max_radius=5000, normalization_floor=1e-8,
+                    integrated_outer=true, convergence_margin=40)
 
 Estimate the numerical domain needed at this parameter point; see `DomainEstimate`.
 Component frequencies are the hydrogenic `q·ω` with `ω_i = α(1 − α²/2n_i²)`, so
-the estimate is only indicative at large `α` or for strongly deformed clouds,
-and a component within `|ω_q − α| ≲ 1e-3 α` of threshold will hit the cap.
+the estimate is only indicative at large `α` or for strongly deformed clouds.
+With the series at the endpoint (`integrated_outer=false`) a component within
+`|ω_q − α| ≲ 1e-3 α` of threshold hits the cap; with integrated outer data the
+mesh only has to contain the bound components, and a warning is issued when
+the far radius of a near-threshold component exceeds `20 max_radius`.
 """
 function domain_estimate(background::KerrBackground, mass_coupling, mode_set::ModeSet; containment=1e-4,
-                         horizon_offset_ratio=1e-6, asymptotic_margin=10, max_radius=5000.0, normalization_floor=1e-8)
+                         horizon_offset_ratio=1e-6, asymptotic_margin=10, max_radius=5000.0, normalization_floor=1e-8,
+                         integrated_outer::Bool=true, convergence_margin=40.0)
     frequencies = component_frequencies(mode_set, hydrogenic_frequency.(mode_set.modes, mass_coupling))
-    containment_radius, asymptotic_radius, normalization_radius = 0.0, 0.0, Inf
+    containment_radius, asymptotic_radius, normalization_radius, far_radius = 0.0, 0.0, Inf, 0.0
     slowest_decay, smallest_wavenumber, peak_radius = Inf, Inf, 0.0
     for (index, frequency) in enumerate(frequencies)
         frequency > 0 || continue
@@ -129,18 +142,26 @@ function domain_estimate(background::KerrBackground, mass_coupling, mode_set::Mo
             wavenumber = sqrt(frequency^2 - mass_coupling^2)
             long_range_power = (2frequency^2 - mass_coupling^2) / wavenumber
             asymptotic_radius = max(asymptotic_radius, asymptotic_margin * long_range_power^2 / (2wavenumber))
+            far_radius = max(far_radius, (long_range_power^2 + convergence_margin) / (2wavenumber))   # |η| = (2ω²−α²)/k
             smallest_wavenumber = min(smallest_wavenumber, wavenumber)
         end
     end
     limit = min(max_radius, normalization_radius)
-    capped = asymptotic_radius > limit
-    asymptotic_radius = min(asymptotic_radius, limit)
-    outer_radius = max(containment_radius, asymptotic_radius)
-    capped && @warn "domain_estimate: a propagating component needs r > $(round(Int, limit)) for its outer series to be asymptotic, " *
-                    "beyond the usable radius set by the amplitude normalization or max_radius; its rates will depend on the endpoint" maxlog=1
+    if integrated_outer
+        capped = false
+        outer_radius = containment_radius          # as before, containment is never cut by the limit
+        far_radius > 20max_radius && @warn "domain_estimate: a component is close to threshold (k = $(round(smallest_wavenumber, sigdigits=2))); " *
+            "its integrated outer data start at r ≈ $(round(Int, far_radius)) and the integration cost grows like 1/k² (k → 0 needs a different expansion)" maxlog=1
+    else
+        capped = asymptotic_radius > limit
+        asymptotic_radius = min(asymptotic_radius, limit)
+        outer_radius = max(containment_radius, asymptotic_radius)
+        capped && @warn "domain_estimate: a propagating component needs r > $(round(Int, limit)) for its outer series to be asymptotic, " *
+                        "beyond the usable radius set by the amplitude normalization or max_radius; its rates will depend on the endpoint" maxlog=1
+    end
     rstar_max = tortoise(background, outer_radius - background.rplus)
     rstar_min = tortoise(background, horizon_offset_ratio * background.horizon_gap)
-    DomainEstimate(rstar_min, rstar_max, containment_radius, asymptotic_radius, normalization_radius, capped,
+    DomainEstimate(rstar_min, rstar_max, containment_radius, asymptotic_radius, normalization_radius, far_radius, capped,
                    slowest_decay, smallest_wavenumber, peak_radius)
 end
 
@@ -174,7 +195,9 @@ one problem serves a whole time evolution.
 
 Keyword arguments: `mesh` (default `RadialMesh(background)`), `n_polar`,
 `n_phase` (quadrature sizes), `horizon_order` (default 3) and `outer_order`
-(default 7) for the asymptotic expansions.
+(default 7) for the asymptotic expansions, `outer_boundary` (an `OuterBoundary`;
+how propagating components get their endpoint data) and the shorthand
+`outer_data = :integrated | :series` overriding its `data` field.
 """
 struct RadialProblem{T<:Real, Q<:Real, P<:AxionPotential}
     background::KerrBackground{T}
@@ -186,14 +209,21 @@ struct RadialProblem{T<:Real, Q<:Real, P<:AxionPotential}
     mixing::Vector{Matrix{Q}}   # angular coupling matrix of each component
     horizon_order::Int
     outer_order::Int
+    outer_boundary::OuterBoundary
 end
 
 function RadialProblem(background::KerrBackground{T}, potential::AxionPotential, mass_coupling, mode_set::ModeSet;
                        mesh::RadialMesh=RadialMesh(background), n_polar::Int=12, n_phase::Int=16,
-                       horizon_order::Int=3, outer_order::Int=7) where {T}
+                       horizon_order::Int=3, outer_order::Int=7, outer_boundary::OuterBoundary=OuterBoundary(),
+                       outer_data::Union{Nothing, Symbol}=nothing) where {T}
     quadrature = FieldQuadrature(mode_set; n_polar, n_phase)
     mixing = [mixing_matrix(quadrature.angular, mode_set, index) for index in 1:n_components(mode_set)]
-    RadialProblem(background, potential, T(mass_coupling), mode_set, quadrature, mesh, mixing, horizon_order, outer_order)
+    if outer_data !== nothing
+        outer_boundary = OuterBoundary(; data=outer_data, include_bound=outer_boundary.include_bound,
+                                       convergence_margin=outer_boundary.convergence_margin, far_order=outer_boundary.far_order,
+                                       steps_per_wavelength=outer_boundary.steps_per_wavelength)
+    end
+    RadialProblem(background, potential, T(mass_coupling), mode_set, quadrature, mesh, mixing, horizon_order, outer_order, outer_boundary)
 end
 
 """
@@ -207,7 +237,7 @@ be differentiated through the background with ForwardDiff.
 function with_background(problem::RadialProblem, background::KerrBackground{B}, mass_coupling) where {B}
     mesh = RadialMesh(background, problem.mesh.rstar)
     RadialProblem(background, problem.potential, convert(B, mass_coupling), problem.mode_set,
-                  problem.quadrature, mesh, problem.mixing, problem.horizon_order, problem.outer_order)
+                  problem.quadrature, mesh, problem.mixing, problem.horizon_order, problem.outer_order, problem.outer_boundary)
 end
 
 """
@@ -218,7 +248,7 @@ mesh and quadrature). Used to seed nonlinear solves from free-field ones.
 """
 with_potential(problem::RadialProblem, potential::AxionPotential) =
     RadialProblem(problem.background, potential, problem.mass_coupling, problem.mode_set, problem.quadrature,
-                  problem.mesh, problem.mixing, problem.horizon_order, problem.outer_order)
+                  problem.mesh, problem.mixing, problem.horizon_order, problem.outer_order, problem.outer_boundary)
 
 n_channels(problem::RadialProblem) = n_channels(problem.mode_set)
 n_modes(problem::RadialProblem) = n_modes(problem.mode_set)

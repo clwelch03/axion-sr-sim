@@ -146,8 +146,11 @@ end
     boundary_residual(problem, layout, side, block, parameter_block, amplitudes, scale)
 
 Mismatch between the node values of `R`, `Q` at an endpoint and the asymptotic
-series evaluated there with the current frequencies and leading coefficients.
-`side` is `:horizon` or `:outer`.
+data evaluated there with the current frequencies and leading coefficients:
+the Frobenius series at the horizon, and at the outer end the truncated series
+or, for propagating components with `outer_boundary.data == :integrated`, the
+far series integrated inward (`integrated_outer_values`). `side` is `:horizon`
+or `:outer`.
 """
 function boundary_residual(problem::RadialProblem, layout::UnknownLayout, side::Symbol, block::AbstractVector,
                            parameter_block::AbstractVector, amplitudes::AbstractVector, scale)
@@ -162,14 +165,20 @@ function boundary_residual(problem::RadialProblem, layout::UnknownLayout, side::
     for (component_index, component) in enumerate(mode_set.components)
         channels = mode_set.component_channels[component_index]
         mixing = problem.mixing[component_index]
-        series = if side == :horizon
-            HorizonSeries(background, mass_coupling, frequencies[component_index], component.m, component.ls,
-                          mixing, parameters.horizon_leading[channels], problem.horizon_order)
+        frequency = frequencies[component_index]
+        if side == :horizon
+            series = HorizonSeries(background, mass_coupling, frequency, component.m, component.ls,
+                                   mixing, parameters.horizon_leading[channels], problem.horizon_order)
+            expected.profiles[channels], expected.slopes[channels] = endpoint_values(series, background, offset)
+        elseif uses_integrated_data(problem.outer_boundary, frequency, mass_coupling)
+            integrated = integrated_outer_values(background, mass_coupling, frequency, component.m, component.ls,
+                                                 mixing, parameters.outer_leading[channels], problem.outer_boundary, offset)
+            expected.profiles[channels], expected.slopes[channels] = integrated.profiles, integrated.slopes
         else
-            OuterSeries(background, mass_coupling, frequencies[component_index], component.m, component.ls,
-                        mixing, parameters.outer_leading[channels], problem.outer_order)
+            series = OuterSeries(background, mass_coupling, frequency, component.m, component.ls,
+                                 mixing, parameters.outer_leading[channels], problem.outer_order)
+            expected.profiles[channels], expected.slopes[channels] = endpoint_values(series, background, offset)
         end
-        expected.profiles[channels], expected.slopes[channels] = endpoint_values(series, background, offset)
     end
     return node_block(NodeState(state.profiles .- expected.profiles, state.slopes .- expected.slopes))
 end

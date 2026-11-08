@@ -1,1 +1,0 @@
-"""Multiphase adiabatic components."""

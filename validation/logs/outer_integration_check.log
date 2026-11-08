@@ -1,0 +1,18 @@
+component q = [-1, 2], l = 3, m = 3, ω_q = 0.300752+7.72e-06i, k = 0.02126+1.1e-04i, ν = -0.978+4.277i, η = -4.277+0.022i
+r_far =    600 (ρ =  12.8): |order 35 − 25|/|R| = 9.2e-07, |order 45 − 35|/|R| = 1.0e-04
+r_far =   1000 (ρ =  21.3): |order 35 − 25|/|R| = 4.2e-13, |order 45 − 35|/|R| = 1.1e-14
+r_far =   1500 (ρ =  31.9): |order 35 − 25|/|R| = 0.0e+00, |order 45 − 35|/|R| = 0.0e+00
+
+reference at r = 400 (ρ = 8.50): R = -1.2661442785e-03-2.0084902873e-03i, R'/R = -0.00235430+0.02889151i
+integration self-consistency (r_far 1000 vs 1500, step 0.04 vs 0.02): |ΔR|/|R| = 2.4e-12, |Δ(R'/R)| = 7.9e-15
+cost of one inward integration (r 1000 → 400, step 0.04): 102.4 ms
+
+series at r = 400 versus the integrated solution:
+  J_B =  7: |ΔR|/|R| = 1.9e-02   |Δ(R'/R)| = 3.8e-04   (last term/sum = 5.8e-02)
+  J_B = 11: |ΔR|/|R| = 2.7e-03   |Δ(R'/R)| = 7.8e-05   (last term/sum = 6.1e-03)
+  J_B = 15: |ΔR|/|R| = 1.2e-03   |Δ(R'/R)| = 4.6e-05   (last term/sum = 2.2e-03)
+  J_B = 20: |ΔR|/|R| = 1.5e-03   |Δ(R'/R)| = 7.9e-05   (last term/sum = 2.4e-03)
+  J_B = 30: |ΔR|/|R| = 7.6e-02   |Δ(R'/R)| = 5.4e-03   (last term/sum = 9.2e-02)
+bare Coulomb H⁺_3(η, kr)/r normalised at r = 1000: at r = 400 |ΔR|/|R| = 1.9e-02, |Δ(R'/R)| = 7.1e-05
+bare Coulomb H⁺_3(η, kr)/r normalised at r = 1500: at r = 400 |ΔR|/|R| = 2.4e-02, |Δ(R'/R)| = 7.1e-05
+bare Coulomb H⁺_3(η, kr)/r normalised at r = 3000: at r = 400 |ΔR|/|R| = 2.9e-02, |Δ(R'/R)| = 7.1e-05

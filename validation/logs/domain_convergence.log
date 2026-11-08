@@ -1,0 +1,160 @@
+== inner endpoint, linear two-mode problem, a = 0.9, α = 0.3 (r*_max = 180, step 0.4)
+r*_min =  -30.0  s_min = 6.79e-05  s_min/gap = 7.79e-05  ω = ComplexF64[0.29629553635894246 + 1.477761510760232e-8im, 0.29845154824162035 + 1.4396005055243012e-12im]  iterations = 11
+r*_min =  -45.0  s_min = 7.15e-07  s_min/gap = 8.21e-07  ω = ComplexF64[0.2962955363589252 + 1.47776151833104e-8im, 0.2984515482416203 + 1.4396005977765738e-12im]  iterations = 11
+r*_min =  -60.0  s_min = 7.53e-09  s_min/gap = 8.64e-09  ω = ComplexF64[0.29629553635894246 + 1.477761510614487e-8im, 0.29845154824162035 + 1.4396005050160498e-12im]  iterations = 11
+r*_min =  -80.0  s_min = 1.74e-11  s_min/gap = 1.99e-11  ω = ComplexF64[0.29629553635894246 + 1.4777615106234614e-8im, 0.29845154824162035 + 1.4396005050160133e-12im]  iterations = 11
+r*_min = -120.0  s_min = 9.26e-17  s_min/gap = 1.06e-16  ω = ComplexF64[0.29629553635894246 + 1.4777615106429463e-8im, 0.29845154824162035 + 1.4396005050160143e-12im]  iterations = 11
+== outer endpoint, joint cosine solution, a = 0.99, α = 0.3, E₁ = E₂ = 650
+r*_max =   400 ( 739 nodes,  245s,  3 it): A = [0.041842993979988176, 0.00012697468382416504]
+   ω = ComplexF64[0.29595243732648674 - 3.901866601813114e-6im, 0.2983528950739662 + 6.245713142605386e-7im]
+   L = [0.004237312244611965, 0.011293085379180397]  F_E(−1,2) = 1.1457e-03  k(−1,2) = 0.02127  |R322_end|/peak = 8.90e-04
+
+[979414] signal 15: Terminated
+in expression starting at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/validation/domain_convergence.jl:21
+zgemm_kernel_n_ZEN at /global/common/software/nersc9/julia/1.11.7/bin/../lib/julia/libopenblas64_.so (unknown line)
+zgemm_nt at /global/common/software/nersc9/julia/1.11.7/bin/../lib/julia/libopenblas64_.so (unknown line)
+zgemm_64_ at /global/common/software/nersc9/julia/1.11.7/bin/../lib/julia/libopenblas64_.so (unknown line)
+gemm! at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/LinearAlgebra/src/blas.jl:1644
+gemm_wrapper! at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/LinearAlgebra/src/matmul.jl:657
+generic_matmatmul! at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/LinearAlgebra/src/matmul.jl:381 [inlined]
+_mul! at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/LinearAlgebra/src/matmul.jl:287 [inlined]
+mul! at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/LinearAlgebra/src/matmul.jl:285 [inlined]
+mul! at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/LinearAlgebra/src/matmul.jl:253 [inlined]
+* at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/LinearAlgebra/src/matmul.jl:130 [inlined]
+reconstruct_field at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/field.jl:70
+nonlinear_source at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/field.jl:92
+radial_rhs at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/radial.jl:225
+rhs_block at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:113
+interval_residual at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:135
+residual at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:183
+#solve_radial#75 at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:467
+solve_radial at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:439 [inlined]
+#amplitudes_for_energy#98 at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/calibration.jl:58
+amplitudes_for_energy at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/calibration.jl:30
+unknown function (ip: 0x7f8372864c30)
+macro expansion at ./timing.jl:421 [inlined]
+top-level scope at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/validation/domain_convergence.jl:24
+jl_toplevel_eval_flex at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/toplevel.c:934
+jl_toplevel_eval_flex at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/toplevel.c:886
+ijl_toplevel_eval_in at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/toplevel.c:994
+eval at ./boot.jl:430 [inlined]
+include_string at ./loading.jl:2734
+_include at ./loading.jl:2794
+include at ./Base.jl:562
+jfptr_include_46986.1 at /global/common/software/nersc9/julia/1.11.7/lib/julia/sys.so (unknown line)
+exec_options at ./client.jl:323
+_start at ./client.jl:531
+jfptr__start_73684.1 at /global/common/software/nersc9/julia/1.11.7/lib/julia/sys.so (unknown line)
+jl_apply at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/julia.h:2157 [inlined]
+true_main at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/jlapi.c:900
+jl_repl_entrypoint at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/jlapi.c:1059
+main at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/cli/loader_exe.c:58
+__libc_start_call_main at /lib64/libc.so.6 (unknown line)
+__libc_start_main at /lib64/libc.so.6 (unknown line)
+unknown function (ip: 0x4010b8)
+unknown function (ip: (nil))
+Allocations: 5548629356 (Pool: 5548624551; Big: 4805); GC: 144484
+┌ Warning: solve_radial did not converge: |F| = 1.9670862422271895e-7 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 0.00013714043589677094 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 6.538454877524913e-8 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 2.1807760514130083e-11 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 8.752788102763213e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 6.143037889597086e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 8.412838425398927e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 9.303170452903656e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.0021468141805056e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.0288513154311583e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 5.683683165889227e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 7.564427957678568e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 8.914066040965094e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.0820373539553499e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.0666356932975627e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 5.689612004810574e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 8.376991115235254e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 9.872530222934766e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.0794070818156334e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.1952655126583808e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 6.574722804667121e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 8.585210896140046e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.1168384687794083e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.255979466176692e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.3390827818069826e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 8.60831370856927e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 9.661561078868165e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 9.080591856606177e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 8.38923498997252e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 8.97189961388704e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.1022376746248475e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.9571778008972517e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.9628838728062684e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.783603830159251e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.8091388052270395e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 6.032983012837519e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 5.2371086340589e-16 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 5.247276432126152e-16 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.432287294577652e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.4141376081596624e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 4.8204606228907575e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 4.2642756536283124e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 4.2526784957509884e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 4.26070222733401e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 4.24117604975985e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.4153387650033273e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 2.668051391444829e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 3.112005893885691e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 3.5693262886778e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 3.789286796633938e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 1.3558760639773682e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486
+┌ Warning: solve_radial did not converge: |F| = 2.3194361600240996e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:486

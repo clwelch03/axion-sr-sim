@@ -1,0 +1,18 @@
+ODE residual |u'' + (1 − 2η/ρ − l(l+1)/ρ²) u| / |u| by central differences:
+  ρ =    5.0: |u| = 8.1825e-01  residual = 4.15e-05
+  ρ =    8.5: |u| = 8.5865e-01  residual = 2.82e-05
+  ρ =   21.0: |u| = 9.2260e-01  residual = 1.59e-05
+  ρ =   60.0: |u| = 9.6792e-01  residual = 1.08e-05
+  ρ =  200.0: |u| = 9.8965e-01  residual = 9.06e-06
+comparison with the asymptotic series U ~ z^{-a} Σ (a)_n (a−b+1)_n / (n! (−z)^n), truncated at the smallest term:
+  ρ =    8.5: series (17 terms, last 1.9e-03) = 0.08264632+0.85570891i   exact z^a U = 0.08225927+0.85470229i   rel. diff = 1.3e-03
+  ρ =   21.0: series (40 terms, last 2.2e-14) = 0.72824146+0.56644783i   exact z^a U = 0.72824146+0.56644783i   rel. diff = 1.6e-14
+  ρ =   60.0: series (40 terms, last 1.3e-32) = 0.93914586+0.23424556i   exact z^a U = 0.93914586+0.23424556i   rel. diff = 2.7e-15
+  ρ =  200.0: series (40 terms, last 1.6e-53) = 0.98686465+0.07417955i   exact z^a U = 0.98686465+0.07417955i   rel. diff = 2.7e-15
+quadrature convergence at ρ = 8.5 (step h):
+  h = 0.40: 0.004365972144459346 + 0.00734711953246701im
+  h = 0.20: 0.004365904140283764 + 0.007347176838912262im
+  h = 0.10: 0.004365904140283775 + 0.007347176838912271im
+  h = 0.05: 0.004365904140283773 + 0.0073471768389122664im
+ForwardDiff through ρ works: 1.1307370157470744
+cost: 21.2 μs per evaluation

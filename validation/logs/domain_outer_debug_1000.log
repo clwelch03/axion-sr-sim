@@ -1,0 +1,219 @@
+901 nodes, largest step 3.7000000000000455
+  newton 1: |step| = 146.38900117206364  |F| = 0.04737769322948049  damping = 1.0
+  newton 2: |step| = 90.14988904544157  |F| = 0.00023298847118603805  damping = 1.0
+  chord step 3 rejected (|F| 0.00023298847118603805 → 0.0002214290168605416); refactorising
+  newton 4: |step| = 4.012101661846681  |F| = 0.00018838806237104523  damping = 1.0
+  chord 5: |step| = 0.11740227112520928  |F| = 2.8606509334624827e-5  damping = 1.0
+  chord step 6 rejected (|F| 2.8606509334624827e-5 → 1.9906558953809814e-5); refactorising
+  newton 7: |step| = 0.017308619503334607  |F| = 1.0790309266781872e-5  damping = 1.0
+  chord 8: |step| = 0.0034757902927234174  |F| = 1.2995237982411614e-6  damping = 1.0
+  chord step 9 rejected (|F| 1.2995237982411614e-6 → 1.2997009241823196e-6); refactorising
+  newton 10: |step| = 0.0005318053916140792  |F| = 3.653706557946974e-7  damping = 1.0
+  chord 11: |step| = 8.416485522611786e-5  |F| = 5.569974464761294e-8  damping = 1.0
+  chord step 12 rejected (|F| 5.569974464761294e-8 → 5.5703408377292725e-8); refactorising
+  newton 13: |step| = 0.0001435631704035162  |F| = 1.1675566905391544e-8  damping = 1.0
+  chord 14: |step| = 5.342988523710734e-5  |F| = 2.408199590200889e-9  damping = 1.0
+  chord step 15 rejected (|F| 2.408199590200889e-9 → 2.408234893135298e-9); refactorising
+  newton 16: |step| = 0.00014795466197478678  |F| = 4.0672454858488673e-10  damping = 1.0
+  chord 17: |step| = 5.500858820864036e-5  |F| = 9.601446769642917e-11  damping = 1.0
+  chord 18: |step| = 3.827941066029627e-5  |F| = 9.388210548192053e-11  damping = 1.0
+  chord 19: |step| = 2.9791468343892575e-5  |F| = 6.762492476003334e-11  damping = 1.0
+  chord 20: |step| = 2.4533317919400485e-5  |F| = 5.757201400074992e-11  damping = 1.0
+  chord 21: |step| = 2.0920034197392683e-5  |F| = 4.880549958652539e-11  damping = 1.0
+  chord 22: |step| = 1.8270106890540838e-5  |F| = 4.278601881319558e-11  damping = 1.0
+  chord 23: |step| = 1.6237016999297e-5  |F| = 3.8122915463061693e-11  damping = 1.0
+  chord 24: |step| = 1.4624405362278696e-5  |F| = 3.438566975588303e-11  damping = 1.0
+  chord 25: |step| = 1.3312093288410302e-5  |F| = 3.13340401424647e-11  damping = 1.0
+  chord 26: |step| = 1.2222151858324353e-5  |F| = 2.8809635818947262e-11  damping = 1.0
+  chord 27: |step| = 1.1301712215029041e-5  |F| = 2.6665046109135974e-11  damping = 1.0
+  chord 28: |step| = 1.0513578475661572e-5  |F| = 2.480036572138657e-11  damping = 1.0
+  chord 29: |step| = 9.83078545814933e-6  |F| = 2.3232148530964475e-11  damping = 1.0
+  chord 30: |step| = 9.233287202647648e-6  |F| = 2.1807760514130083e-11  damping = 1.0
+linear: 29.1s converged=false ω = ComplexF64[0.29486513684266047 + 1.6635693461146534e-7im, 0.2984522683210694 + 1.7965824601911333e-12im]
+linear estimate A = [3.7715796472765826e7, 8.209470902142204e-5]
+  chord 1: |step| = 0.00015706966340303059  |F| = 2.9268275437884604e-16  damping = 6.103515625e-5
+  chord 2: |step| = 0.00015705049614890874  |F| = 5.853000823973929e-16  damping = 6.103515625e-5
+  chord 3: |step| = 0.0001570313336205989  |F| = 8.778517571887641e-16  damping = 6.103515625e-5
+  chord 4: |step| = 0.0001570121758163376  |F| = 1.1703417876739664e-15  damping = 6.103515625e-5
+  chord 5: |step| = 0.00015699302273431253  |F| = 1.4627693253180179e-15  damping = 6.103515625e-5
+  chord 6: |step| = 0.0001569738743728328  |F| = 1.755131380175077e-15  damping = 6.103515625e-5
+  chord 7: |step| = 0.00015695473073011149  |F| = 2.047428729933782e-15  damping = 6.103515625e-5
+  chord 8: |step| = 0.00015693559180440916  |F| = 2.339667210497963e-15  damping = 6.103515625e-5
+  chord 9: |step| = 0.0001569164575939892  |F| = 2.6318427964020615e-15  damping = 6.103515625e-5
+  chord 10: |step| = 0.00015689732809711434  |F| = 2.9239506381633736e-15  damping = 6.103515625e-5
+  chord 11: |step| = 0.00015687820331199796  |F| = 3.2160010344278826e-15  damping = 6.103515625e-5
+  chord 12: |step| = 0.0001568590832369095  |F| = 3.5079914453326936e-15  damping = 6.103515625e-5
+  chord 13: |step| = 0.00015683996787010837  |F| = 3.799902054252459e-15  damping = 6.103515625e-5
+  chord 14: |step| = 0.00015682085720981578  |F| = 4.091761821414194e-15  damping = 6.103515625e-5
+  chord 15: |step| = 0.00015680175125434547  |F| = 4.383556332528313e-15  damping = 6.103515625e-5
+  chord 16: |step| = 0.00015678265000189056  |F| = 4.675289172329258e-15  damping = 6.103515625e-5
+  chord 17: |step| = 0.00015676355345079095  |F| = 4.966961606982627e-15  damping = 6.103515625e-5
+  chord 18: |step| = 0.00015674446159922028  |F| = 5.258563542855881e-15  damping = 6.103515625e-5
+  chord 19: |step| = 0.00015672537444551786  |F| = 5.550110503756112e-15  damping = 6.103515625e-5
+  chord 20: |step| = 0.0001567062919878843  |F| = 5.841585229853537e-15  damping = 6.103515625e-5
+  chord 21: |step| = 0.0001566872142246072  |F| = 6.132994247935256e-15  damping = 6.103515625e-5
+  chord 22: |step| = 0.00015666814115393866  |F| = 6.424344101170657e-15  damping = 6.103515625e-5
+  chord 23: |step| = 0.0001566490727741273  |F| = 6.715621406970987e-15  damping = 6.103515625e-5
+  chord 24: |step| = 0.0001566300090834409  |F| = 7.0068241489268295e-15  damping = 6.103515625e-5
+  chord 25: |step| = 0.00015661095008020017  |F| = 7.297956212459757e-15  damping = 6.103515625e-5
+  chord 26: |step| = 0.0001565918957626067  |F| = 7.5890309611239e-15  damping = 6.103515625e-5
+  chord 27: |step| = 0.00015657284612896068  |F| = 7.880074163951366e-15  damping = 6.103515625e-5
+  chord 28: |step| = 0.00015655380117748978  |F| = 8.171035782418302e-15  damping = 6.103515625e-5
+  chord 29: |step| = 0.00015653476090644511  |F| = 8.461958416350436e-15  damping = 6.103515625e-5
+  chord 30: |step| = 0.00015651572531416913  |F| = 8.752788102763213e-15  damping = 6.103515625e-5
+first nonlinear solve: 52.8s converged=false iterations=30 ω = ComplexF64[0.2948645626518298 + 1.6636951727834513e-7im, 0.2984522683210694 + 1.7965824601911333e-12im]
+┌ Warning: solve_radial did not converge: |F| = 2.1807760514130083e-11 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 8.752788102763213e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 9.980956627777159e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 5.903854375144055e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 7.792819242100438e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 8.99583204778097e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.053657312320026e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.0661451985373467e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 7.226581148016043e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 9.22174937142177e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.0983862520910408e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.1777392745733669e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.2557796562627047e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 5.977726856394523e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 8.864706926795839e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.1220641986782449e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.3045991135845361e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.3796468372046897e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 6.911996328077074e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 9.806574976685252e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.2672018408414155e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.3720133461363895e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.460589281406155e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.629714109142965e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.2893957723998034e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.7077291586525827e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.5057759332979167e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.6494930745356346e-14 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 3.4970053704483495e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 2.4950404027973816e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.4670420892698997e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 3.739895571667914e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 3.5133654862208488e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 5.193220598041045e-16 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 7.142136409255645e-16 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 8.518659059515261e-16 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.351820974008176e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 1.380443198382515e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 2.8357894451927443e-16 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 2.178350075736245e-16 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 2.262356560965481e-16 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 5.904160388039868e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 4.6151804685994425e-17 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 2.3361790088717895e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 2.2404336446333108e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 2.2156392604566885e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 2.1396069669897098e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+┌ Warning: solve_radial did not converge: |F| = 2.2696729972841684e-15 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:492
+ERROR: LoadError: DomainError with -4.1055511935341364:
+log was called with a negative real argument but will only return a complex result if called with a complex argument. Try log(Complex(x)).
+Stacktrace:
+ [1] throw_complex_domainerror(f::Symbol, x::Float64)
+   @ Base.Math ./math.jl:33
+ [2] _log
+   @ ./special/log.jl:295 [inlined]
+ [3] log(x::Float64)
+   @ Base.Math ./special/log.jl:261
+ [4] amplitudes_for_energy(problem::RadialProblem{Float64, Float64, CosinePotential}, target_energies::Vector{Float64}; initial::Vector{Float64}, guess::RadialSolution{Float64, RadialProblem{Float64, Float64, CosinePotential}, SparseArrays.UMFPACK.UmfpackLU{Float64, Int64}}, tol::Float64, maxiter::Int64, max_ratio::Float64, verbose::Bool)
+   @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/calibration.jl:64
+ [5] top-level scope
+   @ ./timing.jl:421
+in expression starting at /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/validation/domain_outer_debug.jl:17
+calibration 1: A = [3.7715796472765826e7, 8.209470902142204e-5]  E/target = [1.5372710511667256e-7, 0.000738412014363823]  converged = false
+  step did not converge; backing off to A = [6.532567573875746e7, 0.00014219220705768602]
+  step did not converge; backing off to A = [4.963677961561238e7, 0.00010804271314399008]
+  step did not converge; backing off to A = [4.3267663185639784e7, 9.41792710602542e-5]
+  step did not converge; backing off to A = [4.0396464926547386e7, 8.792963012284997e-5]
+calibration 2: A = [4.0396464926547386e7, 8.792963012284997e-5]  E/target = [1.5197786688928925e-7, 0.001048884973170722]  converged = false
+  step did not converge; backing off to A = [6.996872969895422e7, 0.00015229858686351496]
+  step did not converge; backing off to A = [5.316473770497583e7, 0.00011572190117320751]
+  step did not converge; backing off to A = [4.6342933247995295e7, 0.00010087310824631674]
+  step did not converge; backing off to A = [4.326766318563979e7, 9.417927106025423e-5]
+calibration 3: A = [4.326766318563979e7, 9.417927106025423e-5]  E/target = [1.5033658389108795e-7, 0.0014182403912777124]  converged = false
+  step did not converge; backing off to A = [7.494179096230558e7, 0.00016312328249616152]
+  step did not converge; backing off to A = [5.694344711980178e7, 0.00012394689120120932]
+  step did not converge; backing off to A = [4.9636779615612395e7, 0.00010804271314399012]
+  step did not converge; backing off to A = [4.63429332479953e7, 0.00010087310824631677]
+calibration 4: A = [4.63429332479953e7, 0.00010087310824631677]  E/target = [1.4822229548009515e-7, 0.0020189622018847234]  converged = false
+  step did not converge; backing off to A = [8.026831495730083e7, 0.00017471734860001573]
+  step did not converge; backing off to A = [6.0990730131678656e7, 0.00013275647636872126]
+  step did not converge; backing off to A = [5.316473770497584e7, 0.00011572190117320755]
+  step did not converge; backing off to A = [4.96367796156124e7, 0.00010804271314399014]
+calibration 5: A = [4.96367796156124e7, 0.00010804271314399014]  E/target = [1.4533587013645023e-7, 0.003087944279102891]  converged = false
+  step did not converge; backing off to A = [8.597342421833985e7, 0.00018713546855298068]
+  step did not converge; backing off to A = [6.532567573875748e7, 0.0001421922070576861]
+  step did not converge; backing off to A = [5.69434471198018e7, 0.00012394689120120937]
+  step did not converge; backing off to A = [5.316473770497585e7, 0.00011572190117320758]
+calibration 6: A = [5.316473770497585e7, 0.00011572190117320758]  E/target = [1.4201752451440387e-7, 0.004726860638271593]  converged = false
+  step did not converge; backing off to A = [9.208402687609096e7, 0.00020043621238045997]
+  step did not converge; backing off to A = [6.996872969895425e7, 0.00015229858686351502]
+  step did not converge; backing off to A = [6.099073013167867e7, 0.0001327564763687213]
+  step did not converge; backing off to A = [5.6943447119801804e7, 0.00012394689120120937]
+calibration 7: A = [5.6943447119801804e7, 0.00012394689120120937]  E/target = [2.762344395683411e-9, 0.16727075210277978]  converged = false
+  step did not converge; backing off to A = [9.862894356960838e7, 0.00016698045372160332]
+  step did not converge; backing off to A = [7.49417909623056e7, 0.00014386350520601167]
+  step did not converge; backing off to A = [6.53256757387575e7, 0.0001335343934257918]
+  step did not converge; backing off to A = [6.0990730131678686e7, 0.0001286513619576804]
+calibration 8: A = [6.0990730131678686e7, 0.0001286513619576804]  E/target = [7.742012050002298e-11, 0.006207470430235366]  converged = false
+  step did not converge; backing off to A = [1.0563904337878951e8, 0.00022283069537363628]
+  step did not converge; backing off to A = [8.026831495730086e7, 0.00016931471420344806]
+  step did not converge; backing off to A = [6.996872969895427e7, 0.00014758918856660542]
+  step did not converge; backing off to A = [6.532567573875751e7, 0.0001377953196568109]
+calibration 9: A = [6.532567573875751e7, 0.0001377953196568109]  E/target = [2.931231444450747e-14, 3.0704049872636892e-6]  converged = false
+  step did not converge; backing off to A = [1.1314738941829756e8, 0.00023866849469079092]
+  step did not converge; backing off to A = [8.597342421833988e7, 0.0001813488393068106]
+  step did not converge; backing off to A = [7.494179096230562e7, 0.00015807916144031637]
+  step did not converge; backing off to A = [6.996872969895428e7, 0.00014758918856660542]

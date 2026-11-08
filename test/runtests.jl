@@ -78,13 +78,20 @@ end
 @testset "Domain estimate" begin
     background = KerrBackground(0.99)
     mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
-    estimate = domain_estimate(background, 0.3, mode_set)
+    estimate = domain_estimate(background, 0.3, mode_set; integrated_outer=false)
     @test estimate.slowest_decay ≈ 0.3^2 / 3 rtol=0.05           # κ₃₂₂ ≈ α²/n
     @test 0 < estimate.smallest_wavenumber < 0.03                   # the near-threshold (−1, 2) component
     @test estimate.capped                                           # its series would need r ≫ the usable radius
     @test estimate.normalization_radius < 1000                      # |211⟩ is negligible at the boundary beyond this
     @test estimate.asymptotic_radius ≈ estimate.normalization_radius  # so the normalization limit sets the outer endpoint
     @test offset_from_tortoise(background, estimate.rstar_min) ≈ 1e-6 * background.horizon_gap rtol=1e-6
+    # With integrated outer data the mesh only has to contain the bound components.
+    integrated = domain_estimate(background, 0.3, mode_set)
+    @test !integrated.capped
+    @test radius(background, offset_from_tortoise(background, integrated.rstar_max)) ≈ integrated.containment_radius rtol=1e-6
+    @test integrated.containment_radius ≈ estimate.containment_radius
+    @test integrated.far_radius > integrated.containment_radius     # the (−1, 2) series only converges far out
+    @test integrated.rstar_min == estimate.rstar_min
     # containment coordinate: r^ν e^{−κr} at x = κr must be `containment` × its peak
     x = AC._containment_coordinate(1.8, 1e-4)
     @test (x / 1.8)^1.8 * exp(-(x - 1.8)) ≈ 1e-4 rtol=1e-8
@@ -137,6 +144,103 @@ end
         dR_ds = (endpoint_values(series, background, s + step)[1][1] - endpoint_values(series, background, s - step)[1][1]) / (2step)
         @test Q[1] ≈ dR_ds * AC.dr_drstar(background, s) rtol=1e-7
     end
+end
+
+@testset "Integrated outer data" begin
+    # (a) Where the series converges at the endpoint, integrating from far out reproduces it.
+    background = KerrBackground(0.9)
+    mass_coupling = 0.3
+    frequency = 0.8 + 1e-6im                     # k ≈ 0.74: the series is converged at r ≈ 62
+    mixing = fill(1 / 5, 1, 1)
+    offset = 60.0
+    reference = OuterSeries(background, mass_coupling, frequency, 1, [1], mixing, [1.0 + 0im], 30)
+    R_series, Q_series = endpoint_values(reference, background, offset)
+    forced = integrated_outer_values(background, mass_coupling, frequency, 1, [1], mixing, [1.0 + 0im],
+                                     OuterBoundary(convergence_margin=2000.0), offset)
+    @test forced.n_steps > 1000                  # genuinely integrated over a dozen wavelengths
+    @test forced.profiles[1] ≈ R_series[1] rtol=1e-11
+    @test forced.slopes[1] ≈ Q_series[1] rtol=1e-11
+    direct = integrated_outer_values(background, mass_coupling, frequency, 1, [1], mixing, [1.0 + 0im], OuterBoundary(), offset)
+    @test direct.n_steps == 0                    # no integration needed: the far series is evaluated at the endpoint
+    @test direct.profiles[1] ≈ R_series[1] rtol=1e-13
+
+    # (b) The Gauss–Legendre stepper reproduces the outgoing Coulomb function (Tricomi-U representation,
+    #     validation/coulomb_prototype.jl) when integrating the Coulomb equation inward.
+    function log_gamma(z::Complex)
+        coefficients = (0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313,
+                        -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7)
+        real(z) < 0.5 && return log(pi / sin(pi * z)) - log_gamma(1 - z)
+        z -= 1
+        accumulated = coefficients[1] + sum(coefficients[k + 1] / (z + k) for k in 1:8)
+        t = z + 7.5
+        return 0.5log(2pi) + (z + 0.5) * log(t) - t + log(accumulated)
+    end
+    function tricomi_u_outgoing(a, b, rho; h=0.1, v_min=-14.0, v_max=6.0)
+        total = zero(complex(a) * rho)
+        for v in v_min:h:v_max
+            x = exp(v)
+            total += exp(a * v - x) * (1 + im * x / (2rho))^(b - a - 1)
+        end
+        return total * h * im * (2rho)^(-a) * exp(im * pi * (a - 1) / 2) * exp(-log_gamma(complex(a)))
+    end
+    function coulomb_outgoing(l, eta, rho)
+        a = l + 1 + im * eta
+        theta = rho - eta * log(2rho) - l * pi / 2 + imag(log_gamma(complex(a)))
+        return exp(im * theta) * (-2im * rho)^a * tricomi_u_outgoing(a, 2l + 2, rho)
+    end
+    l, eta = 3, -4.28
+    rho_far, rho_end = 60.0, 8.5
+    far_value = coulomb_outgoing(l, eta, rho_far)
+    far_slope = complex(ForwardDiff.derivative(x -> real(coulomb_outgoing(l, eta, x)), rho_far),
+                        ForwardDiff.derivative(x -> imag(coulomb_outgoing(l, eta, x)), rho_far))
+    coulomb_matrix(rho) = [0 1; -(1 - 2eta / rho - l * (l + 1) / rho^2) 0]
+    integrated = gauss_legendre_integrate(coulomb_matrix, rho_far, rho_end, [far_value, far_slope], 2000)
+    @test integrated[1] ≈ coulomb_outgoing(l, eta, rho_end) rtol=1e-9
+    # Order 6: halving the step reduces the (tiny) error by ≈ 64.
+    coarse = gauss_legendre_integrate(coulomb_matrix, rho_far, rho_end, [far_value, far_slope], 250)[1]
+    fine = gauss_legendre_integrate(coulomb_matrix, rho_far, rho_end, [far_value, far_slope], 500)[1]
+    exact = coulomb_outgoing(l, eta, rho_end)
+    @test 30 < abs(coarse - exact) / abs(fine - exact) < 130
+
+    # (c) Far-radius and step independence for the near-threshold (−1, 2) component at a = 0.99, α = 0.3,
+    #     and (d) the frequency derivative by ForwardDiff matches a finite difference.
+    background = KerrBackground(0.99)
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
+    component_index = findfirst(component -> component.q == [-1, 2], mode_set.components)
+    component = mode_set.components[component_index]
+    mixing = mixing_matrix(AngularGrid(12, mode_set), mode_set, component_index)
+    frequency = 0.300752 + 7.72e-6im
+    offset = 400.0 - background.rplus
+    data_for(settings, frequency) = integrated_outer_values(background, mass_coupling, frequency, component.m, component.ls,
+                                                            mixing, [1.0 + 0im], settings, offset)
+    default = data_for(OuterBoundary(), frequency)
+    @test default.n_steps > 100 && default.far_series_tail < 1e-15
+    for settings in (OuterBoundary(convergence_margin=120.0), OuterBoundary(steps_per_wavelength=96),
+                     OuterBoundary(convergence_margin=120.0, steps_per_wavelength=96, far_order=50))
+        other = data_for(settings, frequency)
+        @test other.profiles[1] ≈ default.profiles[1] rtol=1e-10
+        @test other.slopes[1] / other.profiles[1] ≈ default.slopes[1] / default.profiles[1] rtol=1e-10
+    end
+    profile_real(w) = real(data_for(OuterBoundary(), complex(w[1], w[2])).profiles[1])
+    gradient_ad = ForwardDiff.gradient(profile_real, [real(frequency), imag(frequency)])
+    step = 1e-8
+    finite = [(profile_real([real(frequency) + step, imag(frequency)]) - profile_real([real(frequency) - step, imag(frequency)])) / 2step,
+              (profile_real([real(frequency), imag(frequency) + step]) - profile_real([real(frequency), imag(frequency) - step])) / 2step]
+    @test gradient_ad ≈ finite rtol=1e-6
+    # Bound components can be integrated too (decaying solution, stable inward): the |322⟩ fundamental.
+    bound_index = findfirst(component -> component.q == [0, 1], mode_set.components)
+    bound = mode_set.components[bound_index]
+    bound_mixing = mixing_matrix(AngularGrid(12, mode_set), mode_set, bound_index)
+    bound_frequency = 0.298350 + 1.54e-6im
+    bound_data = integrated_outer_values(background, mass_coupling, bound_frequency, bound.m, bound.ls, bound_mixing, [1.0 + 0im],
+                                         OuterBoundary(include_bound=true), offset)
+    bound_other = integrated_outer_values(background, mass_coupling, bound_frequency, bound.m, bound.ls, bound_mixing, [1.0 + 0im],
+                                          OuterBoundary(include_bound=true, convergence_margin=120.0, steps_per_wavelength=96), offset)
+    @test bound_data.n_steps > 50
+    @test bound_data.profiles[1] ≈ bound_other.profiles[1] rtol=1e-10
+    bound_series = endpoint_values(OuterSeries(background, mass_coupling, bound_frequency, bound.m, bound.ls, bound_mixing, [1.0 + 0im], 7),
+                                   background, offset)[1][1]
+    @test abs(bound_series / bound_data.profiles[1] - 1) < 1e-3   # the κr ≈ 12 series is close but not exact
 end
 
 @testset "Analytic right-hand-side Jacobian matches automatic differentiation" begin

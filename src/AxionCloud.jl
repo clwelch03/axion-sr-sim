@@ -36,6 +36,7 @@ export BoundMode, ModeSet, FourierComponent, fundamental_channels
 export AngularGrid, polar_harmonic, mixing_matrix
 export FieldQuadrature, nonlinear_source, reconstruct_field
 export HorizonSeries, OuterSeries, endpoint_values, outer_wavenumber
+export OuterBoundary, IntegratedOuterData, integrated_outer_values, is_propagating, uses_integrated_data, gauss_legendre_integrate
 export RadialMesh, DomainEstimate, domain_estimate, RadialProblem, solve_radial, RadialSolution, profiles, slopes, mode_frequencies, growth_rates
 export Charges, cloud_charges, component_charges, outward_flux, boundary_losses, charge_jacobian
 export with_background, amplitude_rates, evolve_fixed_background, evolve_with_spindown

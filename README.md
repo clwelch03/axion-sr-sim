@@ -40,6 +40,12 @@ Julia implementation of the method described in `../outline.tex`.
   the propagating components' asymptotic requirement (`domain_estimate` reports the ingredients).
 * Black-hole spindown couples through `(f_a/M_Pl)²` (non-reduced Planck mass), passed to
   `evolve_with_spindown` as `decay_constant_ratio = f_a/M_Pl`.
+* Each independent phase carries a wave action `N_i = Σ_q q_i n_q` (`phase_actions`), with
+  `J = Σ m_i N_i`. The evolution drivers take `balance=:energy` (default, energy and angular momentum,
+  two modes) or `balance=:action` (one action balance per phase, any number of modes, no metric work).
+  `metric_work` is the action-based `(∂E)|_N` work, independent of the inner endpoint.
+* The evolution state is `ln A` by default (`log_amplitudes`), with the first step set from the
+  initial e-folding time; read amplitudes with `amplitude_trajectory(result)`.
 
 ## Quick start
 
@@ -52,6 +58,8 @@ solution = solve_radial(problem, [1e-6, 1e-7])
 mode_frequencies(solution), cloud_charges(solution), boundary_losses(solution)
 calibrated = amplitudes_for_energy(problem, [650.0, 650.0])      # amplitudes with E₂₁₁ = E₃₂₂ = 650 f_a²M
 result = evolve_fixed_background(problem, [1e-6, 1e-7], (0.0, 1e8); verbose=true)
+trajectory = amplitude_trajectory(result)                         # times, amplitudes[time, mode]
+phase_actions(solution), amplitude_rates(solution; balance=:action)
 spun = evolve_with_spindown(problem, [1e-6, 1e-7], (0.0, 1e8), 1e-2)   # f_a/M_Pl = 0.01
 far = RadialMesh(background; rstar_min=-100.0, rstar_max=2000.0, step=0.4, stretch_from=150.0)
 sized = RadialMesh(background, 0.3, modes; max_radius=2000.0)        # endpoints from the physics at this point

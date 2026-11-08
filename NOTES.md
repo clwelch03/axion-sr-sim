@@ -1,5 +1,64 @@
 # Progress notes
 
+## Day 3 (2026-11-07, evening session)
+
+Repository initialised at the project root (`main`); the outer-boundary work runs in parallel on the
+`boundary-integration` branch (worktree `../can-codex-boundary-worktree`), see `NOTES_boundary.md` once merged.
+
+### Done and verified (main)
+- **Faster source Jacobian** (`field.jl`): the phase averages ⟨e^{iq·ξ} h′(Φ) 2cos/sin(q′·ξ)⟩ are
+  ĥ′(q+q′) ± ĥ′(q−q′), so all of them come from one real BLAS product of a precomputed averaging table
+  (one row per distinct ±k; 25 rows for the two-mode set) with h′(Φ)[point, polar node]. Matches AD to 2e-14
+  for cosine, quartic (n_angular = 2) and chiral. Per node 275 μs → 61 μs; production Jacobian (751 nodes)
+  0.58 s → 0.21 s; a Newton step is now dominated by the sparse LU (≈ 0.35 s).
+- **Integrator tuning** (`evolution.jl`, `validation/evolution_step_control.jl`): the day-2 explanation was
+  wrong: the Newton-tolerance noise in d ln A/dt is 1e-12 of Im ω₂₁₁, negligible. The waste came from Tsit5's
+  initial-step heuristic (it picked dt ≈ 1, then grew ×10 per step: ≈ 40 evaluations to reach 1e6), and from
+  integrating an exponential in A (steps limited to γ dt ≈ 0.1). Now the state is ln A by default
+  (`log_amplitudes=true`, reltol = abstol = 1e-7) and the first step is 0.05 / max|A′/A| (`initial_step_fraction`).
+  Three linear e-folds: 141 → 103 (first step only) → **31** evaluations, identical accuracy. The 5.5e-5
+  remaining error in all three runs is not integration error but the energy-flux bias below.
+  `amplitude_trajectory(result)` reads amplitudes back in either convention (scripts updated).
+- **Nonlinear boundary terms** (`validation/nonlinear_boundary_terms.jl`): local ratio |N|/|B R| per channel.
+  Horizon endpoints: ≤ 4e-7 (a = 0.99 joint E = 650 point), ≤ 4e-9 (a = 0.9 peak and saturated states).
+  Outer endpoint (r* = 200 resp. 180): fundamentals 3e-5–6e-4 (211) and 3e-4–4e-3 (322); second-order
+  components (2,−1) 4e-3–6e-3 and (−1,2) 1e-3–4.5e-3; the third-order components (3,0), (2,1), (1,2), (0,3)
+  are O(1) — they are entirely source-driven there (and carry ≤ 1e-12 of the flux). So the outline's
+  "sufficiently small" holds at the few-1e-3 level for every component that matters, not uniformly.
+- **Wave actions and the action balance** (`charges.jl`, `validation/action_balance.jl`): N_i = ∂⟨L⟩/∂ω_i =
+  Σ_q q_i n_q with n_q the Klein–Gordon charge of component q. Verified to round-off at linear and nonlinear
+  points: J = Σ m_i N_i, L_E = Σ ω_i L_{N_i}, L_J = Σ m_i L_{N_i}. E − Σ ω_i N_i is the outer surface term
+  (plus potential energy): −3.6e-4 E at r*_max = 180, −4e-5 at 250, −3e-6 at 320 (linear point).
+  **Energy-flux bias found**: with a complex trial frequency the energy flux is
+  4π(r²+a²) Σ [ω Im(R*Q) − Im ω̃ Re(R*Q)]; `outward_flux` drops the second term, which is the same order as
+  the losses wherever the cloud is not contained. Linear point, default mesh: A′/(γA) − 1 =
+  (7.4e-5, −4.2e-4) with the energy balance as coded, (−1.5e-6, −1.2e-5) with the complete flux, and
+  identically (−1.5e-6, −1.2e-5) with the action balance, whose flux contains no time derivative. At the
+  nonlinear point (1e-2, 1e-4) the three balances agree to 1e-3. Not changed in `outward_flux` (the γ that
+  belongs there in the nonlinear adiabatic setting is ambiguous); the action balance sidesteps it.
+  `amplitude_rates(...; balance=:action)` and `evolve_*(...; balance=:action)` implement it for any
+  number of modes; the default stays `:energy` so all existing results reproduce.
+- **Metric work, settled** (`evolution.jl`, `validation/metric_work_containment.jl`): actions are adiabatic
+  invariants, so dE = Σ ω_i dN_i + w with
+  w = (∂_b E − Σ ω_i ∂_b N_i)|_A b′ + (∂_j E − Σ ω_i ∂_j N_i)|_A j′, using the same fixed-A, fixed-r*/M
+  derivatives as the drift terms (one extra dual pass); the J-counterpart vanishes identically (J = Σ m N),
+  matching the outline's (w, 0). Independent of r*_min to 7 digits (−4.011009e-3 E b′ for r*_min = −45 … −120,
+  where the Boyer–Lindquist version runs −1e-2 … +5e5). Equals the linear-regime prediction Σ N_i dω_i/dτ once
+  the cloud is contained: w/(E b′) = −4.01e-3, −9.52e-3, −1.0561e-2, −1.0660e-2 vs −1.0664e-2 for
+  r*_max = 180, 250, 320, 400; and there energy balance + w agrees with the action balance to 1e-7
+  (without w: 1e-4). `include_metric_work=true` now uses this w; still off by default.
+  `boyer_lindquist_metric_work` kept for comparison. `BackgroundDerivatives` (struct) replaces the pair
+  returned by `background_charge_derivatives`, adding action and frequency derivatives.
+- `Pkg.test()`: 95/95 (≈ 3.5 min; new sets for actions/balances and a short log-amplitude evolution).
+
+### Open (Catherine)
+1. **Switch the evolution to the action balance?** It is exact for the region, needs no metric work, removes
+   the two-mode restriction (outline "Future work"), and avoids the energy-flux bias. Energy and angular
+   momentum remain available as diagnostics. My recommendation: yes, once the boundary branch is merged
+   (contained domains make the two formulations agree to 1e-7 anyway).
+2. The drift terms ∂_b Q|_A are large on non-contained domains (the fixed outer coefficient rescales the whole
+   tail as κ changes); with contained domains this is benign. Same remedy as above.
+
 ## Day 2 (2026-11-07, afternoon session)
 
 ### Done and verified

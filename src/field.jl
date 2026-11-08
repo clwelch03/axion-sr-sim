@@ -13,12 +13,26 @@ table `phase_factors[point, component] = exp(-i q · ξ_point)`. The trapezoidal
 rule on a periodic grid is spectrally accurate, and `n_per_dim` must exceed
 the highest harmonic that the nonlinearity can alias back onto a retained
 component.
+
+For the source Jacobian it also stores the averaging table
+`exp(+i k_slot · ξ_point) / n_points`, split into real matrices
+`jacobian_cosines` and `jacobian_sines` (so the product with the real `h′(Φ)`
+runs as BLAS), for the distinct wavevectors `k = q ± q′` over all component
+pairs up to sign: `h′(Φ)` is real, so `ĥ′(−k) = conj(ĥ′(k))` and each `±k` pair
+needs one row. `sum_slot[q, q′]`, `difference_slot[q, q′]` point into the table
+and `sum_conjugated`, `difference_conjugated` say whether the stored row is for
+`−k`, so that every phase average the Jacobian needs comes from one matrix
+product (see `nonlinear_source_jacobian`).
 """
 struct PhaseGrid{T<:Real}
     n_per_dim::Int
     phase_factors::Matrix{Complex{T}}
-    cosine_factors::Matrix{T}   # 2 cos(q·ξ) = ∂Φ/∂Re R per unit harmonic
-    sine_factors::Matrix{T}     # 2 sin(q·ξ) = ∂Φ/∂Im R per unit harmonic
+    jacobian_cosines::Matrix{T}   # cos(k_slot · ξ_point) / n_points
+    jacobian_sines::Matrix{T}     # sin(k_slot · ξ_point) / n_points
+    sum_slot::Matrix{Int}
+    difference_slot::Matrix{Int}
+    sum_conjugated::Matrix{Bool}
+    difference_conjugated::Matrix{Bool}
 end
 
 function PhaseGrid(n_per_dim::Int, mode_set::ModeSet)
@@ -26,7 +40,29 @@ function PhaseGrid(n_per_dim::Int, mode_set::ModeSet)
     torus_points = vec(collect(Iterators.product(ntuple(_ -> one_axis, n_modes(mode_set))...)))
     phase_factors = [cis(-sum(component.q .* collect(point)))
                      for point in torus_points, component in mode_set.components]
-    PhaseGrid(n_per_dim, phase_factors, 2 .* real.(phase_factors), -2 .* imag.(phase_factors))
+
+    # Distinct wavevectors up to sign; a slot stores the representative with the larger lexicographic order.
+    wavevectors = Vector{Vector{Int}}()
+    function slot_of(wavevector)
+        representative = max(wavevector, -wavevector)
+        slot = findfirst(==(representative), wavevectors)
+        if slot === nothing
+            push!(wavevectors, representative)
+            slot = length(wavevectors)
+        end
+        return slot
+    end
+    components = mode_set.components
+    sum_slot = [slot_of(target.q .+ source.q) for target in components, source in components]
+    difference_slot = [slot_of(target.q .- source.q) for target in components, source in components]
+    sum_conjugated = [target.q .+ source.q != max(target.q .+ source.q, -(target.q .+ source.q))
+                      for target in components, source in components]
+    difference_conjugated = [target.q .- source.q != max(target.q .- source.q, -(target.q .- source.q))
+                             for target in components, source in components]
+    averaging_table = [cis(sum(wavevector .* collect(point))) / length(torus_points)
+                       for wavevector in wavevectors, point in torus_points]
+    PhaseGrid(n_per_dim, phase_factors, real.(averaging_table), imag.(averaging_table),
+              sum_slot, difference_slot, sum_conjugated, difference_conjugated)
 end
 
 n_points(grid::PhaseGrid) = size(grid.phase_factors, 1)
@@ -129,42 +165,37 @@ Jacobian of `nonlinear_source` with respect to the profiles. With
 
     ∂N_c/∂Re R_{c′} = α² Σ_x w ρ² Ỹ_c Ỹ_{c′} ⟨e^{+i q_c·ξ} h′(Φ) 2cos(q_{c′}·ξ)⟩_ξ,
 
-and likewise with `2 sin` for the imaginary part. The phase averages are one
-small matrix product per polar node.
+and likewise with `2 sin` for the imaginary part. Writing the cosine and sine
+as exponentials, both averages are combinations of the Fourier coefficients
+`ĥ′(k) = ⟨e^{+i k·ξ} h′(Φ)⟩_ξ` at `k = q_c ± q_{c′}`:
+
+    ⟨e^{i q·ξ} h′ 2cos(q′·ξ)⟩ = ĥ′(q + q′) + ĥ′(q − q′),
+    ⟨e^{i q·ξ} h′ 2sin(q′·ξ)⟩ = −i [ĥ′(q + q′) − ĥ′(q − q′)].
+
+The coefficients at all polar nodes come from a single product of the phase
+grid's averaging table with `h′(Φ)[point, node]` (two real BLAS products).
 """
 function nonlinear_source_jacobian(quadrature::FieldQuadrature, potential::AxionPotential,
                                    background::KerrBackground, mass_coupling, s, profiles::AbstractVector)
     mode_set, grid, phase = quadrature.mode_set, quadrature.angular, quadrature.phase
-    factors = phase.phase_factors
     n_chan = n_channels(mode_set)
     T = promote_type(real(eltype(profiles)), typeof(mass_coupling), eltype(grid.x))
     wrt_real = zeros(Complex{T}, n_chan, n_chan)
     wrt_imag = zeros(Complex{T}, n_chan, n_chan)
 
     slope = nonlinearity_derivative.(Ref(potential), reconstruct_field(quadrature, profiles))  # h′(Φ)[point, node]
-    cosine_factors, sine_factors = phase.cosine_factors, phase.sine_factors
+    fourier_coefficients = complex.(phase.jacobian_cosines * slope, phase.jacobian_sines * slope)  # ĥ′(k)[slot, node]
     polar_weights = grid.weights .* rho2.(Ref(background), s, grid.x) .* mass_coupling^2
     owner = mode_set.channel_component
-    n_comp = n_components(mode_set)
-    average_real = zeros(Complex{T}, n_comp, n_comp)   # ⟨e^{+i q·ξ} h′ 2cos(q′·ξ)⟩ at one polar node, [q, q′]
-    average_imag = zeros(Complex{T}, n_comp, n_comp)
-    for node in eachindex(polar_weights)
-        for source_component in 1:n_comp, target_component in 1:n_comp
-            accumulated_real = zero(Complex{T})
-            accumulated_imag = zero(Complex{T})
-            @inbounds for point in axes(factors, 1)
-                weighted = conj(factors[point, target_component]) * slope[point, node]
-                accumulated_real += weighted * cosine_factors[point, source_component]
-                accumulated_imag += weighted * sine_factors[point, source_component]
-            end
-            average_real[target_component, source_component] = accumulated_real / n_points(phase)
-            average_imag[target_component, source_component] = accumulated_imag / n_points(phase)
-        end
-        for source in 1:n_chan, target in 1:n_chan
-            prefactor = polar_weights[node] * grid.harmonics[node, target] * grid.harmonics[node, source]
-            wrt_real[target, source] += prefactor * average_real[owner[target], owner[source]]
-            wrt_imag[target, source] += prefactor * average_imag[owner[target], owner[source]]
-        end
+    for node in eachindex(polar_weights), source in 1:n_chan, target in 1:n_chan
+        target_component, source_component = owner[target], owner[source]
+        plus = fourier_coefficients[phase.sum_slot[target_component, source_component], node]
+        minus = fourier_coefficients[phase.difference_slot[target_component, source_component], node]
+        phase.sum_conjugated[target_component, source_component] && (plus = conj(plus))
+        phase.difference_conjugated[target_component, source_component] && (minus = conj(minus))
+        prefactor = polar_weights[node] * grid.harmonics[node, target] * grid.harmonics[node, source]
+        wrt_real[target, source] += prefactor * (plus + minus)
+        wrt_imag[target, source] += prefactor * (-im) * (plus - minus)
     end
     return NonlinearSourceJacobian(wrt_real, wrt_imag)
 end

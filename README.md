@@ -2,7 +2,7 @@
 
 Multiphase adiabatic evolution of a superradiant axion cloud around a Kerr
 black hole, with self-interactions treated non-perturbatively. This is the
-Julia implementation of the method described in `../outline.tex`.
+Julia implementation of the method described in `docs/multiphase.tex`.
 
 ## Layout
 

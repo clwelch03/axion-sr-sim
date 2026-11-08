@@ -2,7 +2,9 @@
 
 ## Day 3 (2026-11-07, evening session)
 
-The outer-boundary work ran in parallel on a separate branch and is merged below. **The day-2 decision
+This rewrite now lives on the `rewrite/axioncloud` branch of axion-sr-sim (the previous implementation is on
+`main`); `docs/multiphase.tex` is the outline. The outer-boundary work ran in parallel on a separate branch and
+is merged below. **The day-2 decision
 "outer-boundary treatment for propagating components" is settled: integrated outer data (default).**
 
 ### Done and verified (main)

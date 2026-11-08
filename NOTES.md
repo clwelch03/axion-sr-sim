@@ -19,6 +19,11 @@ Repository initialised at the project root (`main`); the outer-boundary work run
   Three linear e-folds: 141 → 103 (first step only) → **31** evaluations, identical accuracy. The 5.5e-5
   remaining error in all three runs is not integration error but the energy-flux bias below.
   `amplitude_trajectory(result)` reads amplitudes back in either convention (scripts updated).
+  **Long nonlinear run repeated** (`validation/evolution_rerun.jl`, a = 0.9, t ≤ 1.5e9, energy balance as before):
+  547 rhs evaluations in 1025 s versus 711 in 3689 s (3.6× faster wall clock with the new Jacobian); the
+  trajectory agrees with the stored one to 1.5e-5 (211) and 1.1e-4 (322) at worst, during the explosive |322⟩
+  growth, and to 1e-8 in the saturated state. The step saving is modest in the nonlinear phase, where the
+  rates genuinely change.
 - **Nonlinear boundary terms** (`validation/nonlinear_boundary_terms.jl`): local ratio |N|/|B R| per channel.
   Horizon endpoints: ≤ 4e-7 (a = 0.99 joint E = 650 point), ≤ 4e-9 (a = 0.9 peak and saturated states).
   Outer endpoint (r* = 200 resp. 180): fundamentals 3e-5–6e-4 (211) and 3e-4–4e-3 (322); second-order

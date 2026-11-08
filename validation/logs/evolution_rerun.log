@@ -1,0 +1,23 @@
+┌ Warning: solve_radial: |F| = 4.8633180815826904e-12 is below tol but the Newton step is 4.171925629392262e-9; the system is ill-conditioned (is the outer boundary too far out for the amplitude normalization?)
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:500
+┌ Warning: solve_radial did not converge: |F| = 4.8633180815826904e-12 after 6 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:509
+rerun: 547 rhs evaluations in 1025 s (stored run: 711 in 3689 s)
+     t        A211 stored     A211 rerun    rel.diff     A322 stored     A322 rerun    rel.diff
+ 0.000e+00  1.000000e-06  1.000000e-06  +4.4e-16  1.000000e-07  1.000000e-07  -5.6e-16
+ 1.000e+08  4.383308e-06  4.383308e-06  +2.2e-08  1.000144e-07  1.000144e-07  -1.0e-09
+ 2.000e+08  1.921282e-05  1.921282e-05  +6.5e-08  1.000287e-07  1.000287e-07  +3.2e-09
+ 3.000e+08  8.421338e-05  8.421337e-05  -5.0e-08  1.000418e-07  1.000418e-07  -5.1e-08
+ 4.000e+08  3.691470e-04  3.691497e-04  +7.4e-06  1.000303e-07  1.000303e-07  +1.2e-07
+ 5.000e+08  1.620176e-03  1.620189e-03  +7.9e-06  9.957899e-08  9.957923e-08  +2.5e-06
+ 6.000e+08  7.287102e-03  7.287159e-03  +7.9e-06  1.029475e-07  1.029482e-07  +6.4e-06
+ 7.000e+08  5.842463e-03  5.842448e-03  -2.6e-06  3.871727e-05  3.871725e-05  -6.1e-07
+ 8.000e+08  5.361287e-03  5.361288e-03  +1.1e-07  3.656745e-05  3.656744e-05  -4.0e-07
+ 9.000e+08  5.431352e-03  5.431353e-03  +1.1e-07  3.540296e-05  3.540295e-05  -2.0e-07
+ 1.000e+09  5.475460e-03  5.475460e-03  +7.8e-08  3.484996e-05  3.484996e-05  -9.6e-08
+ 1.100e+09  5.497824e-03  5.497824e-03  +3.0e-08  3.459413e-05  3.459412e-05  -4.3e-08
+ 1.200e+09  5.508460e-03  5.508460e-03  +2.8e-08  3.447744e-05  3.447744e-05  -2.2e-08
+ 1.300e+09  5.513370e-03  5.513370e-03  +4.2e-09  3.442460e-05  3.442460e-05  -9.1e-09
+ 1.400e+09  5.515605e-03  5.515605e-03  +1.3e-08  3.440077e-05  3.440077e-05  -2.8e-09
+ 1.500e+09  5.516616e-03  5.516616e-03  -1.7e-08  3.439003e-05  3.439003e-05  +6.8e-10
+largest relative difference over all saved times: A211 1.5e-05, A322 1.1e-04

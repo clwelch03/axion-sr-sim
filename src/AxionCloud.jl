@@ -38,8 +38,11 @@ export FieldQuadrature, nonlinear_source, reconstruct_field
 export HorizonSeries, OuterSeries, endpoint_values, outer_wavenumber
 export RadialMesh, DomainEstimate, domain_estimate, RadialProblem, solve_radial, RadialSolution, profiles, slopes, mode_frequencies, growth_rates
 export Charges, cloud_charges, component_charges, outward_flux, boundary_losses, charge_jacobian
+export phase_actions, action_flux, action_losses, action_jacobian, amplitude_response
 export with_background, amplitude_rates, evolve_fixed_background, evolve_with_spindown
-export BackgroundState, balance_terms, background_charge_derivatives, metric_work, EvolutionResult, EvolutionDiagnostics
+export BackgroundState, BackgroundDerivatives, balance_terms, background_charge_derivatives, metric_work, boyer_lindquist_metric_work,
+       EvolutionCache, EvolutionResult, EvolutionDiagnostics,
+       AmplitudeTrajectory, amplitude_trajectory
 export amplitudes_for_energy, fundamental_energies, with_potential
 
 end

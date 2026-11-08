@@ -2,7 +2,7 @@
 │ It is recommended to `Pkg.resolve()` or consider `Pkg.update()` if necessary.
 └ @ Pkg.API /global/common/software/nersc9/julia/1.11.7/share/julia/stdlib/v1.11/Pkg/src/API.jl:1206
      Testing AxionCloud
-      Status `/tmp/jl_mAPgfM/Project.toml`
+      Status `/tmp/jl_9mUZB9/Project.toml`
   [6f1c2b3a] AxionCloud v0.1.0 `/global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud`
   [442a2c76] FastGaussQuadrature v1.3.0
   [f6369f11] ForwardDiff v1.4.7
@@ -10,7 +10,7 @@
   [37e2e46d] LinearAlgebra v1.11.0
   [2f01184e] SparseArrays v1.11.0
   [8dfed614] Test v1.11.0
-      Status `/tmp/jl_mAPgfM/Manifest.toml`
+      Status `/tmp/jl_9mUZB9/Manifest.toml`
   [47edcb42] ADTypes v1.24.0
   [7d9f7c33] Accessors v0.1.46
   [79e6a3ab] Adapt v4.8.0
@@ -115,11 +115,15 @@
   [8e850b90] libblastrampoline_jll v5.11.0+0
         Info Packages marked with ⌅ have new versions available but compatibility constraints restrict them from upgrading.
 Precompiling project for configuration --code-coverage=none --color=auto --check-bounds=yes --warn-overwrite=yes --depwarn=yes --inline=yes --startup-file=no --track-allocation=none...
-   3138.5 ms  ✓ AxionCloud
-  1 dependency successfully precompiled in 4 seconds. 139 already precompiled.
+   3544.4 ms  ✓ AxionCloud
+  1 dependency successfully precompiled in 5 seconds. 139 already precompiled.
      Testing Running tests...
 ┌ Warning: domain_estimate: a propagating component needs r > 496 for its outer series to be asymptotic, beyond the usable radius set by the amplitude normalization or max_radius; its rates will depend on the endpoint
 └ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/radial.jl:139
 Test Summary: | Pass  Total     Time
-AxionCloud    |   84     84  1m47.4s
+AxionCloud    |   95     95  3m12.1s
      Testing AxionCloud tests passed 
+
+real	3m28.945s
+user	7m15.654s
+sys	0m8.892s

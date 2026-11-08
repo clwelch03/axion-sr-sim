@@ -8,8 +8,10 @@ problem = RadialProblem(background, CosinePotential(), 0.3, mode_set)
 amplitudes = [1e-6, 1e-7]
 t = @elapsed result = evolve_with_spindown(problem, amplitudes, (0.0, 2e7), 1e-2; saveat=1e7, verbose=true)
 println("spindown run: $(length(result.diagnostics)) rhs evals in $(round(t, digits=1))s")
-for (time, state) in zip(result.ode_solution.t, result.ode_solution.u)
-    @printf("t = %.3e  A = (%.6e, %.6e)  b = %.15f  j = %.15f\n", time, state[1], state[2], state[3], state[4])
+trajectory = amplitude_trajectory(result)
+for index in eachindex(trajectory.times)
+    @printf("t = %.3e  A = (%.6e, %.6e)  b = %.15f  j = %.15f\n", trajectory.times[index], trajectory.amplitudes[index, 1],
+            trajectory.amplitudes[index, 2], trajectory.black_hole_mass[index], trajectory.black_hole_angular_momentum[index])
 end
 growth = imag(result.diagnostics[1].mode_frequencies[1])
 @printf("fixed-background prediction at t = 2e7: A1 = %.6e\n", amplitudes[1] * exp(growth * 2e7))

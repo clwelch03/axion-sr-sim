@@ -16,8 +16,9 @@ open(joinpath(@__DIR__, "..", "results", "fixed_background_a0.9_alpha0.3_diagnos
 end
 open(joinpath(@__DIR__, "..", "results", "fixed_background_a0.9_alpha0.3_solution.csv"), "w") do io
     println(io, "time,A1,A2")
-    for (time, amps) in zip(result.ode_solution.t, result.ode_solution.u)
-        @printf(io, "%.8e,%.8e,%.8e\n", time, amps[1], amps[2])
+    trajectory = amplitude_trajectory(result)
+    for (index, time) in enumerate(trajectory.times)
+        @printf(io, "%.8e,%.8e,%.8e\n", time, trajectory.amplitudes[index, 1], trajectory.amplitudes[index, 2])
     end
 end
 flush(stdout)

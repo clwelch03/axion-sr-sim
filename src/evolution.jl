@@ -12,6 +12,20 @@ provided:
   fluxes, and the balance includes the background derivatives of the charges
   and the rate of metric work on the cloud.
 
+Two equivalent balances are available (`balance` keyword):
+
+* `:energy` (default, the outline's formulation): energy and angular momentum,
+  `[∂_A E; ∂_A J] A' = −L + (w, 0) − (∂_b Q b' + ∂_j Q j')`. Two conservation laws,
+  so exactly two bound modes.
+* `:action`: one wave-action balance per independent phase,
+  `[∂_A N] A' = −L_N − (∂_b N b' + ∂_j N j')`, valid for any number of modes. The
+  actions are adiabatic invariants, so no metric-work term appears, and their
+  fluxes contain no time derivative. Energy and angular momentum follow from
+  `J = Σ m_i N_i` and `dE = Σ ω_i dN_i + w`. On a fixed background the two
+  balances agree up to the `Im ω̃ Re(R*Q)` term that `outward_flux` omits from
+  the energy flux at a boundary where the cloud is not contained
+  (`validation/action_balance.jl`).
+
 Reference units are the *initial* black-hole mass `M₀` (and `f_a`): with
 `b = M/M₀`, `j = J_BH/M₀²`, `τ = t/M₀`, a radial solution in units of the
 current mass carries `E_ref = b E`, `J_ref = b² J`, energy losses per unit `τ`
@@ -24,6 +38,15 @@ units of `M₀` (with `G = 1`), so the horizon fluxes change the hole's mass and
 spin only after multiplication by `(f_a / M_Pl)²`, where `M_Pl = G^{-1/2}` is the
 (non-reduced) Planck mass. This `decay_constant_ratio = f_a / M_Pl` is a
 required input of the spindown driver.
+
+Both drivers integrate the *logarithms* of the amplitudes by default
+(`log_amplitudes=true`): in the linear regime `d ln A/dt = Im ω` is constant, so
+the step size is limited by how fast the rates change rather than by the
+exponential growth itself, and the error tolerances become relative accuracies
+of the amplitudes. The first step is set from the initial e-folding times
+(`initial_step_fraction`) rather than by the integrator's heuristic, which the
+`1e-13`-level noise of the Newton solve otherwise drives down to `dt ≈ 1`.
+Use `amplitude_trajectory` to read the amplitudes back from a result.
 """
 
 """
@@ -47,13 +70,48 @@ end
 """
     EvolutionResult
 
-Output of a driver: the `OrdinaryDiffEq` solution object (state `[A₁, A₂]` or
-`[A₁, A₂, b, j]`), the diagnostics log, and the final radial solution.
+Output of a driver: the `OrdinaryDiffEq` solution object (state `[A₁, …, A_K]` or
+`[A₁, …, A_K, b, j]`, with `ln A` in place of `A` when `log_amplitudes` is true),
+the diagnostics log, and the final radial solution. Read the amplitudes with
+`amplitude_trajectory` rather than from `ode_solution.u` directly.
 """
 struct EvolutionResult{S, T<:Real, R<:RadialSolution}
     ode_solution::S
     diagnostics::Vector{EvolutionDiagnostics{T}}
     final_radial_solution::R
+    log_amplitudes::Bool
+end
+
+"""
+    AmplitudeTrajectory
+
+Amplitudes at the integrator's output times, whatever the state convention:
+`times`, `amplitudes[time_index, mode]`, and the black-hole mass `b` and
+angular momentum `j` (constant `1` and `a` on a fixed background).
+"""
+struct AmplitudeTrajectory{T<:Real}
+    times::Vector{T}
+    amplitudes::Matrix{T}
+    black_hole_mass::Vector{T}
+    black_hole_angular_momentum::Vector{T}
+end
+
+"""
+    amplitude_trajectory(result)
+
+Amplitudes (and background state) at the saved times of an evolution, undoing
+the logarithmic state if it was used.
+"""
+function amplitude_trajectory(result::EvolutionResult)
+    states = result.ode_solution.u
+    mode_count = n_modes(result.final_radial_solution.problem)
+    transform = result.log_amplitudes ? exp : identity
+    amplitudes = permutedims(reduce(hcat, [transform.(state[1:mode_count]) for state in states]))
+    with_background = length(first(states)) == mode_count + 2
+    spin = result.final_radial_solution.problem.background.a
+    mass = with_background ? [state[mode_count + 1] for state in states] : ones(length(states))
+    angular_momentum = with_background ? [state[mode_count + 2] for state in states] : fill(spin, length(states))
+    AmplitudeTrajectory(collect(result.ode_solution.t), amplitudes, mass, angular_momentum)
 end
 
 """Mutable scratch shared by the right-hand-side evaluations of one evolution."""
@@ -66,6 +124,22 @@ mutable struct EvolutionCache{P<:RadialProblem, T<:Real}
     diagnostics::Vector{EvolutionDiagnostics{T}}
     newton_tol::T
     verbose::Bool
+    log_amplitudes::Bool
+    balance::Symbol       # :energy or :action
+end
+
+"""
+    EvolutionCache(problem; decay_constant_ratio=0.0, include_metric_work=false, newton_tol=1e-10,
+                   verbose=false, log_amplitudes=true, balance=:energy, last_solution=nothing)
+
+Fresh cache for an evolution of `problem` (also handy for calling
+`balance_terms` directly).
+"""
+function EvolutionCache(problem::RadialProblem; decay_constant_ratio=0.0, include_metric_work=false, newton_tol=1e-10,
+                        verbose=false, log_amplitudes=true, balance=:energy, last_solution=nothing)
+    _check_balance(problem, balance)
+    EvolutionCache(problem, problem.mass_coupling, float(decay_constant_ratio)^2, include_metric_work, last_solution,
+                   EvolutionDiagnostics{Float64}[], float(newton_tol), verbose, log_amplitudes, balance)
 end
 
 """Print one progress line per right-hand-side evaluation when the cache is verbose."""
@@ -76,8 +150,37 @@ function _report_step(cache::EvolutionCache, time, amplitudes, solution::RadialS
     return nothing
 end
 
-function _check_two_modes(problem::RadialProblem)
-    n_modes(problem) == 2 || throw(ArgumentError("amplitude evolution needs exactly two bound modes (energy and angular momentum give two equations); got $(n_modes(problem))"))
+"""Reject unknown balances, and the energy balance for anything but two bound modes."""
+function _check_balance(problem::RadialProblem, balance::Symbol)
+    balance in (:energy, :action) || throw(ArgumentError("balance must be :energy or :action; got :$balance"))
+    balance == :energy && n_modes(problem) != 2 &&
+        throw(ArgumentError("the energy balance needs exactly two bound modes (energy and angular momentum give two " *
+                            "equations); got $(n_modes(problem)). Use balance=:action for any number of modes"))
+    return nothing
+end
+
+"""Amplitudes from the integrator state's first `n_modes` entries (`ln A` or `A`)."""
+_state_amplitudes(state, n_modes::Int, log_amplitudes::Bool) =
+    log_amplitudes ? exp.(state[1:n_modes]) : state[1:n_modes]
+
+"""Integrator-state rates of the amplitude entries from the amplitude rates."""
+_state_rates(amplitude_rates, amplitudes, log_amplitudes::Bool) = log_amplitudes ? amplitude_rates ./ amplitudes : amplitude_rates
+
+"""
+Initial step `initial_step_fraction / max_i |A_i'/A_i|` from the rates at the
+start, or `nothing` (the integrator's own heuristic) if every rate vanishes or
+`initial_step_fraction` is `nothing`.
+"""
+function _initial_step(amplitudes, amplitude_rates, initial_step_fraction)
+    initial_step_fraction === nothing && return nothing
+    fastest = maximum(abs.(amplitude_rates ./ amplitudes))
+    return fastest > 0 ? initial_step_fraction / fastest : nothing
+end
+
+"""Solver keywords with `dt` from `_initial_step` unless the caller supplied one."""
+function _with_initial_step(kwargs, step)
+    (haskey(kwargs, :dt) || step === nothing) && return kwargs
+    return merge(NamedTuple(kwargs), (dt=step,))
 end
 
 """Radial solve warm-started from the cache's previous solution."""
@@ -90,18 +193,21 @@ end
 # --- fixed background -----------------------------------------------------------
 
 """
-    amplitude_rates(solution)
+    amplitude_rates(solution; balance=:energy)
 
-`dA/dt` on a fixed background from `[∂_A E; ∂_A J] A' = −[L_E; L_J]`.
+`dA/dt` on a fixed background, from `[∂_A E; ∂_A J] A' = −[L_E; L_J]`
+(`balance=:energy`, two modes) or `[∂_A N] A' = −L_N` (`balance=:action`).
 """
-function amplitude_rates(solution::RadialSolution)
-    _check_two_modes(solution.problem)
+function amplitude_rates(solution::RadialSolution; balance::Symbol=:energy)
+    _check_balance(solution.problem, balance)
+    balance == :action && return -(action_jacobian(solution) \ action_losses(solution))
     return -(charge_jacobian(solution) \ collect(boundary_losses(solution)))
 end
 
-function _fixed_background_rhs!(rates, amplitudes, cache::EvolutionCache, time)
+function _fixed_background_rhs!(rates, state, cache::EvolutionCache, time)
+    amplitudes = _state_amplitudes(state, n_modes(cache.template), cache.log_amplitudes)
     solution = _solve_cached!(cache, cache.template, amplitudes)
-    rates .= amplitude_rates(solution)
+    rates .= _state_rates(amplitude_rates(solution; cache.balance), amplitudes, cache.log_amplitudes)
     push!(cache.diagnostics, EvolutionDiagnostics(time, copy(amplitudes), mode_frequencies(solution),
                                                   cloud_charges(solution), boundary_losses(solution),
                                                   1.0, cache.template.background.a, 0.0))
@@ -110,19 +216,31 @@ function _fixed_background_rhs!(rates, amplitudes, cache::EvolutionCache, time)
 end
 
 """
-    evolve_fixed_background(problem, amplitudes, time_span; newton_tol=1e-10, verbose=false, kwargs...)
+    evolve_fixed_background(problem, amplitudes, time_span; balance=:energy, log_amplitudes=true,
+                            initial_step_fraction=0.05, newton_tol=1e-10, verbose=false, reltol, abstol, kwargs...)
 
-Integrate the two amplitudes with Tsit5 on a frozen Kerr background.
-`verbose` prints one line per right-hand-side evaluation. Keyword arguments
-other than these are passed to `solve` (e.g. `reltol`, `abstol`, `saveat`, `dtmax`).
+Integrate the amplitudes with Tsit5 on a frozen Kerr background, with the
+energy (two modes) or action (any number of modes) balance.
+With `log_amplitudes` (default) the state is `ln A` and the default tolerances
+`reltol = abstol = 1e-7` bound the per-step relative error of the amplitudes
+by about `1e-7 (1 + |ln A|)`; otherwise the state is `A` with the old defaults
+`reltol = 1e-6`, `abstol = 1e-12`. The first step is `initial_step_fraction`
+times the shortest initial e-folding time unless `dt` is passed
+(`initial_step_fraction=nothing` leaves it to Tsit5's heuristic).
+`verbose` prints one line per right-hand-side evaluation. Other keyword
+arguments are passed to `solve` (e.g. `saveat`, `dtmax`).
 """
-function evolve_fixed_background(problem::RadialProblem, amplitudes::AbstractVector, time_span;
-                                 newton_tol=1e-10, verbose=false, reltol=1e-6, abstol=1e-12, kwargs...)
-    _check_two_modes(problem)
-    cache = EvolutionCache(problem, problem.mass_coupling, 0.0, false, nothing, EvolutionDiagnostics{Float64}[], float(newton_tol), verbose)
-    ode = ODEProblem(_fixed_background_rhs!, collect(float.(amplitudes)), time_span, cache)
-    ode_solution = solve(ode, Tsit5(); reltol, abstol, kwargs...)
-    EvolutionResult(ode_solution, cache.diagnostics, cache.last_solution)
+function evolve_fixed_background(problem::RadialProblem, amplitudes::AbstractVector, time_span; balance::Symbol=:energy,
+                                 log_amplitudes=true, initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
+                                 reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
+    cache = EvolutionCache(problem; newton_tol, verbose, log_amplitudes, balance)
+    initial_amplitudes = collect(float.(amplitudes))
+    initial_rates = amplitude_rates(_solve_cached!(cache, problem, initial_amplitudes); balance)
+    solver_options = _with_initial_step(kwargs, _initial_step(initial_amplitudes, initial_rates, initial_step_fraction))
+    initial_state = log_amplitudes ? log.(initial_amplitudes) : initial_amplitudes
+    ode = ODEProblem(_fixed_background_rhs!, initial_state, time_span, cache)
+    ode_solution = solve(ode, Tsit5(); reltol, abstol, solver_options...)
+    EvolutionResult(ode_solution, cache.diagnostics, cache.last_solution, log_amplitudes)
 end
 
 # --- evolving background --------------------------------------------------------
@@ -151,6 +269,29 @@ reference_charges(charges::Charges, state::BackgroundState) =
 """Losses per unit `τ` in reference units from current-unit fluxes."""
 reference_losses(losses::Charges, state::BackgroundState) =
     Charges(losses.energy, state.mass * losses.angular_momentum)
+
+"""Wave actions in reference units: `N_ref = b² N` (like `J`)."""
+reference_actions(actions::AbstractVector, state::BackgroundState) = state.mass^2 .* actions
+
+"""Real mode frequencies in reference units, `ω_ref = ω / b`."""
+reference_frequencies(frequencies::AbstractVector, state::BackgroundState) = real.(frequencies) ./ state.mass
+
+"""Real mode frequencies decoded from the unknown vector (current units)."""
+real_mode_frequencies(layout::UnknownLayout, unknowns::AbstractVector) =
+    real.(_complexify(unknowns[parameter_range(layout)][frequency_range(layout)]))
+
+"""
+Everything the balances differentiate, stacked as one vector in reference
+units: `[E, J, N₁ … N_K, ω₁ … ω_K]`. One dual pass of this function gives all
+background derivatives at once.
+"""
+function reference_observables(problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector, scale,
+                               state::BackgroundState)
+    charges = reference_charges(cloud_charges(problem, layout, unknowns, scale), state)
+    vcat(charges.energy, charges.angular_momentum,
+         reference_actions(phase_actions(problem, layout, unknowns, scale), state),
+         reference_frequencies(real_mode_frequencies(layout, unknowns), state))
+end
 
 """Outer horizon radius `M + √(M² − a²)` of a hole with the given mass and angular momentum."""
 outer_horizon_radius(mass, angular_momentum) = mass + sqrt(mass^2 - (angular_momentum / mass)^2)
@@ -181,17 +322,20 @@ function inverse_metric_components(mass, angular_momentum, horizon_offset, x)
 end
 
 """
-    metric_work(solution, state, state_rate)
+    boyer_lindquist_metric_work(solution, state, state_rate)
 
-Rate of work done on the cloud by the time-dependent metric, in reference
-units per unit `τ`,
+Superseded by the action-based `metric_work`; kept for comparison. Rate of
+work done on the cloud by the time-dependent metric, in reference units per
+unit `τ`,
 
     w = ½ ∫ [ (∂_τ g^{αβ}) ∂_αΦ ∂_βΦ + (½ g^{αβ}∂_αΦ∂_βΦ + V) ∂_τ ln(−g) ] √−g d³x,
 
 with `∂_τ` taken at fixed Boyer–Lindquist coordinates in reference units along
-the direction `(b', j')` given by `state_rate`.
+the direction `(b', j')` given by `state_rate`. This chart is singular at a
+moving horizon: the integrand grows like `1/(r − r₊)`, so the result depends on
+the inner endpoint (`validation/metric_work_endpoint.jl`).
 """
-function metric_work(solution::RadialSolution, state::BackgroundState, state_rate::BackgroundState)
+function boyer_lindquist_metric_work(solution::RadialSolution, state::BackgroundState, state_rate::BackgroundState)
     problem, layout, scale = solution.problem, solution.layout, solution.scale
     mesh, grid = problem.mesh, problem.quadrature.angular
     mass = state.mass
@@ -236,20 +380,45 @@ function metric_work(solution::RadialSolution, state::BackgroundState, state_rat
 end
 
 """
-    background_charge_derivatives(cache, solution, state; relative_step=1e-5)
+    BackgroundDerivatives
 
-Total derivatives `d Q_ref / d b` and `d Q_ref / d j` of the reference-unit
-charges at fixed amplitudes and fixed tortoise mesh (in units of the current
-mass), returned as a pair of `Charges`. By the implicit-function theorem,
+Total derivatives, at fixed amplitudes and fixed tortoise mesh in units of the
+current mass, of the reference-unit charges, wave actions and real mode
+frequencies with respect to the black-hole mass `b` and angular momentum `j`.
+"""
+struct BackgroundDerivatives{T<:Real}
+    charges_wrt_mass::Charges{T}
+    charges_wrt_angular_momentum::Charges{T}
+    actions_wrt_mass::Vector{T}
+    actions_wrt_angular_momentum::Vector{T}
+    frequencies_wrt_mass::Vector{T}
+    frequencies_wrt_angular_momentum::Vector{T}
+end
 
-    dQ/db = ∂Q/∂b|_u + (∂Q/∂u) du/db,    du/db = −J⁻¹ ∂F/∂b|_u,
+"""Split a stacked derivative of `reference_observables` along `b` and along `j`."""
+function BackgroundDerivatives(wrt_mass::AbstractVector, wrt_angular_momentum::AbstractVector, mode_count::Int)
+    actions = 3:2 + mode_count
+    frequencies = 3 + mode_count:2 + 2mode_count
+    BackgroundDerivatives(Charges(wrt_mass[1], wrt_mass[2]), Charges(wrt_angular_momentum[1], wrt_angular_momentum[2]),
+                          wrt_mass[actions], wrt_angular_momentum[actions],
+                          wrt_mass[frequencies], wrt_angular_momentum[frequencies])
+end
+
+"""
+    background_charge_derivatives(cache, solution, state; relative_step=1e-6)
+
+`BackgroundDerivatives` at fixed amplitudes and fixed tortoise mesh (in units
+of the current mass). By the implicit-function theorem, for every observable `O`
+of `reference_observables`,
+
+    dO/db = ∂O/∂b|_u + (∂O/∂u) du/db,    du/db = −J⁻¹ ∂F/∂b|_u,
 
 where `∂F/∂b|_u` is exact (ForwardDiff through the background, mass coupling
 and mesh offsets: the outer-boundary rows vary as `e^{−κr}` with
-`d(κr)/dα ≈ 10³`, far too steeply for finite differences), `∂Q/∂b|_u` is a
-central difference of the charges over the background (benign), `J` is the
-factorised Jacobian of the converged solution, and the last term is one dual
-pass of the charges along `du/db`, exactly as in `charge_jacobian`.
+`d(κr)/dα ≈ 10³`, far too steeply for finite differences), `∂O/∂b|_u` is a
+central difference over the background (benign), `J` is the factorised
+Jacobian of the converged solution, and the last term is one dual pass along
+`du/db`, exactly as in `charge_jacobian`.
 """
 function background_charge_derivatives(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState;
                                        relative_step=1e-6)
@@ -258,41 +427,61 @@ function background_charge_derivatives(cache::EvolutionCache, solution::RadialSo
     function derivative_along(direction::BackgroundState, step)
         plus = BackgroundState(state.mass + step * direction.mass, state.angular_momentum + step * direction.angular_momentum)
         minus = BackgroundState(state.mass - step * direction.mass, state.angular_momentum - step * direction.angular_momentum)
-        problem_plus, problem_minus = current_problem(cache, plus), current_problem(cache, minus)
         residual_partial = ForwardDiff.derivative(0.0) do epsilon
             perturbed = BackgroundState(state.mass + epsilon * direction.mass,
                                         state.angular_momentum + epsilon * direction.angular_momentum)
             residual(current_problem(cache, perturbed), layout, unknowns, amplitudes, scale)
         end
-        charges_partial = (collect(reference_charges(cloud_charges(problem_plus, layout, unknowns, scale), plus)) .-
-                           collect(reference_charges(cloud_charges(problem_minus, layout, unknowns, scale), minus))) ./ (2step)
+        explicit_partial = (reference_observables(current_problem(cache, plus), layout, unknowns, scale, plus) .-
+                            reference_observables(current_problem(cache, minus), layout, unknowns, scale, minus)) ./ (2step)
         unknown_direction = -(solution.jacobian_factorization \ residual_partial)
-        charges_via_unknowns = ForwardDiff.derivative(0.0) do epsilon
-            collect(reference_charges(cloud_charges(problem, layout, unknowns .+ epsilon .* unknown_direction, scale), state))
+        via_unknowns = ForwardDiff.derivative(0.0) do epsilon
+            reference_observables(problem, layout, unknowns .+ epsilon .* unknown_direction, scale, state)
         end
-        total = charges_partial .+ charges_via_unknowns
-        return Charges(total[1], total[2])
+        return explicit_partial .+ via_unknowns
     end
     mass_step = relative_step * state.mass
     spin_step = relative_step * max(abs(state.angular_momentum), state.mass^2)
-    wrt_mass = derivative_along(BackgroundState(1.0, 0.0), mass_step)
-    wrt_spin = derivative_along(BackgroundState(0.0, 1.0), spin_step)
-    return wrt_mass, wrt_spin
+    BackgroundDerivatives(derivative_along(BackgroundState(1.0, 0.0), mass_step),
+                          derivative_along(BackgroundState(0.0, 1.0), spin_step), n_modes(problem))
+end
+
+"""
+    metric_work(derivatives, mode_frequencies, state_rate)
+
+Rate of work done on the cloud by the changing black hole, in reference units
+per unit `τ`, from the adiabatic invariance of the wave actions:
+
+    w = (∂_b E − Σ_i ω_i ∂_b N_i) b' + (∂_j E − Σ_i ω_i ∂_j N_i) j' = (∂_b E)|_N b' + (∂_j E)|_N j',
+
+with all derivatives at fixed amplitudes (`background_charge_derivatives`) and
+`ω_i` the real reference-unit mode frequencies. The angular-momentum
+counterpart vanishes identically because `J = Σ m_i N_i`. In the linear regime
+(`E_i = ω_i N_i`) this reduces to `w = Σ_i N_i dω_i/dτ`. Unlike the
+Boyer–Lindquist expression (`boyer_lindquist_metric_work`), no metric
+derivative near the moving horizon is needed: the near-horizon densities of `E`
+and `Σ ω_i N_i` coincide.
+"""
+function metric_work(derivatives::BackgroundDerivatives, mode_frequencies::AbstractVector, state_rate::BackgroundState)
+    work_wrt_mass = derivatives.charges_wrt_mass.energy - sum(mode_frequencies .* derivatives.actions_wrt_mass)
+    work_wrt_spin = derivatives.charges_wrt_angular_momentum.energy - sum(mode_frequencies .* derivatives.actions_wrt_angular_momentum)
+    return work_wrt_mass * state_rate.mass + work_wrt_spin * state_rate.angular_momentum
 end
 
 """
     BalanceTerms
 
-Everything entering the evolving-background balance at one instant, in
-reference units: amplitude derivatives of the charges, background derivatives
-`∂_b`, `∂_j` of the charges at fixed amplitudes, losses, metric work, and the
-background rates driven by the horizon fluxes.
+Everything entering the evolving-background balances at one instant, in
+reference units: amplitude derivatives of the charges and of the wave actions,
+background derivatives at fixed amplitudes, charge and action losses, the
+action-based metric work, and the background rates driven by the horizon fluxes.
 """
 struct BalanceTerms{T<:Real}
     charge_jacobian::Matrix{T}
-    charges_wrt_mass::Charges{T}
-    charges_wrt_angular_momentum::Charges{T}
+    action_jacobian::Matrix{T}
+    derivatives::BackgroundDerivatives{T}
     losses::Charges{T}
+    action_losses::Vector{T}
     metric_work::T
     state_rate::BackgroundState{T}
 end
@@ -301,62 +490,78 @@ end
     balance_terms(cache, solution, state; resolve_background=false, relative_step=1e-4)
 
 Assemble the balance terms. The background rates are the horizon fluxes times
-`(f_a/M_Pl)²` (see the module docstring). Background derivatives of the charges
-(amplitudes and tortoise mesh in units of the current mass held fixed) come
-from `background_charge_derivatives`; with `resolve_background=true` they are
-instead central finite differences of the charges over four re-solved radial
-problems (the slow reference used for validation). The metric work is included
-only when the cache says so (see `evolve_with_spindown`); otherwise it is zero
-and the balance states that the cloud's energy changes only through its
-boundary fluxes, the leading-order model of the literature.
+`(f_a/M_Pl)²` (see the module docstring). Background derivatives at fixed
+amplitudes and tortoise mesh in units of the current mass come from
+`background_charge_derivatives`; with `resolve_background=true` they are instead
+central finite differences over four re-solved radial problems (the slow
+reference used for validation). The metric work (`metric_work`) is always
+computed and reported, and enters the energy balance only when the cache says so.
 """
 function balance_terms(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState;
                        resolve_background=false, relative_step=1e-4)
-    amplitudes = solution.amplitudes
+    amplitudes, mode_count = solution.amplitudes, n_modes(solution.problem)
     inner_flux = outward_flux(solution, 1)
     state_rate = BackgroundState(-cache.coupling_to_hole * inner_flux.energy,
                                  -cache.coupling_to_hole * state.mass * inner_flux.angular_momentum)
 
-    if resolve_background
-        function charges_at(perturbed::BackgroundState)
+    derivatives = if resolve_background
+        function observables_at(perturbed::BackgroundState)
             perturbed_solution = solve_radial(current_problem(cache, perturbed), amplitudes; guess=solution, tol=cache.newton_tol)
-            reference_charges(cloud_charges(perturbed_solution), perturbed)
+            reference_observables(perturbed_solution.problem, perturbed_solution.layout, perturbed_solution.unknowns,
+                                  perturbed_solution.scale, perturbed)
         end
         mass_step = relative_step * state.mass
         spin_step = relative_step * max(abs(state.angular_momentum), state.mass^2)
-        wrt_mass = (1 / 2mass_step) * (charges_at(BackgroundState(state.mass + mass_step, state.angular_momentum)) -
-                                       charges_at(BackgroundState(state.mass - mass_step, state.angular_momentum)))
-        wrt_spin = (1 / 2spin_step) * (charges_at(BackgroundState(state.mass, state.angular_momentum + spin_step)) -
-                                       charges_at(BackgroundState(state.mass, state.angular_momentum - spin_step)))
+        wrt_mass = (observables_at(BackgroundState(state.mass + mass_step, state.angular_momentum)) .-
+                    observables_at(BackgroundState(state.mass - mass_step, state.angular_momentum))) ./ (2mass_step)
+        wrt_spin = (observables_at(BackgroundState(state.mass, state.angular_momentum + spin_step)) .-
+                    observables_at(BackgroundState(state.mass, state.angular_momentum - spin_step))) ./ (2spin_step)
+        BackgroundDerivatives(wrt_mass, wrt_spin, mode_count)
     else
-        wrt_mass, wrt_spin = background_charge_derivatives(cache, solution, state)
+        background_charge_derivatives(cache, solution, state)
     end
 
-    jacobian = charge_jacobian(solution) .* [state.mass, state.mass^2]
-    work = cache.include_metric_work ? metric_work(solution, state, state_rate) : 0.0
-    BalanceTerms(jacobian, wrt_mass, wrt_spin, reference_losses(boundary_losses(solution), state), work, state_rate)
+    directions = amplitude_response(solution)
+    charge_matrix = charge_jacobian(solution; directions) .* [state.mass, state.mass^2]
+    action_matrix = state.mass^2 .* action_jacobian(solution; directions)
+    frequencies = reference_frequencies(mode_frequencies(solution), state)
+    BalanceTerms(charge_matrix, action_matrix, derivatives, reference_losses(boundary_losses(solution), state),
+                 state.mass .* action_losses(solution), metric_work(derivatives, frequencies, state_rate), state_rate)
 end
 
 """
-    amplitude_rates(terms::BalanceTerms)
+    amplitude_rates(terms::BalanceTerms; balance=:energy, include_metric_work=false)
 
-`A'` from `[∂_A E; ∂_A J] A' = −L + (w, 0) − (∂_b Q b' + ∂_j Q j')`.
+`A'` from the energy balance
+`[∂_A E; ∂_A J] A' = −L + (w, 0) − (∂_b Q b' + ∂_j Q j')` (`w` only with
+`include_metric_work`), or from the action balance
+`[∂_A N] A' = −L_N − (∂_b N b' + ∂_j N j')`, which needs no work term.
 """
-function amplitude_rates(terms::BalanceTerms)
-    background_drift = terms.state_rate.mass * terms.charges_wrt_mass +
-                       terms.state_rate.angular_momentum * terms.charges_wrt_angular_momentum
-    right_hand_side = -collect(terms.losses) .+ [terms.metric_work, 0.0] .- collect(background_drift)
-    return terms.charge_jacobian \ right_hand_side
+function amplitude_rates(terms::BalanceTerms; balance::Symbol=:energy, include_metric_work::Bool=false)
+    derivatives, rate = terms.derivatives, terms.state_rate
+    if balance == :action
+        drift = rate.mass .* derivatives.actions_wrt_mass .+ rate.angular_momentum .* derivatives.actions_wrt_angular_momentum
+        return terms.action_jacobian \ (-terms.action_losses .- drift)
+    end
+    balance == :energy || throw(ArgumentError("balance must be :energy or :action; got :$balance"))
+    drift = rate.mass * derivatives.charges_wrt_mass + rate.angular_momentum * derivatives.charges_wrt_angular_momentum
+    work = include_metric_work ? terms.metric_work : 0.0
+    return terms.charge_jacobian \ (-collect(terms.losses) .+ [work, 0.0] .- collect(drift))
 end
+
+"""`amplitude_rates` with the balance and metric-work choice of an evolution cache."""
+amplitude_rates(terms::BalanceTerms, cache::EvolutionCache) =
+    amplitude_rates(terms; cache.balance, include_metric_work=cache.include_metric_work)
 
 function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
-    amplitudes = state_vector[1:2]
-    state = BackgroundState(state_vector[3], state_vector[4])
+    mode_count = n_modes(cache.template)
+    amplitudes = _state_amplitudes(state_vector, mode_count, cache.log_amplitudes)
+    state = BackgroundState(state_vector[mode_count + 1], state_vector[mode_count + 2])
     solution = _solve_cached!(cache, current_problem(cache, state), amplitudes)
     terms = balance_terms(cache, solution, state)
-    rates[1:2] = amplitude_rates(terms)
-    rates[3] = terms.state_rate.mass
-    rates[4] = terms.state_rate.angular_momentum
+    rates[1:mode_count] = _state_rates(amplitude_rates(terms, cache), amplitudes, cache.log_amplitudes)
+    rates[mode_count + 1] = terms.state_rate.mass
+    rates[mode_count + 2] = terms.state_rate.angular_momentum
     push!(cache.diagnostics, EvolutionDiagnostics(time, copy(amplitudes), mode_frequencies(solution),
                                                   reference_charges(cloud_charges(solution), state), terms.losses,
                                                   state.mass, dimensionless_spin(state), terms.metric_work))
@@ -365,28 +570,36 @@ function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
 end
 
 """
-    evolve_with_spindown(problem, amplitudes, time_span, decay_constant_ratio;
-                         include_metric_work=false, newton_tol=1e-10, verbose=false, kwargs...)
+    evolve_with_spindown(problem, amplitudes, time_span, decay_constant_ratio; balance=:energy,
+                         include_metric_work=false, log_amplitudes=true, initial_step_fraction=0.05,
+                         newton_tol=1e-10, verbose=false, reltol, abstol, kwargs...)
 
-Integrate `[A₁, A₂, b, j]` with Tsit5, starting from `b = 1` and
-`j = a` of `problem.background`. `problem` defines the reference units: its
-`mass_coupling` is `α₀ = M₀ μ` and its mesh is reused in units of the current
-mass at every step. `decay_constant_ratio = f_a / M_Pl` (non-reduced Planck
-mass) sets how strongly the cloud's horizon fluxes change the hole.
+Integrate `[A₁ … A_K, b, j]` (or `[ln A₁ … ln A_K, b, j]`, the default) with
+Tsit5, starting from `b = 1` and `j = a` of `problem.background`. `problem`
+defines the reference units: its `mass_coupling` is `α₀ = M₀ μ` and its mesh is
+reused in units of the current mass at every step. `decay_constant_ratio =
+f_a / M_Pl` (non-reduced Planck mass) sets how strongly the cloud's horizon
+fluxes change the hole. Tolerances, the initial step and `log_amplitudes` are
+as in `evolve_fixed_background`.
 
-`include_metric_work` adds the `metric_work` term to the energy balance. It is
-off by default: in its present Boyer–Lindquist-fixed form the term grows like
-`1/(r − r₊)` towards the horizon and so depends on the inner endpoint (see
-NOTES.md); it is also of relative order `(f_a/M_Pl)² E`, like the background
-drift terms, so the default is the leading-order balance.
+`balance=:action` uses the wave-action balance (any number of modes, no
+metric-work term). With the energy balance, `include_metric_work` adds the
+action-based `metric_work` to the energy equation; it is off by default so that
+existing runs reproduce, and is of relative order `(f_a/M_Pl)² E` like the
+background-drift terms. The work is recorded in the diagnostics either way.
 """
 function evolve_with_spindown(problem::RadialProblem, amplitudes::AbstractVector, time_span, decay_constant_ratio::Real;
-                              include_metric_work=false, newton_tol=1e-10, verbose=false, reltol=1e-6, abstol=1e-12, kwargs...)
-    _check_two_modes(problem)
-    cache = EvolutionCache(problem, problem.mass_coupling, float(decay_constant_ratio)^2, include_metric_work, nothing,
-                           EvolutionDiagnostics{Float64}[], float(newton_tol), verbose)
-    initial = vcat(collect(float.(amplitudes)), [1.0, problem.background.a])
-    ode = ODEProblem(_spindown_rhs!, initial, time_span, cache)
-    ode_solution = solve(ode, Tsit5(); reltol, abstol, kwargs...)
-    EvolutionResult(ode_solution, cache.diagnostics, cache.last_solution)
+                              balance::Symbol=:energy, include_metric_work=false, log_amplitudes=true,
+                              initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
+                              reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
+    cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, newton_tol, verbose, log_amplitudes, balance)
+    initial_amplitudes = collect(float.(amplitudes))
+    initial_background = BackgroundState(1.0, problem.background.a)
+    initial_solution = _solve_cached!(cache, current_problem(cache, initial_background), initial_amplitudes)
+    initial_rates = amplitude_rates(balance_terms(cache, initial_solution, initial_background), cache)
+    solver_options = _with_initial_step(kwargs, _initial_step(initial_amplitudes, initial_rates, initial_step_fraction))
+    initial_state = vcat(log_amplitudes ? log.(initial_amplitudes) : initial_amplitudes, [1.0, problem.background.a])
+    ode = ODEProblem(_spindown_rhs!, initial_state, time_span, cache)
+    ode_solution = solve(ode, Tsit5(); reltol, abstol, solver_options...)
+    EvolutionResult(ode_solution, cache.diagnostics, cache.last_solution, log_amplitudes)
 end

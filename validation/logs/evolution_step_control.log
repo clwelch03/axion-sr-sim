@@ -1,0 +1,14 @@
+Im ω = (1.477761e-08, 1.439601e-12)
+d ln A/dt cold = (1.4778701595e-08, 1.4389922811e-12)
+d ln A/dt warm = (1.4778701595e-08, 1.4389922817e-12)
+noise |cold − warm| = (2.6e-20, 5.6e-22); relative to Im ω₂₁₁: (1.8e-12, 3.8e-14)
+old: state A, Tsit5 heuristic first step              141 rhs evaluations,  274.5 s, max relative error vs A₀e^{γt}: 211 5.5e-05, 322 9.2e-07
+state A, physics-based first step                     103 rhs evaluations,  171.5 s, max relative error vs A₀e^{γt}: 211 5.5e-05, 322 9.2e-07
+new default: state ln A, physics-based first step      31 rhs evaluations,   78.4 s, max relative error vs A₀e^{γt}: 211 5.5e-05, 322 9.2e-07
+Precompiling AxionCloud...
+   3753.0 ms  ✓ AxionCloud
+  1 dependency successfully precompiled in 5 seconds. 136 already precompiled.
+┌ Warning: solve_radial: |F| = 4.8633180815826904e-12 is below tol but the Newton step is 4.171925629392262e-9; the system is ill-conditioned (is the outer boundary too far out for the amplitude normalization?)
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:500
+┌ Warning: solve_radial did not converge: |F| = 4.8633180815826904e-12 after 6 iterations
+└ @ AxionCloud /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/src/bvp.jl:509

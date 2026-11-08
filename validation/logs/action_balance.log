@@ -1,0 +1,38 @@
+1–2. identities and balances (default mesh r* ∈ [−80, 180])
+== linear: A = [1.0e-6, 1.0e-7], N = [3.0877669906149872e-6, 0.002894507394724924]
+  (J − Σ m N)/J          = +6.0e-16
+  (L_E − Σ ω L_N)/L_E    = +2.1e-16
+  (L_J − Σ m L_N)/L_J    = +2.3e-16
+  (E − Σ ω N)/E          = -3.6e-04  (outer surface term plus potential energy)
+  (∂_A E − Σ ω ∂_A N)/∂_A E = (-4.4e-06, -3.6e-04)
+  energy balance, coded flux     A' = (1.47787016e-14, 1.43899228e-19)   A'/(γA) − 1 = (+7.4e-05, -4.2e-04)
+  energy balance, complete flux  A' = (1.47775927e-14, 1.43958374e-19)   A'/(γA) − 1 = (-1.5e-06, -1.2e-05)
+  action balance                 A' = (1.47775927e-14, 1.43958372e-19)   A'/(γA) − 1 = (-1.5e-06, -1.2e-05)
+== nonlinear (A'/(γA) is not expected to be 1 here): A = [0.01, 0.0001], N = [224.1499225557203, 2111.5600630765316]
+  (J − Σ m N)/J          = +0.0e+00
+  (L_E − Σ ω L_N)/L_E    = +0.0e+00
+  (L_J − Σ m L_N)/L_J    = +0.0e+00
+  (E − Σ ω N)/E          = -2.3e-04  (outer surface term plus potential energy)
+  (∂_A E − Σ ω ∂_A N)/∂_A E = (+3.4e-04, -3.2e-04)
+  energy balance, coded flux     A' = (-1.23991323e-09, -3.95123522e-12)   A'/(γA) − 1 = (+1.3e-01, +4.9e-01)
+  energy balance, complete flux  A' = (-1.23811020e-09, -3.95146525e-12)   A'/(γA) − 1 = (+1.3e-01, +4.9e-01)
+  action balance                 A' = (-1.23841946e-09, -3.95142580e-12)   A'/(γA) − 1 = (+1.3e-01, +4.9e-01)
+
+E − Σ ω N against the outer endpoint (free field, linear point):
+  r*_max =   180: (E − Σ ω N)/E = -3.57e-04
+  r*_max =   250: (E − Σ ω N)/E = -4.11e-05
+  r*_max =   320: (E − Σ ω N)/E = -2.82e-06
+
+3. metric work against the inner endpoint (linear point, f_a/M_Pl = 1, b' and j' from the horizon fluxes)
+  r*_min =  -45.0: w/(E b') action-based = -4.011010e-03, linear prediction Σ N dω/dτ = -1.066981e-02, Boyer–Lindquist = -1.120e-02
+                  A' energy = [1.4778336159972022e-14, 1.2687156472207778e-19], energy + w = [1.477844990575759e-14, 1.2686549770499747e-19], action = [1.477745687035497e-14, 1.269184646089811e-19]
+  r*_min =  -60.0: w/(E b') action-based = -4.011009e-03, linear prediction Σ N dω/dτ = -1.066981e-02, Boyer–Lindquist = -5.567e-03
+                  A' energy = [1.4778336164157683e-14, 1.2687157206100057e-19], energy + w = [1.4778449909930635e-14, 1.2686550504728293e-19], action = [1.4777456873996035e-14, 1.2691847196033403e-19]
+  r*_min =  -80.0: w/(E b') action-based = -4.011009e-03, linear prediction Σ N dω/dτ = -1.066981e-02, Boyer–Lindquist = +2.457e+00
+                  A' energy = [1.477833616434288e-14, 1.2687158121131305e-19], energy + w = [1.4778449910115042e-14, 1.2686551420122433e-19], action = [1.4777456873533403e-14, 1.269184811173724e-19]
+  r*_min = -100.0: w/(E b') action-based = -4.011009e-03, linear prediction Σ N dω/dτ = -1.066981e-02, Boyer–Lindquist = +1.070e+03
+                  A' energy = [1.4778336164514428e-14, 1.2687159036298885e-19], energy + w = [1.4778449910288793e-14, 1.2686552335636935e-19], action = [1.477745687307109e-14, 1.2691849027442998e-19]
+  r*_min = -120.0: w/(E b') action-based = -4.011009e-03, linear prediction Σ N dω/dτ = -1.066981e-02, Boyer–Lindquist = +4.634e+05
+                  A' energy = [1.477833616468582e-14, 1.268715995139581e-19], energy + w = [1.4778449910476056e-14, 1.2686553251007871e-19], action = [1.4777456872608766e-14, 1.2691849943148425e-19]
+┌ Warning: Assignment to `problem` in soft scope is ambiguous because a global variable by the same name exists: `problem` will be treated as a new local. Disambiguate by using `local problem` to suppress this warning or `global problem` to assign to the existing global variable.
+└ @ /global/u1/c/clwelch/can-codex-remake-entire-project/AxionCloud/validation/action_balance.jl:74

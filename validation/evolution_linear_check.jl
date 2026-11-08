@@ -10,6 +10,8 @@ rates = amplitude_rates(solution)
 println("dA/dt = ", rates, "  γA = ", growth_rates(solution) .* amplitudes, "  relative mismatch = ", rates ./ (growth_rates(solution) .* amplitudes) .- 1)
 horizon = 1 / growth_rates(solution)[1]
 result = evolve_fixed_background(problem, amplitudes, (0.0, 3horizon); saveat=horizon)
-for (time, amps) in zip(result.ode_solution.t, result.ode_solution.u)
-    @printf("t = %.3e  A = %s   linear prediction = %s\n", time, amps, amplitudes .* exp.(growth_rates(solution) .* time))
+trajectory = amplitude_trajectory(result)
+for (index, time) in enumerate(trajectory.times)
+    @printf("t = %.3e  A = %s   linear prediction = %s\n", time, trajectory.amplitudes[index, :],
+            amplitudes .* exp.(growth_rates(solution) .* time))
 end

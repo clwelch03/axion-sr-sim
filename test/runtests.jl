@@ -196,4 +196,43 @@ end
     @test mode_frequencies(rescaled)[1] ≈ frequency
 end
 
+
+@testset "Wave actions: identities and balances" begin
+    background = KerrBackground(0.9)
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
+    mesh = RadialMesh(background; rstar_min=-60.0, rstar_max=250.0, step=0.8)
+    problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh)
+    solution = solve_radial(problem, [1e-6, 1e-7])
+    frequencies = real.(mode_frequencies(solution))
+    charges, actions = cloud_charges(solution), phase_actions(solution)
+    losses, action_loss = boundary_losses(solution), action_losses(solution)
+    # J = Σ m_i N_i holds exactly; the fluxes are exact combinations of the action fluxes.
+    @test charges.angular_momentum ≈ dot([1, 2], actions) rtol=1e-12
+    @test losses.energy ≈ dot(frequencies, action_loss) rtol=1e-12
+    @test losses.angular_momentum ≈ dot([1, 2], action_loss) rtol=1e-12
+    # Linear regime: the action balance reproduces A' = γA mode by mode.
+    rates = amplitude_rates(solution; balance=:action)
+    @test rates ≈ growth_rates(solution) .* solution.amplitudes rtol=1e-4
+    # and dE = Σ ω dN once the cloud is (nearly) contained.
+    @test charge_jacobian(solution)[1, :] ≈ vec(transpose(frequencies) * action_jacobian(solution)) rtol=1e-3
+    @test_throws ArgumentError amplitude_rates(solution; balance=:momentum)
+end
+
+@testset "Evolution: logarithmic state and trajectory" begin
+    background = KerrBackground(0.9)
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
+    mesh = RadialMesh(background; rstar_min=-60.0, rstar_max=250.0, step=0.8)
+    problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh)
+    amplitudes = [1e-6, 1e-7]
+    solution = solve_radial(problem, amplitudes)
+    final_time = 0.5 / growth_rates(solution)[1]
+    result = evolve_fixed_background(problem, amplitudes, (0.0, final_time); balance=:action, saveat=final_time)
+    trajectory = amplitude_trajectory(result)
+    @test result.log_amplitudes
+    @test trajectory.times ≈ [0.0, final_time]
+    @test trajectory.amplitudes[1, :] ≈ amplitudes
+    @test trajectory.amplitudes[end, :] ≈ amplitudes .* exp.(growth_rates(solution) .* final_time) rtol=1e-4
+    @test length(result.diagnostics) < 25
+end
+
 end

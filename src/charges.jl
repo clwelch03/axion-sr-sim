@@ -10,6 +10,14 @@ per unit `t/M`. With the Killing vectors `∂_t`, `∂_φ` of Kerr,
 
 and the outward fluxes through a sphere are `F_E = −∮ T^r_t √−g`, `F_J = ∮ T^r_φ √−g`,
 so that `dE/dt = −(F_E(out) − F_E(in))` and likewise for `J`.
+
+Each independent phase `ξ_i` also carries a wave action `N_i = ∂⟨L⟩/∂ω_i`
+(Whitham), the Noether charge of the phase shift `ξ_i → ξ_i + c` of the
+averaged Lagrangian. Component `q` contributes its Klein–Gordon charge `n_q`
+with weight `q_i`, so `N_i = Σ_q q_i n_q`, `J = Σ_i m_i N_i` exactly, and at
+fixed background `dE = Σ_i ω_i dN_i`. The actions are adiabatic invariants: a
+slowly changing black hole changes them only through boundary fluxes, which is
+what fixes the metric work in the energy balance (see `evolution.jl`).
 """
 
 """
@@ -191,6 +199,76 @@ function component_charges(solution::RadialSolution, component_index::Int)
 end
 
 """
+    component_action_densities(problem, s, profiles)
+
+Klein–Gordon charge of every Fourier component per unit tortoise coordinate at
+offset `s`, `dn_q/dr* = 2π Σ_x w ρ² (Δ/(r²+a²)) 2|F_q|² (−g^{tt} ω_q + g^{tφ} m_q)`,
+from the physical profiles and the real component frequencies.
+"""
+function component_action_densities(problem::RadialProblem, s, profiles::AbstractVector, real_frequencies::AbstractVector)
+    background, quadrature, mode_set = problem.background, problem.quadrature, problem.mode_set
+    grid = quadrature.angular
+    a, r = background.a, radius(background, s)
+    horizon_function, sum_r2a2 = delta(background, s), r2a2(background, s)
+    sin2 = 1 .- grid.x .^ 2
+    tt_weight = (sum_r2a2^2 .- a^2 * horizon_function .* sin2) ./ sum_r2a2   # −ρ² g^{tt} Δ/(r²+a²)
+    tphi_weight = -2a * r / sum_r2a2                                         #  ρ² g^{tφ} Δ/(r²+a²)
+    squared = 2 .* abs2.(component_profiles(quadrature, profiles))           # 2|F_q(x)|², [polar node, component]
+    azimuthal = [component.m for component in mode_set.components]
+    return [2pi * sum(grid.weights .* squared[:, index] .* (tt_weight .* real_frequencies[index] .+ tphi_weight * azimuthal[index]))
+            for index in 1:n_components(mode_set)]
+end
+
+"""Matrix `[mode, component]` of the integer vectors `q`: `N_i = Σ_q q_i n_q`."""
+phase_weights(mode_set::ModeSet) = [component.q[mode] for mode in 1:n_modes(mode_set), component in mode_set.components]
+
+"""
+    phase_actions(problem, layout, unknowns, scale)
+    phase_actions(solution)
+
+Wave actions `N_i = Σ_q q_i n_q` of the independent phases between the
+numerical endpoints, in units of `f_a² M²` (like `J`), as a vector over modes.
+"""
+function phase_actions(problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector, scale)
+    mesh = problem.mesh
+    frequencies = real_component_frequencies(problem, layout, unknowns)
+    weights = simpson_weights(mesh.rstar)
+    component_totals = sum(weights[node] .* component_action_densities(problem, mesh.offsets[node],
+                                                                     physical_state(layout, unknowns, scale, node).profiles,
+                                                                     frequencies)
+                           for node in 1:layout.n_nodes)
+    return phase_weights(problem.mode_set) * component_totals
+end
+
+phase_actions(solution::RadialSolution) = phase_actions(solution.problem, solution.layout, solution.unknowns, solution.scale)
+
+"""
+    action_flux(solution, node)
+
+Outward action fluxes of the independent phases through the sphere at mesh
+`node`, `F_{N_i} = Σ_q q_i 4π(r²+a²) Σ_l Im[R*_{l,q} Q_{l,q}]`, so that a
+component's energy and angular-momentum fluxes are `ω_q` and `m_q` times its
+action flux (`outward_flux`).
+"""
+function action_flux(solution::RadialSolution, node::Int)
+    problem, layout = solution.problem, solution.layout
+    mode_set = problem.mode_set
+    state = physical_state(layout, solution.unknowns, solution.scale, node)
+    wronskian = imag.(conj.(state.profiles) .* state.slopes)
+    prefactor = 4pi * r2a2(problem.background, problem.mesh.offsets[node])
+    component_fluxes = [prefactor * sum(wronskian[channels]) for channels in mode_set.component_channels]
+    return phase_weights(mode_set) * component_fluxes
+end
+
+"""
+    action_losses(solution)
+
+Signed net action losses `F_N(outer) − F_N(inner)` of the independent phases,
+so that `dN_i/dt = −L_{N_i}` on any slowly varying background.
+"""
+action_losses(solution::RadialSolution) = action_flux(solution, solution.layout.n_nodes) - action_flux(solution, 1)
+
+"""
     outward_flux(problem, layout, unknowns, scale, node)
     outward_flux(solution, node)
 
@@ -223,31 +301,60 @@ boundary_losses(solution::RadialSolution) =
     outward_flux(solution, solution.layout.n_nodes) - outward_flux(solution, 1)
 
 """
+    amplitude_response(solution)
+
+Directions `du/dA_i` (columns) of the whole discretised solution with respect
+to each amplitude, by the implicit-function theorem `du/dA_i = −J⁻¹ ∂F/∂A_i`
+with the factorised Newton Jacobian. Only the outer boundary block depends
+explicitly on the amplitudes.
+"""
+function amplitude_response(solution::RadialSolution)
+    problem, layout, unknowns, scale = solution.problem, solution.layout, solution.unknowns, solution.scale
+    outer_block = unknowns[node_range(layout, layout.n_nodes)]
+    parameter_block = unknowns[parameter_range(layout)]
+    residual_wrt_amplitudes = ForwardDiff.jacobian(solution.amplitudes) do amplitudes
+        boundary_residual(problem, layout, :outer, outer_block, parameter_block, amplitudes, scale)
+    end
+    directions = zeros(n_unknowns(layout), layout.n_modes)
+    for mode_index in 1:layout.n_modes
+        forcing = zeros(n_unknowns(layout))
+        forcing[outer_rows(layout)] = -residual_wrt_amplitudes[:, mode_index]
+        directions[:, mode_index] = solution.jacobian_factorization \ forcing
+    end
+    return directions
+end
+
+"""
+    observable_jacobian(solution, observable; directions=amplitude_response(solution))
+
+Matrix `[∂O_k/∂A_i]` of a vector-valued `observable(problem, layout, unknowns, scale)`
+including the response of the coupled solution, with one dual pass of the
+observable along each amplitude direction.
+"""
+function observable_jacobian(solution::RadialSolution, observable; directions=amplitude_response(solution))
+    problem, layout, unknowns, scale = solution.problem, solution.layout, solution.unknowns, solution.scale
+    columns = map(eachcol(directions)) do direction
+        ForwardDiff.derivative(epsilon -> observable(problem, layout, unknowns .+ epsilon .* direction, scale), 0.0)
+    end
+    return reduce(hcat, columns)
+end
+
+"""
     charge_jacobian(solution)
 
 The `2 × K` matrix `[∂E/∂A_i; ∂J/∂A_i]` including the response of the whole
 coupled solution (profiles, frequencies, driven components) to each amplitude.
 Computed exactly for the discretised problem via the implicit-function
-theorem: `du/dA_i = −J⁻¹ ∂F/∂A_i` using the factorised Newton Jacobian, after
-which the charges are differentiated along that direction with one dual pass.
+theorem (`amplitude_response`), after which the charges are differentiated
+along each direction with one dual pass.
 """
-function charge_jacobian(solution::RadialSolution)
-    problem, layout, unknowns, scale = solution.problem, solution.layout, solution.unknowns, solution.scale
-    outer_node = layout.n_nodes
-    outer_block = unknowns[node_range(layout, outer_node)]
-    parameter_block = unknowns[parameter_range(layout)]
-    # Only the outer boundary block depends explicitly on the amplitudes.
-    residual_wrt_amplitudes = ForwardDiff.jacobian(solution.amplitudes) do amplitudes
-        boundary_residual(problem, layout, :outer, outer_block, parameter_block, amplitudes, scale)
-    end
-    result = zeros(2, layout.n_modes)
-    for mode_index in 1:layout.n_modes
-        forcing = zeros(n_unknowns(layout))
-        forcing[outer_rows(layout)] = -residual_wrt_amplitudes[:, mode_index]
-        direction = solution.jacobian_factorization \ forcing
-        result[:, mode_index] = ForwardDiff.derivative(0.0) do epsilon
-            collect(cloud_charges(problem, layout, unknowns .+ epsilon .* direction, scale))
-        end
-    end
-    return result
-end
+charge_jacobian(solution::RadialSolution; directions=amplitude_response(solution)) =
+    observable_jacobian(solution, (arguments...) -> collect(cloud_charges(arguments...)); directions)
+
+"""
+    action_jacobian(solution)
+
+The `K × K` matrix `[∂N_j/∂A_i]` of the phase actions, like `charge_jacobian`.
+"""
+action_jacobian(solution::RadialSolution; directions=amplitude_response(solution)) =
+    observable_jacobian(solution, phase_actions; directions)

@@ -149,7 +149,7 @@ function domain_estimate(background::KerrBackground, mass_coupling, mode_set::Mo
     limit = min(max_radius, normalization_radius)
     if integrated_outer
         capped = false
-        outer_radius = min(containment_radius, limit)
+        outer_radius = containment_radius          # as before, containment is never cut by the limit
         far_radius > 20max_radius && @warn "domain_estimate: a component is close to threshold (k = $(round(smallest_wavenumber, sigdigits=2))); " *
             "its integrated outer data start at r ≈ $(round(Int, far_radius)) and the integration cost grows like 1/k² (k → 0 needs a different expansion)" maxlog=1
     else

@@ -56,7 +56,9 @@ Use `amplitude_trajectory` to read the amplitudes back from a result.
 
 Snapshot recorded at every right-hand-side evaluation: time, amplitudes,
 complex mode frequencies, reference-unit charges and losses, and (with
-spindown) the background state and metric work.
+spindown) the background state and metric work; also the occupations
+`N_i` (`phase_actions`) and their losses `L_{N_i}` (`action_losses`), in
+reference units.
 """
 struct EvolutionDiagnostics{T<:Real}
     time::T
@@ -67,6 +69,8 @@ struct EvolutionDiagnostics{T<:Real}
     black_hole_mass::T
     black_hole_spin::T
     metric_work::T
+    actions::Vector{T}
+    action_losses::Vector{T}
 end
 
 """
@@ -213,7 +217,8 @@ function _fixed_background_rhs!(rates, state, cache::EvolutionCache, time)
     rates .= _state_rates(amplitude_rates(solution; cache.balance), amplitudes, cache.log_amplitudes)
     push!(cache.diagnostics, EvolutionDiagnostics(time, copy(amplitudes), mode_frequencies(solution),
                                                   cloud_charges(solution), boundary_losses(solution),
-                                                  1.0, cache.template.background.a, 0.0))
+                                                  1.0, cache.template.background.a, 0.0,
+                                                  phase_actions(solution), action_losses(solution)))
     _report_step(cache, time, amplitudes, solution, "")
     return nothing
 end
@@ -567,7 +572,8 @@ function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
     rates[mode_count + 2] = terms.state_rate.angular_momentum
     push!(cache.diagnostics, EvolutionDiagnostics(time, copy(amplitudes), mode_frequencies(solution),
                                                   reference_charges(cloud_charges(solution), state), terms.losses,
-                                                  state.mass, dimensionless_spin(state), terms.metric_work))
+                                                  state.mass, dimensionless_spin(state), terms.metric_work,
+                                                  reference_actions(phase_actions(solution), state), terms.action_losses))
     _report_step(cache, time, amplitudes, solution, "  b = $(state.mass)  j = $(state.angular_momentum)  w = $(terms.metric_work)")
     return nothing
 end

@@ -2,22 +2,19 @@
 Adiabatic time evolution of the cloud amplitudes.
 
 At every instant the cloud is the stationary multiphase solution at the current
-amplitudes; energy and angular-momentum balance between the slowly changing
-charges and the boundary fluxes then fixes the amplitude rates. Two levels are
-provided:
+amplitudes; a balance between the slowly changing conserved quantities (the
+wave actions by default, or energy and angular momentum) and their boundary
+fluxes then fixes the amplitude rates. Two levels are provided:
 
 * `evolve_fixed_background`: the black hole does not respond (toy model),
-  `[∂_A E; ∂_A J] A' = −L`.
+  `[∂_A N] A' = −L_N`.
 * `evolve_with_spindown`: the black-hole mass and spin absorb the horizon
   fluxes, and the balance includes the background derivatives of the charges
   and the rate of metric work on the cloud.
 
 Two equivalent balances are available (`balance` keyword):
 
-* `:energy` (default, the outline's formulation): energy and angular momentum,
-  `[∂_A E; ∂_A J] A' = −L + (w, 0) − (∂_b Q b' + ∂_j Q j')`. Two conservation laws,
-  so exactly two bound modes.
-* `:action`: one wave-action balance per independent phase,
+* `:action` (default since 2026-11-09): one wave-action balance per independent phase,
   `[∂_A N] A' = −L_N − (∂_b N b' + ∂_j N j')`, valid for any number of modes. The
   actions are adiabatic invariants, so no metric-work term appears, and their
   fluxes contain no time derivative. Energy and angular momentum follow from
@@ -25,6 +22,10 @@ Two equivalent balances are available (`balance` keyword):
   balances agree up to the `Im ω̃ Re(R*Q)` term that `outward_flux` omits from
   the energy flux at a boundary where the cloud is not contained
   (`validation/action_balance.jl`).
+* `:energy` (the outline's formulation, the default before 2026-11-09): energy and
+  angular momentum, `[∂_A E; ∂_A J] A' = −L + (w, 0) − (∂_b Q b' + ∂_j Q j')`. Two
+  conservation laws, so exactly two bound modes. Pass `balance=:energy` to
+  reproduce results computed before the default changed.
 
 Reference units are the *initial* black-hole mass `M₀` (and `f_a`): with
 `b = M/M₀`, `j = J_BH/M₀²`, `τ = t/M₀`, a radial solution in units of the
@@ -130,13 +131,13 @@ end
 
 """
     EvolutionCache(problem; decay_constant_ratio=0.0, include_metric_work=false, newton_tol=1e-10,
-                   verbose=false, log_amplitudes=true, balance=:energy, last_solution=nothing)
+                   verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing)
 
 Fresh cache for an evolution of `problem` (also handy for calling
 `balance_terms` directly).
 """
 function EvolutionCache(problem::RadialProblem; decay_constant_ratio=0.0, include_metric_work=false, newton_tol=1e-10,
-                        verbose=false, log_amplitudes=true, balance=:energy, last_solution=nothing)
+                        verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing)
     _check_balance(problem, balance)
     EvolutionCache(problem, problem.mass_coupling, float(decay_constant_ratio)^2, include_metric_work, last_solution,
                    EvolutionDiagnostics{Float64}[], float(newton_tol), verbose, log_amplitudes, balance)
@@ -193,12 +194,13 @@ end
 # --- fixed background -----------------------------------------------------------
 
 """
-    amplitude_rates(solution; balance=:energy)
+    amplitude_rates(solution; balance=:action)
 
-`dA/dt` on a fixed background, from `[∂_A E; ∂_A J] A' = −[L_E; L_J]`
-(`balance=:energy`, two modes) or `[∂_A N] A' = −L_N` (`balance=:action`).
+`dA/dt` on a fixed background, from `[∂_A N] A' = −L_N` (`balance=:action`,
+the default, any number of modes) or `[∂_A E; ∂_A J] A' = −[L_E; L_J]`
+(`balance=:energy`, two modes).
 """
-function amplitude_rates(solution::RadialSolution; balance::Symbol=:energy)
+function amplitude_rates(solution::RadialSolution; balance::Symbol=:action)
     _check_balance(solution.problem, balance)
     balance == :action && return -(action_jacobian(solution) \ action_losses(solution))
     return -(charge_jacobian(solution) \ collect(boundary_losses(solution)))
@@ -216,11 +218,11 @@ function _fixed_background_rhs!(rates, state, cache::EvolutionCache, time)
 end
 
 """
-    evolve_fixed_background(problem, amplitudes, time_span; balance=:energy, log_amplitudes=true,
+    evolve_fixed_background(problem, amplitudes, time_span; balance=:action, log_amplitudes=true,
                             initial_step_fraction=0.05, newton_tol=1e-10, verbose=false, reltol, abstol, kwargs...)
 
 Integrate the amplitudes with Tsit5 on a frozen Kerr background, with the
-energy (two modes) or action (any number of modes) balance.
+action (default, any number of modes) or energy (two modes) balance.
 With `log_amplitudes` (default) the state is `ln A` and the default tolerances
 `reltol = abstol = 1e-7` bound the per-step relative error of the amplitudes
 by about `1e-7 (1 + |ln A|)`; otherwise the state is `A` with the old defaults
@@ -230,7 +232,7 @@ times the shortest initial e-folding time unless `dt` is passed
 `verbose` prints one line per right-hand-side evaluation. Other keyword
 arguments are passed to `solve` (e.g. `saveat`, `dtmax`).
 """
-function evolve_fixed_background(problem::RadialProblem, amplitudes::AbstractVector, time_span; balance::Symbol=:energy,
+function evolve_fixed_background(problem::RadialProblem, amplitudes::AbstractVector, time_span; balance::Symbol=:action,
                                  log_amplitudes=true, initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
                                  reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
     cache = EvolutionCache(problem; newton_tol, verbose, log_amplitudes, balance)
@@ -530,14 +532,14 @@ function balance_terms(cache::EvolutionCache, solution::RadialSolution, state::B
 end
 
 """
-    amplitude_rates(terms::BalanceTerms; balance=:energy, include_metric_work=false)
+    amplitude_rates(terms::BalanceTerms; balance=:action, include_metric_work=false)
 
 `A'` from the energy balance
 `[∂_A E; ∂_A J] A' = −L + (w, 0) − (∂_b Q b' + ∂_j Q j')` (`w` only with
 `include_metric_work`), or from the action balance
 `[∂_A N] A' = −L_N − (∂_b N b' + ∂_j N j')`, which needs no work term.
 """
-function amplitude_rates(terms::BalanceTerms; balance::Symbol=:energy, include_metric_work::Bool=false)
+function amplitude_rates(terms::BalanceTerms; balance::Symbol=:action, include_metric_work::Bool=false)
     derivatives, rate = terms.derivatives, terms.state_rate
     if balance == :action
         drift = rate.mass .* derivatives.actions_wrt_mass .+ rate.angular_momentum .* derivatives.actions_wrt_angular_momentum
@@ -570,7 +572,7 @@ function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
 end
 
 """
-    evolve_with_spindown(problem, amplitudes, time_span, decay_constant_ratio; balance=:energy,
+    evolve_with_spindown(problem, amplitudes, time_span, decay_constant_ratio; balance=:action,
                          include_metric_work=false, log_amplitudes=true, initial_step_fraction=0.05,
                          newton_tol=1e-10, verbose=false, reltol, abstol, kwargs...)
 
@@ -582,14 +584,14 @@ f_a / M_Pl` (non-reduced Planck mass) sets how strongly the cloud's horizon
 fluxes change the hole. Tolerances, the initial step and `log_amplitudes` are
 as in `evolve_fixed_background`.
 
-`balance=:action` uses the wave-action balance (any number of modes, no
-metric-work term). With the energy balance, `include_metric_work` adds the
-action-based `metric_work` to the energy equation; it is off by default so that
-existing runs reproduce, and is of relative order `(f_a/M_Pl)² E` like the
+The default `balance=:action` uses the wave-action balance (any number of
+modes, no metric-work term). With `balance=:energy`, `include_metric_work` adds
+the action-based `metric_work` to the energy equation; it is off by default so
+that earlier energy-balance runs reproduce, and is of relative order `(f_a/M_Pl)² E` like the
 background-drift terms. The work is recorded in the diagnostics either way.
 """
 function evolve_with_spindown(problem::RadialProblem, amplitudes::AbstractVector, time_span, decay_constant_ratio::Real;
-                              balance::Symbol=:energy, include_metric_work=false, log_amplitudes=true,
+                              balance::Symbol=:action, include_metric_work=false, log_amplitudes=true,
                               initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
                               reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
     cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, newton_tol, verbose, log_amplitudes, balance)

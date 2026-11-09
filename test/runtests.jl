@@ -317,6 +317,7 @@ end
     # Linear regime: the action balance reproduces A' = γA mode by mode.
     rates = amplitude_rates(solution; balance=:action)
     @test rates ≈ growth_rates(solution) .* solution.amplitudes rtol=1e-4
+    @test amplitude_rates(solution) == rates   # the action balance is the default
     # and dE = Σ ω dN once the cloud is (nearly) contained.
     @test charge_jacobian(solution)[1, :] ≈ vec(transpose(frequencies) * action_jacobian(solution)) rtol=1e-3
     @test_throws ArgumentError amplitude_rates(solution; balance=:momentum)

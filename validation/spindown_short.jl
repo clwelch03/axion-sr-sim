@@ -6,7 +6,7 @@ background = KerrBackground(0.9)
 mode_set = ModeSet([BoundMode(2,1,1), BoundMode(3,2,2)])
 problem = RadialProblem(background, CosinePotential(), 0.3, mode_set)
 amplitudes = [1e-6, 1e-7]
-t = @elapsed result = evolve_with_spindown(problem, amplitudes, (0.0, 2e7), 1e-2; saveat=1e7, verbose=true)
+t = @elapsed result = evolve_with_spindown(problem, amplitudes, (0.0, 2e7), 1e-2; balance=:energy, saveat=1e7, verbose=true)
 println("spindown run: $(length(result.diagnostics)) rhs evals in $(round(t, digits=1))s")
 trajectory = amplitude_trajectory(result)
 for index in eachindex(trajectory.times)

@@ -83,8 +83,8 @@ for rstar_min in (-45.0, -60.0, -80.0, -100.0, -120.0)
     energy_rate = cloud_charges(solution).energy * rate.mass
     @printf("  r*_min = %6.1f: w/(E b') action-based = %+.6e, linear prediction Σ N dω/dτ = %+.6e, Boyer–Lindquist = %+.3e\n",
             rstar_min, terms.metric_work / energy_rate, linear_prediction / energy_rate, old_work / energy_rate)
-    rates_energy = amplitude_rates(terms)
-    rates_energy_work = amplitude_rates(terms; include_metric_work=true)
+    rates_energy = amplitude_rates(terms; balance=:energy)
+    rates_energy_work = amplitude_rates(terms; balance=:energy, include_metric_work=true)
     rates_action = amplitude_rates(terms; balance=:action)
     @printf("                  A' energy = %s, energy + w = %s, action = %s\n", rates_energy, rates_energy_work, rates_action)
     flush(stdout)

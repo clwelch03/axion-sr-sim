@@ -1,5 +1,16 @@
 # Progress notes
 
+## Day 4 (2026-11-09)
+
+- **`balance=:action` is now the default** in `amplitude_rates` (both methods), `EvolutionCache`,
+  `evolve_fixed_background` and `evolve_with_spindown` (Day 3 open item 1). Validation scripts that compare
+  against the energy balance or reproduce older logs (`action_balance`, `metric_work_containment`,
+  `background_derivatives`, `chord_vs_newton`, `evolution_linear_check`, `evolution_step_control`,
+  `evolution_rerun`, `spindown_short`) now pass `balance=:energy` explicitly, so their logs still apply.
+  `scripts/evolution_fixed_background.jl` follows the new default; the stored `results/` trajectory was
+  made with the energy balance (and the old boundary) and is superseded by the pending contained-domain rerun.
+  `Pkg.test()`: 119/119 (new check: the default equals `balance=:action`).
+
 ## Day 3 (2026-11-07, evening session)
 
 This rewrite now lives on the `rewrite/axioncloud` branch of axion-sr-sim (the previous implementation is on

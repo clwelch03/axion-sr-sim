@@ -6,10 +6,10 @@ mode_set = ModeSet([BoundMode(2,1,1), BoundMode(3,2,2)])
 problem = RadialProblem(background, CosinePotential(), 0.3, mode_set)
 amplitudes = [1e-6, 1e-7]
 solution = solve_radial(problem, amplitudes)
-rates = amplitude_rates(solution)
+rates = amplitude_rates(solution; balance=:energy)
 println("dA/dt = ", rates, "  γA = ", growth_rates(solution) .* amplitudes, "  relative mismatch = ", rates ./ (growth_rates(solution) .* amplitudes) .- 1)
 horizon = 1 / growth_rates(solution)[1]
-result = evolve_fixed_background(problem, amplitudes, (0.0, 3horizon); saveat=horizon)
+result = evolve_fixed_background(problem, amplitudes, (0.0, 3horizon); balance=:energy, saveat=horizon)
 trajectory = amplitude_trajectory(result)
 for (index, time) in enumerate(trajectory.times)
     @printf("t = %.3e  A = %s   linear prediction = %s\n", time, trajectory.amplitudes[index, :],

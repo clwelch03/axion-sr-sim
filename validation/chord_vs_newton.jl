@@ -13,7 +13,7 @@ for factor in (1.001, 1.005, 1.03)
     t_full = @elapsed full = solve_radial(problem, amps; guess=previous_full, reuse_factorization=false)
     println("factor $factor: chord $(round(t_chord, digits=2))s ($(chord.iterations) it)  full $(round(t_full, digits=2))s ($(full.iterations) it)",
             "  |Δω| = ", maximum(abs, mode_frequencies(chord) .- mode_frequencies(full)),
-            "  rel Δ(dA/dt) = ", maximum(abs, amplitude_rates(chord) ./ amplitude_rates(full) .- 1))
+            "  rel Δ(dA/dt) = ", maximum(abs, amplitude_rates(chord; balance=:energy) ./ amplitude_rates(full; balance=:energy) .- 1))
     flush(stdout)
     global previous_chord, previous_full = chord, full
 end

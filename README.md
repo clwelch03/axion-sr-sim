@@ -41,8 +41,9 @@ Julia implementation of the method described in `docs/multiphase.tex`.
 * Black-hole spindown couples through `(f_a/M_Pl)²` (non-reduced Planck mass), passed to
   `evolve_with_spindown` as `decay_constant_ratio = f_a/M_Pl`.
 * Each independent phase carries a wave action `N_i = Σ_q q_i n_q` (`phase_actions`), with
-  `J = Σ m_i N_i`. The evolution drivers take `balance=:energy` (default, energy and angular momentum,
-  two modes) or `balance=:action` (one action balance per phase, any number of modes, no metric work).
+  `J = Σ m_i N_i`. The evolution drivers take `balance=:action` (default since 2026-11-09: one action
+  balance per phase, any number of modes, no metric work) or `balance=:energy` (energy and angular
+  momentum, two modes; the earlier default, needed to reproduce results from before that date).
   `metric_work` is the action-based `(∂E)|_N` work, independent of the inner endpoint.
 * The evolution state is `ln A` by default (`log_amplitudes`), with the first step set from the
   initial e-folding time; read amplitudes with `amplitude_trajectory(result)`.

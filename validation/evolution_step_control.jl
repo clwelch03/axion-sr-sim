@@ -13,7 +13,7 @@ amplitudes = [1e-6, 1e-7]
 cold = solve_radial(problem, amplitudes; tol=1e-10)
 nearby = solve_radial(problem, amplitudes .* (1 + 1e-4); tol=1e-10)
 warm = solve_radial(problem, amplitudes; guess=nearby, tol=1e-10)
-logarithmic_rates(solution) = amplitude_rates(solution) ./ amplitudes
+logarithmic_rates(solution) = amplitude_rates(solution; balance=:energy) ./ amplitudes
 growth = growth_rates(cold)
 @printf("Im ω = (%.6e, %.6e)\n", growth...)
 @printf("d ln A/dt cold = (%.10e, %.10e)\n", logarithmic_rates(cold)...)
@@ -27,7 +27,7 @@ exact(time) = amplitudes .* exp.(growth .* time)
 for (label, options) in (("old: state A, Tsit5 heuristic first step", (log_amplitudes=false, initial_step_fraction=nothing)),
                          ("state A, physics-based first step", (log_amplitudes=false,)),
                          ("new default: state ln A, physics-based first step", NamedTuple()))
-    elapsed = @elapsed result = evolve_fixed_background(problem, amplitudes, (0.0, final_time); saveat=final_time / 3, options...)
+    elapsed = @elapsed result = evolve_fixed_background(problem, amplitudes, (0.0, final_time); balance=:energy, saveat=final_time / 3, options...)
     trajectory = amplitude_trajectory(result)
     error_211 = maximum(abs(trajectory.amplitudes[i, 1] / exact(trajectory.times[i])[1] - 1) for i in eachindex(trajectory.times))
     error_322 = maximum(abs(trajectory.amplitudes[i, 2] / exact(trajectory.times[i])[2] - 1) for i in eachindex(trajectory.times))

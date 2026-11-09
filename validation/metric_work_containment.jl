@@ -17,7 +17,7 @@ for rstar_max in (180.0, 250.0, 320.0, 400.0)
     prediction = sum(actions .* (derivatives.frequencies_wrt_mass .* rate.mass .+ derivatives.frequencies_wrt_angular_momentum .* rate.angular_momentum))
     energy_rate = cloud_charges(solution).energy * rate.mass
     surface = (cloud_charges(solution).energy - dot(real.(mode_frequencies(solution)), phase_actions(solution))) / cloud_charges(solution).energy
-    rates_energy, rates_work, rates_action = amplitude_rates(terms), amplitude_rates(terms; include_metric_work=true), amplitude_rates(terms; balance=:action)
+    rates_energy, rates_work, rates_action = amplitude_rates(terms; balance=:energy), amplitude_rates(terms; balance=:energy, include_metric_work=true), amplitude_rates(terms; balance=:action)
     @printf("r*_max = %5.0f: (E − ΣωN)/E = %+.1e  w/(E b') = %+.6e  Σ N dω/dτ/(E b') = %+.6e  A'_action/A'_energy − 1 = (%+.1e, %+.1e)  with w: (%+.1e, %+.1e)\n",
             rstar_max, surface, terms.metric_work / energy_rate, prediction / energy_rate,
             (rates_action ./ rates_energy .- 1)..., (rates_action ./ rates_work .- 1)...)

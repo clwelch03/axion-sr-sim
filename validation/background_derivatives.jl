@@ -25,6 +25,6 @@ for amplitudes in ([1e-6, 1e-7], [1e-2, 1e-4])
     @printf("  actions:  IFT ∂N/∂b = %s  FD %s\n", derivatives.actions_wrt_mass, terms.derivatives.actions_wrt_mass)
     @printf("            IFT ∂N/∂j = %s  FD %s\n", derivatives.actions_wrt_angular_momentum, terms.derivatives.actions_wrt_angular_momentum)
     t_fast = @elapsed fast = balance_terms(cache, solution, state)
-    @printf("  balance_terms with IFT: %.1fs; A' = %s vs %s\n", t_fast, amplitude_rates(fast), amplitude_rates(terms))
+    @printf("  balance_terms with IFT: %.1fs; A' = %s vs %s\n", t_fast, amplitude_rates(fast; balance=:energy), amplitude_rates(terms; balance=:energy))
     flush(stdout)
 end

@@ -432,14 +432,113 @@ mode_frequencies(solution::RadialSolution) = solution.parameters.mode_frequencie
 """Growth rates `γ_i = Im ω̃_i` of the bound modes."""
 growth_rates(solution::RadialSolution) = imag.(mode_frequencies(solution))
 
+# --- envelope scaling of the Newton system ----------------------------------------
+
+"""
+    channel_envelopes(problem, layout, mode_frequencies)
+
+Matrix `[node, channel]` of the expected size of each channel along the mesh,
+used to scale the Newton system. Bound components (`Re ω_q < α`) decay like
+`r^ν e^{−κr}` with `κ = √(α² − ω_q²)` and `ν = −1 + (2ω_q² − α²)/κ`; a driven
+component whose nonlinear source decays more slowly (rate `Σ|q_i|κ_i` over the
+fundamentals) follows the source instead. The envelope is one up to the
+radius where `r^ν e^{−κr}` peaks and follows it beyond; propagating components
+get one everywhere. The frequencies are those at the start of a solve and are
+not differentiated.
+
+The amplitude of each bound mode is imposed at the outer endpoint, where its
+profile can be many orders of magnitude below its peak. Without scaling, that
+row, the only one that sets the size of the solution, changes the residual by
+less than the Newton tolerance on domains that contain the cloud, and the
+solve drifts towards `R ≈ 0` (`validation/logs/domain_outer_debug_1000.log`).
+"""
+function channel_envelopes(problem::RadialProblem, layout::UnknownLayout, mode_frequencies::AbstractVector)
+    mode_set, background, mass_coupling = problem.mode_set, problem.background, problem.mass_coupling
+    real_frequencies = real.(component_frequencies(mode_set, mode_frequencies))
+    decay_rate(frequency) = frequency < mass_coupling ? sqrt(mass_coupling^2 - frequency^2) : 0.0
+    long_range_power(frequency) = -1 + (2frequency^2 - mass_coupling^2) / decay_rate(frequency)
+    fundamental_decay = [decay_rate(real(frequency)) for frequency in mode_frequencies]
+    fundamental_power = [long_range_power(real(frequency)) for frequency in mode_frequencies]
+    radii = [radius(background, offset) for offset in problem.mesh.offsets]
+    envelopes = ones(layout.n_nodes, layout.n_channels)
+    for (component_index, component) in enumerate(mode_set.components)
+        frequency = real_frequencies[component_index]
+        frequency < mass_coupling || continue
+        decay, power = decay_rate(frequency), long_range_power(frequency)
+        source_decay = sum(abs.(component.q) .* fundamental_decay)
+        if source_decay < decay
+            decay, power = source_decay, sum(abs.(component.q) .* fundamental_power)
+        end
+        envelope_peak = max(power / decay, radii[1])
+        log_envelope = [r > envelope_peak ? power * log(r / envelope_peak) - decay * (r - envelope_peak) : 0.0
+                        for r in radii]
+        # keep the weights representable; such tails are below underflow anyway
+        envelopes[:, mode_set.component_channels[component_index]] .= exp.(max.(log_envelope, -600.0))
+    end
+    return envelopes
+end
+
+"""
+    NewtonScaling(problem, layout, mode_frequencies)
+
+Row and column weights of the scaled Newton system `(D_r J D_c) y = −D_r F`,
+step `D_c y`. Each node block of a channel is measured in units of its envelope
+(`channel_envelopes`); the residual rows of an interval and of the outer
+boundary are divided by the envelope at the interval's inner node and at the
+endpoint. Parameters and horizon rows are unscaled. The discrete solution is
+unchanged; only the conditioning and the convergence test change.
+"""
+struct NewtonScaling
+    row::Vector{Float64}
+    column::Vector{Float64}
+end
+
+function NewtonScaling(problem::RadialProblem, layout::UnknownLayout, mode_frequencies::AbstractVector)
+    envelopes = channel_envelopes(problem, layout, mode_frequencies)
+    row, column = ones(n_unknowns(layout)), ones(n_unknowns(layout))
+    for channel in 1:layout.n_channels
+        reals = 4channel-3:4channel   # Re R, Im R, Re Q, Im Q of this channel within a node block
+        for node in 1:layout.n_nodes
+            column[node_range(layout, node)[reals]] .= envelopes[node, channel]
+        end
+        for interval in 1:layout.n_nodes-1
+            row[interval_rows(layout, interval)[reals]] .= 1 / envelopes[interval, channel]
+        end
+        row[outer_rows(layout)[reals]] .= 1 / envelopes[end, channel]
+    end
+    return NewtonScaling(row, column)
+end
+
+"""
+    ScaledFactorization
+
+LU factorization of the scaled Jacobian `D_r J D_c` with its weights;
+`factorization \\ b` returns `J⁻¹ b` in unscaled variables, so the implicit-
+function solves (`amplitude_response`, `background_charge_derivatives`) use the
+well-conditioned system without knowing about the scaling.
+"""
+struct ScaledFactorization{F}
+    factorization::F
+    scaling::NewtonScaling
+end
+
+ScaledFactorization(jacobian::AbstractMatrix, scaling::NewtonScaling) =
+    ScaledFactorization(lu(Diagonal(scaling.row) * jacobian * Diagonal(scaling.column)), scaling)
+
+Base.:\(scaled::ScaledFactorization, right_hand_side::AbstractVecOrMat) =
+    scaled.scaling.column .* (scaled.factorization \ (scaled.scaling.row .* right_hand_side))
+
 """
     solve_radial(problem, amplitudes; guess=nothing, tol=1e-10, maxiter=30, verbose=false,
                  reuse_factorization=true, chord_threshold=1e-3)
 
 Solve the coupled radial boundary-value problem at the prescribed amplitudes.
 `guess` may be a previous `RadialSolution` (warm start, rescaled to the new
-amplitudes) or `nothing` for the hydrogenic initial guess. Newton iterations
-stop when both the residual and the step fall below `tol` in the max norm.
+amplitudes) or `nothing` for the hydrogenic initial guess. The Newton system
+is solved with envelope scaling (`NewtonScaling`, built once per solve from the
+starting frequencies), and iterations stop when both the scaled residual and
+the scaled step fall below `tol` in the max norm. On domains that do not reach
+far into the tails the scaling is close to the identity.
 
 With `reuse_factorization` and a warm start, the iteration begins as a chord
 method: steps use the guess's factorised Jacobian (and later the most recent
@@ -457,8 +556,11 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
     scale = maximum(amplitudes)
     warm = guess isa RadialSolution && length(guess.unknowns) == n_unknowns(layout)
     unknowns = warm ? warm_start_unknowns(guess, scale) : initial_unknowns(problem, layout, amplitudes, scale)
+    scaling = NewtonScaling(problem, layout, _complexify(unknowns[parameter_range(layout)][frequency_range(layout)]))
+    scaled_norm(residual_vector) = norm(scaling.row .* residual_vector, Inf)
+    scaled_step_norm(step_vector) = norm(step_vector ./ scaling.column, Inf)
     current = residual(problem, layout, unknowns, amplitudes, scale)
-    current_norm = norm(current, Inf)
+    current_norm = scaled_norm(current)
 
     # Chord steps are only worthwhile near a solution; far from it every rejected step costs a residual.
     factorization = warm && reuse_factorization && current_norm < chord_threshold ? guess.jacobian_factorization : nothing
@@ -471,7 +573,7 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
         iterations = iteration
         chord = factorization !== nothing
         if !chord
-            factorization = lu(jacobian(problem, layout, unknowns, amplitudes, scale))
+            factorization = ScaledFactorization(jacobian(problem, layout, unknowns, amplitudes, scale), scaling)
             factorization_distance = 0.0
         end
         step = -(factorization \ current)
@@ -482,7 +584,7 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
         while damping ≥ 1e-4
             trial = unknowns .+ damping .* step
             trial_residual = residual(problem, layout, trial, amplitudes, scale)
-            trial_norm = norm(trial_residual, Inf)
+            trial_norm = scaled_norm(trial_residual)
             trial_norm ≤ (1 - 1e-4damping) * current_norm && break
             damping /= 2
         end
@@ -494,20 +596,25 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
         unknowns, current, current_norm = trial, trial_residual, trial_norm
         reuse_factorization && current_norm < chord_threshold || (factorization = nothing)
         factorization_distance += damping * norm(step, Inf)
-        verbose && println("  $(chord ? "chord" : "newton") $iteration: |step| = $(norm(step, Inf))  |F| = $current_norm  damping = $damping")
-        if current_norm < tol && damping * norm(step, Inf) < tol
+        step_norm = damping * scaled_step_norm(step)
+        verbose && println("  $(chord ? "chord" : "newton") $iteration: |step| = $step_norm  |F| = $current_norm  damping = $damping")
+        if current_norm < tol && step_norm < tol
             converged = true
             break
         end
-        # Residual at its floor while the step neither vanishes nor shrinks: the system is (nearly)
-        # singular, typically because an amplitude is imposed where its profile is negligible. Stop
-        # rather than spin. (Chord steps near convergence shrink geometrically, which is fine.)
-        step_norm = damping * norm(step, Inf)
+        # Residual below tol while the step stops shrinking. With envelope scaling the scaled step can sit at a
+        # roundoff floor of ~1e-9 (tail unknowns measured in units of their envelopes): accept that as converged.
+        # A step that stalls above √tol still means a (nearly) singular system. (Chord steps near convergence
+        # shrink geometrically, which is fine.)
         if current_norm < tol && step_norm > previous_step_norm / 2
             stalled += 1
             if stalled ≥ 3
-                @warn "solve_radial: |F| = $current_norm is below tol but the Newton step is $(norm(step, Inf)); " *
-                      "the system is ill-conditioned (is the outer boundary too far out for the amplitude normalization?)"
+                if step_norm < sqrt(tol)
+                    converged = true
+                else
+                    @warn "solve_radial: |F| = $current_norm is below tol but the Newton step is $step_norm; " *
+                          "the system is ill-conditioned"
+                end
                 break
             end
         else
@@ -519,7 +626,7 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
     # Sensitivities need the Jacobian at the converged point: refactorise unless the
     # current factorisation was taken within √tol of it (Jacobian error O(distance)).
     if factorization === nothing || factorization_distance > sqrt(tol)
-        factorization = lu(jacobian(problem, layout, unknowns, amplitudes, scale))
+        factorization = ScaledFactorization(jacobian(problem, layout, unknowns, amplitudes, scale), scaling)
     end
     parameters = RadialParameters(layout, unknowns[parameter_range(layout)], amplitudes, scale)
     RadialSolution(problem, layout, collect(float.(amplitudes)), float(scale), unknowns, parameters, factorization,

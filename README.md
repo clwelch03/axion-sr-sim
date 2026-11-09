@@ -70,5 +70,6 @@ Diagnostic and convergence scripts live in `validation/` (logs in `validation/lo
 
 Progress, numerical findings and open questions are tracked in `NOTES.md`.
 
-Run the tests with `julia --project -e 'using Pkg; Pkg.test()'` (Perlmutter: `module load julia/1.11.7` first).
+Run the tests with `julia --project -e 'using Pkg; Pkg.test()'` (Perlmutter: `module load julia/1.11.7` first;
+Lawrencium: `~/.juliaup/bin/julia +1.11.7`, Slurm recipe in `docs/session-2026-11-09.md`).
 The plot script lives in `scripts/` with its own environment: `julia --project=scripts scripts/profile_comparison.jl`.

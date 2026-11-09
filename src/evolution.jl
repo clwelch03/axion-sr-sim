@@ -30,9 +30,10 @@ Two equivalent balances are available (`balance` keyword):
 Reference units are the *initial* black-hole mass `M₀` (and `f_a`): with
 `b = M/M₀`, `j = J_BH/M₀²`, `τ = t/M₀`, a radial solution in units of the
 current mass carries `E_ref = b E`, `J_ref = b² J`, energy losses per unit `τ`
-equal to the current-unit fluxes, and angular-momentum losses `b` times them.
-Two independent conservation laws give two amplitude equations, so these
-drivers require exactly two bound modes.
+equal to the current-unit fluxes, and angular-momentum losses `b` times them;
+actions scale like `J` (`N_ref = b² N`, losses `b` times the current-unit ones).
+The action balance handles any number of bound modes; the energy balance (two
+conservation laws, two amplitude equations) requires exactly two.
 
 Cloud charges are measured in units of `f_a² M₀` while the black hole's are in
 units of `M₀` (with `G = 1`), so the horizon fluxes change the hole's mass and

@@ -61,9 +61,12 @@ with the quantities that set them (all from hydrogenic frequency estimates):
   (capped at `max_radius`, in which case `capped` is true);
 * `normalization_radius`: radius beyond which the fastest-decaying *fundamental*
   component is below `normalization_floor` of its peak. The amplitudes are
-  imposed through the leading outer coefficients, so past this radius the
-  boundary condition no longer constrains the amplitude at the Newton
-  tolerance and the system turns singular (the eigenvalue comes out wrong);
+  imposed through the leading outer coefficients; without scaling, that
+  boundary condition stopped constraining the amplitude past this radius and
+  the system turned singular. `solve_radial` now scales the Newton system by
+  the channel envelopes (`NewtonScaling`), which removes this limit
+  (`validation/envelope_scaling_*.jl`). The radius still limits the outer
+  endpoint on the legacy series path (`integrated_outer=false`) only;
 * `far_radius`: radius from which the integrated outer data of the
   propagating components start (`2 k r ≥ |η|² + convergence_margin`); it is not
   part of the mesh but sets the cost of the inward integration, which grows

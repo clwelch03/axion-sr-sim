@@ -1,0 +1,9 @@
+reference r*_max = 400: ω = 0.2963043391463 +2.6806796e-08i  converged = true  iterations = 7
+cold   r*_max = 600          nodes =  793  converged = true  iterations =  8  ω = 0.2963043391463 +2.6806796e-08i  |Δω|/|ω| = 1.9e-16  peak/reference = 0.99999050  tail/peak = 4.6e-11
+cold   r*_max = 1000         nodes =  901  converged = true  iterations = 10  ω = 0.2963043391463 +2.6806796e-08i  |Δω|/|ω| = 1.9e-16  peak/reference = 0.99996973  tail/peak = 5.2e-19
+cold   r*_max = 2000         nodes = 1171  converged = false iterations = 30  ω = 0.2958880688734 +7.5381418e-08i  |Δω|/|ω| = 1.4e-03  peak/reference = 0.00020534  tail/peak = 4.7e-39
+cold   r*_max = 4000         nodes = 1712  converged = false iterations = 30  ω = 0.2966414868762 +7.3361748e-06i  |Δω|/|ω| = 1.1e-03  peak/reference = 1.49348554  tail/peak = 1.0e-75
+┌ Warning: solve_radial did not converge: |F| = 0.0001585203221651931 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:619
+┌ Warning: solve_radial did not converge: |F| = 1.205171037099781 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:619

@@ -31,11 +31,26 @@ potential_energy(::FreePotential, field_value) = field_value^2 / 2
 nonlinearity(::FreePotential, field_value) = zero(field_value)
 nonlinearity_derivative(::FreePotential, field_value) = zero(field_value)
 
-"""Standard cosine potential `U = 1 − cos Φ`, giving `h = Φ − sin Φ`."""
+"""
+    phi_minus_sin(x)
+
+`x − sin x` without cancellation: the Taylor series `x³/6 − x⁵/120 + …` (through
+`x¹¹`, relative truncation error below 1e-19) for `|x| < 0.1`, the direct
+difference otherwise. The direct difference has a relative error of about
+`1e-16/x²`, which matters in the far tails of the cloud once the Newton system is
+scaled by the channel envelopes.
+"""
+function phi_minus_sin(x)
+    abs(x) < 0.1 || return x - sin(x)
+    square = x^2
+    return x * square * (1 / 6 - square * (1 / 120 - square * (1 / 5040 - square * (1 / 362880 - square / 39916800))))
+end
+
+"""Standard cosine potential `U = 1 − cos Φ = 2 sin²(Φ/2)`, giving `h = Φ − sin Φ`."""
 struct CosinePotential <: AxionPotential end
-potential_energy(::CosinePotential, field_value) = 1 - cos(field_value)
-nonlinearity(::CosinePotential, field_value) = field_value - sin(field_value)
-nonlinearity_derivative(::CosinePotential, field_value) = 1 - cos(field_value)
+potential_energy(::CosinePotential, field_value) = 2sin(field_value / 2)^2
+nonlinearity(::CosinePotential, field_value) = phi_minus_sin(field_value)
+nonlinearity_derivative(::CosinePotential, field_value) = 2sin(field_value / 2)^2
 
 """
     QuarticPotential(λ)
@@ -71,21 +86,31 @@ function ChiralPotential(; quark_mass_ratio=0.48)
     ChiralPotential(ratio, 4ratio / (1 + ratio)^2)
 end
 
+# The forms below avoid cancellation at small Φ: with s = sin(Φ/2) and D = √(1 − κs²),
+# 1 − D = κs²/(1 + D) and 1 − 1/D = −κs²/(D(1 + D)), and 1 − cos Φ = 2s².
+
 function potential_energy(potential::ChiralPotential, field_value)
-    pion_coupling = potential.pion_coupling
-    return (4 / pion_coupling) * (1 - sqrt(1 - pion_coupling * sin(field_value / 2)^2))
+    half_sine_squared = sin(field_value / 2)^2
+    root = sqrt(1 - potential.pion_coupling * half_sine_squared)
+    return 4half_sine_squared / (1 + root)
 end
 
+"""`h = (Φ − sin Φ) + sin Φ (1 − 1/D)` with `D = √(1 − κ sin²(Φ/2))`."""
 function nonlinearity(potential::ChiralPotential, field_value)
     pion_coupling = potential.pion_coupling
-    return field_value - sin(field_value) / sqrt(1 - pion_coupling * sin(field_value / 2)^2)
+    half_sine_squared = sin(field_value / 2)^2
+    root = sqrt(1 - pion_coupling * half_sine_squared)
+    return phi_minus_sin(field_value) - sin(field_value) * pion_coupling * half_sine_squared / (root * (1 + root))
 end
 
-"""`h' = 1 − cos Φ / D − κ sin²Φ / (4D³)` with `D = √(1 − κ sin²(Φ/2))`."""
+"""`h' = 1 − cos Φ / D − κ sin²Φ / (4D³)` with `D = √(1 − κ sin²(Φ/2))`, written as
+`(1 − cos Φ) + cos Φ (1 − 1/D) − κ sin²Φ / (4D³)`."""
 function nonlinearity_derivative(potential::ChiralPotential, field_value)
     pion_coupling = potential.pion_coupling
-    root = sqrt(1 - pion_coupling * sin(field_value / 2)^2)
-    return 1 - cos(field_value) / root - pion_coupling * sin(field_value)^2 / (4root^3)
+    half_sine_squared = sin(field_value / 2)^2
+    root = sqrt(1 - pion_coupling * half_sine_squared)
+    return 2half_sine_squared - cos(field_value) * pion_coupling * half_sine_squared / (root * (1 + root)) -
+           pion_coupling * sin(field_value)^2 / (4root^3)
 end
 
 """

@@ -33,7 +33,7 @@ The axion field around a black hole contains components with many different phas
 \begin{equation}
     e^{-i\xi}, \quad \xi \equiv \omega t - m \varphi.
 \end{equation}
-Here and below, the $\omega$ are real phase frequencies. Let us consider a field with $K$ independently oscillating bound axion modes, labeled by their respective no-self-interaction state $\ket{nlm}$. We have one phase $\xi_i$ and one amplitude $A_i$\footnote{Defined through the asymptotic normalization of its fundamental radial profile; see Equation 20 of \cite{Omiya_2022} for details.} for each bound mode present in the cloud; we arrange these in vectors $\boldsymbol{\xi}, \mathbf{A}$. The nonlinear field equation couples these components. For example,
+Here and below, the $\omega$ are real phase frequencies. Let us consider a field with $K$ independently oscillating bound axion modes, labeled by their respective no-self-interaction state $\ket{nlm}$. Each bound mode $i$ in the cloud has a phase $\xi_i$ and an amplitude $A_i$\footnote{Defined through the asymptotic normalization of its fundamental radial profile; see Equation 20 of \cite{Omiya_2022} for details.}; we arrange these in vectors $\boldsymbol{\xi}, \mathbf{A}$. The nonlinear field equation couples these components. For example,
 a quartic term in the potential produces a cubic term in the field
 equation containing $\phi_{211}^{\,2}\phi_{322}^{*}$, where
 $\phi_{nlm}$ denotes the complex oscillatory contribution associated
@@ -252,15 +252,50 @@ where $E(\mathbf{A})$ and $J(\mathbf{A})$ are the phase-averaged energy and angu
 In practice, we begin evolution at $A_{211}=10^{-6}$ and $A_{322}=10^{-7}$, and we're able to do a timestep in roughly \CW{how long?}.  
 
 \subsection{Full time-evolution method}
-Including the changing background, let $b=M_{\mathrm{BH}}/M_0$ and $j=J_{\mathrm{BH}}/M_0^2$ denote the black-hole mass and angular momentum relative to the initial mass $M_0$. Primes below denote derivatives with respect to $\tau=t/M_0$.
+Once the black hole evolves, energy and angular momentum are no longer the most convenient balance variables: the changing metric does work on the cloud, and with more than two bound modes they provide too few equations. We instead balance the occupations of the independent phases, following Whitham's averaged-Lagrangian method~\cite{Whitham_1965} in its multiphase form~\cite{Ablowitz_1970}\footnote{In these papers, the quantity in question is the \textit{wave action}, identical to our phase occupation.}.
+
+Including the changing background, let $b=M_{\mathrm{BH}}/M_0$ and $j=J_{\mathrm{BH}}/M_0^2$ denote the black-hole mass and angular momentum relative to the initial mass $M_0$. Averaging the Lagrangian of the full field over $\boldsymbol{\xi}$ gives an averaged Lagrangian $\bar{\mathcal{L}}(\boldsymbol{\omega},\mathbf{A};b,j)$ that no longer depends on the phases. Each shift $\xi_i\to\xi_i+c$ is therefore a symmetry, and its Noether charge is the occupation of phase $i$,
+\begin{equation}
+    \label{eq:wave_action}
+    \mathcal{N}_i = \frac{\partial\bar{\mathcal{L}}}{\partial\omega_i} = \sum_{\mathbf{q}} q_i\, n_\mathbf{q},
+    \qquad
+    n_\mathbf{q} = 4\pi\int dr\int_{-1}^{1}dx\;|F_\mathbf{q}|^2\,
+    \frac{\big[(r^2+a^2)^2-a^2\Delta(1-x^2)\big]\omega_\mathbf{q}-2a r\,m_\mathbf{q}}{\Delta},
+\end{equation}
+where $n_\mathbf{q}$ is the Klein--Gordon charge of component $\mathbf{q}$, integrated over the cloud as in~\cite{Hayes_1970}. It is helpful to consider the linear limit, in which $E=\omega\mathcal{N}$ and $J=m\mathcal{N}$ for each mode, and a component such as $(2,-1)$ contributes two quanta to $\mathcal{N}_{211}$ and minus one to $\mathcal{N}_{322}$. The phase-averaged source moves charge between components, but only with these weights, so the bulk transfer cancels and each $\mathcal{N}_i$ changes only through the radial current $F_{\mathcal{N}_i}=\sum_\mathbf{q} q_i\,4\pi(r^2+a^2)\sum_{l}\mathrm{Im}\big[R^*_{l,\mathbf{q}}Q_{l,\mathbf{q}}\big]$ at the boundaries. The actions are also adiabatic invariants of the slowly changing background, as the black hole changes the frequency of each quantum but not the number of quanta. With $L_{\mathcal{N}_i}=F_{\mathcal{N}_i}(\text{outer})-F_{\mathcal{N}_i}(\text{inner})$ (per unit $\tau$), each occupation obeys
+\begin{equation}
+    \label{eq:evolution_law}
+    \boxed{\frac{d\mathcal{N}_i}{d\tau} = -L_{\mathcal{N}_i}, \qquad i=1,\ldots,K.}
+\end{equation}
+The amplitudes $A_i$ and the occupations $\mathcal{N}_i$ are two ways of specifying the same stationary cloud: $A_i$ is convenient for the radial solve and $\mathcal{N}_i$ for the dynamics. Since we solve at fixed $\mathbf{A}$, we integrate \eqref{eq:evolution_law} in the amplitudes:
+\begin{equation}
+    \label{eq:action_balance}
+    \sum_{k}\frac{\partial\mathcal{N}_i}{\partial A_k}\frac{dA_k}{d\tau} = -L_{\mathcal{N}_i} - \left(\frac{\partial\mathcal{N}_i}{\partial b}\frac{db}{d\tau} + \frac{\partial\mathcal{N}_i}{\partial j}\frac{dj}{d\tau}\right), \qquad i=1,\ldots,K.
+\end{equation}
+There is no metric-work term. The background-derivative terms appear only because $\mathbf{A}$ is held fixed while the background changes; the number of quanta itself does not change. The amplitude derivatives include the response of the entire coupled solution, and background derivatives hold the amplitudes, the other background variable, and the extraction coordinates fixed. All quantities use consistent fixed reference units.
+
+
+The energy and angular momentum follow from the actions:
+\begin{align}
+    J &= \sum_i m_i\mathcal{N}_i \\
+    L_E &= \sum_i \omega_i L_{\mathcal{N}_i} \\
+    L_J &= \sum_i m_i L_{\mathcal{N}_i} \\
+    E &= \sum_i\omega_i\mathcal{N}_i-\bar{\mathcal{L}}
+\end{align}
+Once the cloud is contained in the domain, the last of the above gives $dE=\sum_i\omega_i\,d\mathcal{N}_i+w$. Multiplying \eqref{eq:evolution_law} by the frequencies and azimuthal numbers then recovers the energy and angular-momentum balance
 \begin{equation}
     \label{eq:evolving_background_balance}
     \begin{pmatrix}
     \partial_{A_1} E & \partial_{A_2} E \\
     \partial_{A_1} J & \partial_{A_2} J \\
-    \end{pmatrix}\begin{pmatrix}A_1' \\ A_2'\end{pmatrix} = -\begin{pmatrix}L_E \\ L_J\end{pmatrix} + \begin{pmatrix}w \\ 0\end{pmatrix} - \begin{pmatrix}(\partial_b E)b' + (\partial_j E)j' \\ (\partial_b J)b' + (\partial_j J)j'\end{pmatrix}
+    \end{pmatrix}\begin{pmatrix}A_1' \\ A_2'\end{pmatrix} = -\begin{pmatrix}L_E \\ L_J\end{pmatrix} + \begin{pmatrix}w \\ 0\end{pmatrix} - \begin{pmatrix}(\partial_b E)b' + (\partial_j E)j' \\ (\partial_b J)b' + (\partial_j J)j'\end{pmatrix},
 \end{equation}
-Here $E$ and $J$ are the cloud charges, $L_E$ and $L_J$ are the signed boundary losses, and $w$ is the rate of metric work on the cloud, positive when it adds energy. All quantities use consistent fixed reference units, with losses and work measured per unit $\tau$. Background derivatives hold the amplitudes, the other background variable, and the extraction coordinates fixed.
+with the rate of metric work on the cloud (positive when it adds energy)
+\begin{equation}
+    \label{eq:metric_work}
+    w = \Big(\partial_b E-\sum_i\omega_i\,\partial_b\mathcal{N}_i\Big)b' + \Big(\partial_j E-\sum_i\omega_i\,\partial_j\mathcal{N}_i\Big)j',
+\end{equation}
+which reduces to $w=\sum_i\mathcal{N}_i\,d\omega_i/d\tau$ in the linear regime. For two modes the two formulations are equivalent; on a contained domain they agree to $10^{-7}$ in the amplitude rates.
 
 \section{Approximations and validation}
 We make several assumptions and approximations in the construction of radial profiles. The most obvious one is the adiabatic approximation that undergirds the entire project. The 

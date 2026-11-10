@@ -1,0 +1,9 @@
+α = 0.42, mesh: 629 nodes, r* ∈ [-113.14, 267.11]; output /global/u1/c/clwelch/axion-sr-sim-rewrite/scripts/../results/omiya_rate_map_a0.99_alpha0.42_col4.csv
+column E₂₁₁ = 30: reference A = (3.862196e-02, 3.623684e-06)
+column E₂₁₁ = 100: reference A = (7.500727e-02, 3.791688e-06)
+column E₂₁₁ = 300: reference A = (1.567950e-01, 4.352733e-06)
+column E₂₁₁ = 1000: reference A = (6.880612e-01, 7.884619e-06)
+┌ Warning: solve_radial did not converge: |F| = 0.00033119968489738166 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+  E₃₂₂ = 1: failed (A₁ matching did not converge for N₁ = 2440.627891778899); next column
+done

@@ -1,0 +1,2 @@
+α = 0.30, mesh: 861 nodes, r* ∈ [-113.14, 517.90]; output /global/u1/c/clwelch/axion-sr-sim-rewrite/scripts/../results/omiya_rate_map_a0.99_alpha0.30_col2.csv
+[2026-11-10T07:38:07.372] error: *** JOB 61077883 ON nid004116 CANCELLED AT 2026-11-10T07:38:07 DUE to SIGNAL Terminated ***

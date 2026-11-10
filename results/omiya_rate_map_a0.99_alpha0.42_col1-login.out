@@ -1,0 +1,13 @@
+α = 0.42, mesh: 629 nodes, r* ∈ [-113.14, 267.11]; output /global/u1/c/clwelch/axion-sr-sim-rewrite/scripts/../results/omiya_rate_map_a0.99_alpha0.42_col1.csv
+column E₂₁₁ = 30: reference A = (3.862196e-02, 3.623684e-06)
+  E₃₂₂ = 1      N = (7.3385e+01, 2.4060e+00)  joint/Omiya − 1 = (-6.660e-05, +1.604e-04)  [21 s]
+  E₃₂₂ = 10     N = (7.3385e+01, 2.4060e+01)  joint/Omiya − 1 = (-1.036e-03, +1.328e-03)  [23 s]
+  E₃₂₂ = 30     N = (7.3384e+01, 7.2184e+01)  joint/Omiya − 1 = (-6.232e-03, -1.032e-03)  [22 s]
+  E₃₂₂ = 100    N = (7.3363e+01, 2.4066e+02)  joint/Omiya − 1 = (-4.327e-02, +4.302e-02)  [31 s]
+  E₃₂₂ = 300    N = (7.3123e+01, 7.2236e+02)  joint/Omiya − 1 = (+1.256e-01, +1.090e-01)  [39 s]
+  E₃₂₂ = 1000   N = (6.9441e+01, 2.4140e+03)  joint/Omiya − 1 = (+5.469e-01, +5.193e-01)  [68 s]
+┌ Warning: solve_radial did not converge: |F| = 0.00033119968489738166 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+  E₃₂₂ = 3000: failed (DomainError with -0.49700144168569177:
+sqrt was called with a negative real argument but will only return a complex result if called with a complex argument. Try sqrt(Complex(x)).); next column
+done

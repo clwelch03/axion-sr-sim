@@ -1,0 +1,79 @@
+α = 0.30, mesh: 861 nodes, r* ∈ [-113.14, 517.90]; output /global/u1/c/clwelch/axion-sr-sim-rewrite/scripts/../results/omiya_rate_map_a0.99_alpha0.30_col6.csv
+column E₂₁₁ = 30: reference A = (5.748215e-03, 3.258800e-07)
+column E₂₁₁ = 100: reference A = (1.084099e-02, 3.352398e-07)
+column E₂₁₁ = 300: reference A = (2.065465e-02, 3.646272e-07)
+column E₂₁₁ = 1000: reference A = (5.456026e-02, 5.115877e-07)
+column E₂₁₁ = 2000: reference A = (1.521135e-01, 9.888832e-07)
+column E₂₁₁ = 2700: reference A = (3.580905e-01, 1.882664e-06)
+  E₃₂₂ = 1      N = (9.0933e+03, 2.8558e+00)  joint/Omiya − 1 = (+5.717e-04, +3.123e-04)  [43 s]
+  E₃₂₂ = 10     N = (9.1020e+03, 2.8561e+01)  joint/Omiya − 1 = (+3.344e-03, +3.172e-03)  [68 s]
+  E₃₂₂ = 30     N = (9.1217e+03, 8.5696e+01)  joint/Omiya − 1 = (+9.828e-03, +9.664e-03)  [98 s]
+  E₃₂₂ = 100    N = (9.1957e+03, 2.8553e+02)  joint/Omiya − 1 = (+3.392e-02, +3.380e-02)  [158 s]
+  E₃₂₂ = 300    N = (9.4720e+03, 8.4458e+02)  joint/Omiya − 1 = (+1.092e-01, +1.093e-01)  [241 s]
+
+[651239] signal 15: Terminated
+in expression starting at /global/u1/c/clwelch/axion-sr-sim-rewrite/scripts/omiya_rate_map.jl:79
+_broadcast_zeropres! at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/SparseArrays/src/higherorderfns.jl:919
+_diffshape_broadcast at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/SparseArrays/src/higherorderfns.jl:221
+_copy at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/SparseArrays/src/higherorderfns.jl:1052 [inlined]
+copy at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/SparseArrays/src/higherorderfns.jl:1167 [inlined]
+materialize at ./broadcast.jl:872 [inlined]
+broadcast at ./broadcast.jl:810 [inlined]
+* at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/usr/share/julia/stdlib/v1.11/LinearAlgebra/src/diagonal.jl:442
+ScaledFactorization at /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:525 [inlined]
+#solve_radial#105 at /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:576
+solve_radial at /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:553 [inlined]
+#amplitudes_for_energy#164 at /global/u1/c/clwelch/axion-sr-sim-rewrite/src/calibration.jl:58
+amplitudes_for_energy at /global/u1/c/clwelch/axion-sr-sim-rewrite/src/calibration.jl:30
+unknown function (ip: 0x7fd4b984ba27)
+macro expansion at /global/u1/c/clwelch/axion-sr-sim-rewrite/scripts/omiya_rate_map.jl:103 [inlined]
+macro expansion at ./timing.jl:421 [inlined]
+top-level scope at /global/u1/c/clwelch/axion-sr-sim-rewrite/scripts/omiya_rate_map.jl:102
+jl_toplevel_eval_flex at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/toplevel.c:934
+jl_toplevel_eval_flex at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/toplevel.c:886
+ijl_toplevel_eval_in at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/toplevel.c:994
+eval at ./boot.jl:430 [inlined]
+include_string at ./loading.jl:2734
+_include at ./loading.jl:2794
+include at ./Base.jl:562
+jfptr_include_46986.1 at /global/common/software/nersc9/julia/1.11.7/lib/julia/sys.so (unknown line)
+exec_options at ./client.jl:323
+_start at ./client.jl:531
+jfptr__start_73684.1 at /global/common/software/nersc9/julia/1.11.7/lib/julia/sys.so (unknown line)
+jl_apply at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/julia.h:2157 [inlined]
+true_main at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/jlapi.c:900
+jl_repl_entrypoint at /cache/build/builder-demeter6-3/julialang/julia-release-1-dot-11/src/jlapi.c:1059
+main at julia (unknown line)
+__libc_start_call_main at /lib64/libc.so.6 (unknown line)
+__libc_start_main at /lib64/libc.so.6 (unknown line)
+unknown function (ip: 0x4010b8)
+unknown function (ip: (nil))
+Allocations: 2592471667 (Pool: 2592465438; Big: 6229); GC: 4662
+┌ Warning: solve_radial did not converge: |F| = 0.06305877618117095 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.013552114323874584 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.03979196110005689 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.013690243236563593 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.0349166813299268e-7 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.09660480052752807 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.03087570362993855 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.011589692089819153 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.0023030050195219356 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.0763036050832956 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.0544478946249775 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.0382851976069195 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.010730567371100955 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.024175953988258187 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625

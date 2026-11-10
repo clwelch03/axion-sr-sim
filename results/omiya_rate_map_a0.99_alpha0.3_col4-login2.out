@@ -1,0 +1,13 @@
+α = 0.30, mesh: 861 nodes, r* ∈ [-113.14, 517.90]; output /global/u1/c/clwelch/axion-sr-sim-rewrite/scripts/../results/omiya_rate_map_a0.99_alpha0.30_col4.csv
+column E₂₁₁ = 30: reference A = (5.748215e-03, 3.258800e-07)
+column E₂₁₁ = 100: reference A = (1.084099e-02, 3.352398e-07)
+column E₂₁₁ = 300: reference A = (2.065465e-02, 3.646272e-07)
+column E₂₁₁ = 1000: reference A = (5.456026e-02, 5.115877e-07)
+  E₃₂₂ = 1      N = (3.3746e+03, 3.3323e+00)  joint/Omiya − 1 = (-1.423e-04, +9.988e-05)  [31 s]
+  E₃₂₂ = 10     N = (3.3749e+03, 3.3335e+01)  joint/Omiya − 1 = (+1.519e-03, +1.013e-03)  [37 s]
+  E₃₂₂ = 30     N = (3.3756e+03, 1.0009e+02)  joint/Omiya − 1 = (+3.492e-03, +3.079e-03)  [43 s]
+  E₃₂₂ = 100    N = (3.3775e+03, 3.3459e+02)  joint/Omiya − 1 = (+1.107e-02, +1.070e-02)  [58 s]
+  E₃₂₂ = 300    N = (3.3793e+03, 1.0126e+03)  joint/Omiya − 1 = (+3.630e-02, +3.626e-02)  [83 s]
+  E₃₂₂ = 1000   N = (3.3300e+03, 3.5032e+03)  joint/Omiya − 1 = (+1.818e-01, +1.991e-01)  [126 s]
+  E₃₂₂ = 3000   N = (1.8221e+03, 1.3428e+04)  joint/Omiya − 1 = (-1.748e+00, +3.344e+00)  [174 s]
+done

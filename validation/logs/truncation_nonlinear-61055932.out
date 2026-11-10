@@ -1,0 +1,5 @@
+max_order = 3, n_angular = 1 ( 8 components,   8 channels,  182 s, converged = true): Im ω₂₁₁ = -3.888678e-06  Im ω₃₂₂ = +5.962253e-07  Re ω = (0.295952427, 0.298352882)  L_E = 4.231418e-03  L_J = 1.122808e-02  L_N = (+1.741738e-02, -3.094651e-03)  A = (4.185089e-02, 1.269835e-04)
+max_order = 5, n_angular = 1 (18 components,  18 channels, 9928 s, converged = true): Im ω₂₁₁ = -3.906206e-06  Im ω₃₂₂ = +5.929306e-07  Re ω = (0.295952398, 0.298352864)  L_E = 4.258003e-03  L_J = 1.132615e-02  L_N = (+1.749883e-02, -3.086339e-03)  A = (4.179876e-02, 1.269965e-04)
+max_order = 3, n_angular = 2 ( 8 components,  16 channels,  341 s, converged = true): Im ω₂₁₁ = -4.176333e-06  Im ω₃₂₂ = +6.480253e-07  Re ω = (0.295947850, 0.298351040)  L_E = 4.532028e-03  L_J = 1.194461e-02  L_N = (+1.873776e-02, -3.396578e-03)  A = (4.209163e-02, 1.279292e-04)
+/var/spool/slurmd/job61055932/slurm_script: line 4: 1433420 Killed                  julia --project=. validation/truncation_nonlinear.jl
+[2026-11-10T01:29:48.664] error: Detected 1 oom_kill event in StepId=61055932.batch. Some of the step tasks have been OOM Killed.

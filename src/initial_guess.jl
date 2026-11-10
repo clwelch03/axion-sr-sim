@@ -29,6 +29,28 @@ function hydrogenic_profile(mode::BoundMode, mass_coupling, r)
 end
 
 """
+    single_mode_frequencies(problem)
+
+Starting frequencies for a cold solve. For one bound mode, the hydrogenic
+frequency. For several, each mode's free-field frequency from its own
+single-mode solve on the same mesh (itself started from the hydrogenic value):
+at large α the hydrogenic guess is too far off for the coupled system (a = 0.99,
+α = 0.42: ω₂₁₁ off by 1.9e-3, and the two-mode free solve wandered to
+ω₂₁₁ = 0.398 instead of 0.4088), while each mode alone converges from it.
+"""
+function single_mode_frequencies(problem::RadialProblem)
+    mode_set, mass_coupling = problem.mode_set, problem.mass_coupling
+    n_modes(problem) == 1 && return complex.(hydrogenic_frequency.(mode_set.modes, mass_coupling))
+    map(mode_set.modes) do mode
+        single = RadialProblem(problem.background, FreePotential(), mass_coupling, ModeSet([mode]); mesh=problem.mesh,
+                               horizon_order=problem.horizon_order, outer_order=problem.outer_order,
+                               outer_boundary=problem.outer_boundary)
+        solution = solve_radial(single, [one(mass_coupling)])
+        solution.converged ? mode_frequencies(solution)[1] : complex(hydrogenic_frequency(mode, mass_coupling))
+    end
+end
+
+"""
     initial_unknowns(problem, layout, amplitudes, scale)
 
 Unknown vector seeded with hydrogenic profiles and frequencies, zero driven
@@ -51,6 +73,6 @@ function initial_unknowns(problem::RadialProblem, layout::UnknownLayout, amplitu
         end
     end
     parameter_block = view(unknowns, parameter_range(layout))
-    parameter_block[frequency_range(layout)] = _realify(complex.(hydrogenic_frequency.(mode_set.modes, mass_coupling)))
+    parameter_block[frequency_range(layout)] = _realify(single_mode_frequencies(problem))
     return unknowns
 end

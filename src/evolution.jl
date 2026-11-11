@@ -132,6 +132,8 @@ mutable struct EvolutionCache{P<:RadialProblem, T<:Real}
     verbose::Bool
     log_amplitudes::Bool
     balance::Symbol       # :energy or :action
+    accepted_solution::Union{Nothing, RadialSolution}   # radial solution at the last accepted step (spindown warm start)
+    solve_failed::Bool    # a radial solve in the current step attempt did not converge (spindown rejects the step)
 end
 
 """
@@ -145,7 +147,8 @@ function EvolutionCache(problem::RadialProblem; decay_constant_ratio=0.0, includ
                         verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing)
     _check_balance(problem, balance)
     EvolutionCache(problem, problem.mass_coupling, float(decay_constant_ratio)^2, include_metric_work, last_solution,
-                   EvolutionDiagnostics{Float64}[], float(newton_tol), verbose, log_amplitudes, balance)
+                   EvolutionDiagnostics{Float64}[], float(newton_tol), verbose, log_amplitudes, balance,
+                   last_solution, false)
 end
 
 """Print one progress line per right-hand-side evaluation when the cache is verbose."""
@@ -561,11 +564,32 @@ end
 amplitude_rates(terms::BalanceTerms, cache::EvolutionCache) =
     amplitude_rates(terms; cache.balance, include_metric_work=cache.include_metric_work)
 
+"""
+Right-hand side of the spindown evolution. Every radial solve is warm-started
+from the solution at the last accepted step, never from a stage of a rejected
+step: after a rejection the retry's stages can be far from the rejected trial
+stages in both amplitudes and background, and that combination broke the warm
+start (`validation/spindown_warmstart_check.jl`). If a solve still fails, the
+rates are set to zero, the remaining stages of the step are skipped, and
+`_reject_failed_step` makes the integrator retry with a smaller step.
+"""
 function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
     mode_count = n_modes(cache.template)
+    if cache.solve_failed
+        rates .= 0
+        return nothing
+    end
     amplitudes = _state_amplitudes(state_vector, mode_count, cache.log_amplitudes)
     state = BackgroundState(state_vector[mode_count + 1], state_vector[mode_count + 2])
-    solution = _solve_cached!(cache, current_problem(cache, state), amplitudes)
+    solution = solve_radial(current_problem(cache, state), amplitudes; guess=cache.accepted_solution, tol=cache.newton_tol)
+    if !solution.converged
+        cache.solve_failed = true
+        rates .= 0
+        cache.verbose && (println("t = ", time, "  radial solve failed (|F| = ", solution.residual_norm,
+                                  "); the step will be rejected"); flush(stdout))
+        return nothing
+    end
+    cache.last_solution = solution
     terms = balance_terms(cache, solution, state)
     rates[1:mode_count] = _state_rates(amplitude_rates(terms, cache), amplitudes, cache.log_amplitudes)
     rates[mode_count + 1] = terms.state_rate.mass
@@ -579,12 +603,42 @@ function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
 end
 
 """
+`isoutofdomain` for the spindown integrator: reject the step if any radial
+solve in it failed (the integrator then shrinks the step by `qmin`), and clear
+the flag for the next attempt. Called once per step attempt, after the last stage.
+"""
+function _reject_failed_step(state_vector, cache::EvolutionCache, time)
+    failed = cache.solve_failed
+    cache.solve_failed = false
+    return failed
+end
+
+"""
+Callback after every accepted step: keep the step's radial solution as the
+warm start for the next step. Tsit5 evaluates the right-hand side at the
+accepted state as its last stage (first-same-as-last), so `cache.last_solution`
+is the solution there; the check makes a different integrator fail loudly.
+"""
+function _record_accepted_solution!(integrator)
+    cache = integrator.p
+    amplitudes = _state_amplitudes(integrator.u, n_modes(cache.template), cache.log_amplitudes)
+    isapprox(cache.last_solution.amplitudes, amplitudes; rtol=1e-12) ||
+        error("last radial solution is not at the accepted state (amplitudes $(cache.last_solution.amplitudes) " *
+              "vs $amplitudes); the accepted-step warm start assumes a first-same-as-last integrator such as Tsit5")
+    cache.accepted_solution = cache.last_solution
+    u_modified!(integrator, false)
+    return nothing
+end
+
+"""
     evolve_with_spindown(problem, amplitudes, time_span, decay_constant_ratio; balance=:action,
                          include_metric_work=false, log_amplitudes=true, initial_step_fraction=0.05,
-                         newton_tol=1e-10, verbose=false, reltol, abstol, kwargs...)
+                         newton_tol=1e-10, verbose=false, initial_background, initial_guess=nothing,
+                         reltol, abstol, kwargs...)
 
 Integrate `[A₁ … A_K, b, j]` (or `[ln A₁ … ln A_K, b, j]`, the default) with
-Tsit5, starting from `b = 1` and `j = a` of `problem.background`. `problem`
+Tsit5, starting from `initial_background`, by default `b = 1` and `j = a` of
+`problem.background`. `problem`
 defines the reference units: its `mass_coupling` is `α₀ = M₀ μ` and its mesh is
 reused in units of the current mass at every step. `decay_constant_ratio =
 f_a / M_Pl` (non-reduced Planck mass) sets how strongly the cloud's horizon
@@ -596,19 +650,40 @@ modes, no metric-work term). With `balance=:energy`, `include_metric_work` adds
 the action-based `metric_work` to the energy equation; it is off by default so
 that earlier energy-balance runs reproduce, and is of relative order `(f_a/M_Pl)² E` like the
 background-drift terms. The work is recorded in the diagnostics either way.
+
+Each radial solve is warm-started from the solution at the last accepted step,
+and a step in which a solve fails is rejected and retried with a smaller step
+(`_spindown_rhs!`). If the step size then reaches the integrator's minimum, the
+integration stops with a non-success return code instead of using an
+unconverged solution. Do not pass `callback` or `isoutofdomain`; they are used.
+
+To restart from a saved state `(t, A, b, j)`, pass the original run's `problem`
+(it fixes the reference units and the mesh), the saved amplitudes, `time_span =
+(t, t_final)` and `initial_background = BackgroundState(b, j)`. `initial_guess`
+is a converged `RadialSolution` at the starting state to begin the first solve
+from (for example from amplitude continuation); without it the first solve
+starts cold, which can fail in the nonlinear regime.
 """
 function evolve_with_spindown(problem::RadialProblem, amplitudes::AbstractVector, time_span, decay_constant_ratio::Real;
                               balance::Symbol=:action, include_metric_work=false, log_amplitudes=true,
                               initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
+                              initial_background::BackgroundState=BackgroundState(1.0, problem.background.a),
+                              initial_guess=nothing,
                               reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
-    cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, newton_tol, verbose, log_amplitudes, balance)
+    cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, newton_tol, verbose, log_amplitudes, balance,
+                           last_solution=initial_guess)
     initial_amplitudes = collect(float.(amplitudes))
-    initial_background = BackgroundState(1.0, problem.background.a)
     initial_solution = _solve_cached!(cache, current_problem(cache, initial_background), initial_amplitudes)
+    initial_solution.converged || error("initial radial solve did not converge")
+    cache.accepted_solution = initial_solution
     initial_rates = amplitude_rates(balance_terms(cache, initial_solution, initial_background), cache)
     solver_options = _with_initial_step(kwargs, _initial_step(initial_amplitudes, initial_rates, initial_step_fraction))
-    initial_state = vcat(log_amplitudes ? log.(initial_amplitudes) : initial_amplitudes, [1.0, problem.background.a])
+    initial_state = vcat(log_amplitudes ? log.(initial_amplitudes) : initial_amplitudes,
+                         [initial_background.mass, initial_background.angular_momentum])
     ode = ODEProblem(_spindown_rhs!, initial_state, time_span, cache)
-    ode_solution = solve(ode, Tsit5(); reltol, abstol, solver_options...)
+    accepted_step_callback = DiscreteCallback((state, time, integrator) -> true, _record_accepted_solution!;
+                                              save_positions=(false, false))
+    ode_solution = solve(ode, Tsit5(); reltol, abstol, callback=accepted_step_callback,
+                         isoutofdomain=_reject_failed_step, solver_options...)
     EvolutionResult(ode_solution, cache.diagnostics, cache.last_solution, log_amplitudes)
 end

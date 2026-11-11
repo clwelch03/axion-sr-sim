@@ -1,0 +1,22 @@
+stringy: cosine potential, E = 650, mesh 861 nodes, r* ∈ [-113.1, 517.9]
+  linear pair            61 s, converged = true, |F| = 2.62e-12
+  single primary         59 s, converged = true, |F| = 5.31e-13
+  small-secondary pair   160 s, converged = true, |F| = 2.53e-13
+  Omiya reference        4 s, converged = true, |F| = 2.33e-13
+  joint pair             94 s, converged = true, |F| = 2.79e-13
+┌ Warning: solve_radial did not converge: |F| = 0.0005368718706953396 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.8396784699272941 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 0.00026926326469527536 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+  dE/dr* integrates to [649.9999993451761, 650.0000000050704] (fundamental_energies [649.9999993451764, 650.0000000050701])
+  dE/dr* integrates to [650.0000002480451] (fundamental_energies [650.0000002480447])
+  dE/dr* integrates to [649.9983623677316, 0.010000015183450898] (fundamental_energies [649.9983623677322, 0.010000015183450898])
+  dE/dr* integrates to [649.9999055083168, 649.999554770582] (fundamental_energies [649.9999055083161, 649.9995547705811])
+Spin room a: 0.99 → 0.877 with J = 6601.7 fₐ²M² needs fₐ/M_Pl ≤ 0.00414 (fₐ ≤ 5.1e+16 GeV); QCD at that fₐ: mₐ = 1.1e-10 eV, M = 0.36 M☉
+  linear           A = [0.02639038085300348, 8.209450613468739e-5]  E_fund = [649.9999993451764, 650.0000000050701]  ω = [0.296304339146206, 0.2984522683213336]
+  single primary   A = [0.0362886345089153]  E_fund = [650.0000002480447]  ω = [0.29603414741576317]
+  Omiya reference  A = [0.0362886345089153, 4.277567129231345e-7]  E_fund = [649.9983623677322, 0.010000015183450898]  ω = [0.29603414701044145, 0.29838589810550303]
+  joint            A = [0.041852915943010514, 0.00012698285138235693]  E_fund = [649.9999055083161, 649.9995547705811]  ω = [0.2959524269220614, 0.29835288143458943]
+/global/u1/c/clwelch/axion-sr-sim-rewrite/scripts/../results/profile_comparison_stringy.csv

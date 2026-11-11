@@ -1,0 +1,23 @@
+α = 0.38, a = 0.990: mesh 684 nodes, r* ∈ [-113.14, 325.10]; linear growth rates ω₂₁₁,I = +1.0524e-07
+    Newton  1: A = (2.778085e-02, 1.534028e-04)  L/G = (+4.40e-02, +2.55e-02)
+    Newton  2: A = (2.775838e-02, 1.528569e-04)  L/G = (+2.36e-03, +2.79e-03)
+    Newton  3: A = (2.775843e-02, 1.528549e-04)  L/G = (+4.26e-06, +1.52e-05)
+  a = 0.990: plateau ωN = (47.88, 72.87) after 4 Newton steps; measure = 4.256e-03; Omiya plateau shift δN/N = (+3.209e-03, +1.029e-02)  [105 s]
+α = 0.38, a = 0.970: mesh 579 nodes, r* ∈ [-70.84, 325.10]; linear growth rates ω₂₁₁,I = +7.9700e-08
+    Newton  1: A = (2.611660e-02, 1.435591e-04)  L/G = (+9.98e-02, -1.28e-03)
+    Newton  2: A = (2.587624e-02, 1.422932e-04)  L/G = (+1.29e-02, -2.77e-04)
+    Newton  3: A = (2.587213e-02, 1.422721e-04)  L/G = (+2.17e-04, -8.88e-06)
+  a = 0.970: plateau ωN = (41.75, 63.73) after 4 Newton steps; measure = 3.498e-03; Omiya plateau shift δN/N = (+2.507e-03, +8.772e-03)  [118 s]
+α = 0.38, a = 0.950: mesh 546 nodes, r* ∈ [-57.69, 325.10]; linear growth rates ω₂₁₁,I = -8.6709e-08
+  a = 0.950: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.38, a = 0.900: mesh 512 nodes, r* ∈ [-44.35, 325.10]; linear growth rates ω₂₁₁,I = -1.4241e-06
+  a = 0.900: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.38, a = 0.850: mesh 498 nodes, r* ∈ [-38.41, 325.10]; linear growth rates ω₂₁₁,I = -4.2434e-06
+  a = 0.850: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.38, a = 0.800: mesh 489 nodes, r* ∈ [-34.88, 325.10]; linear growth rates ω₂₁₁,I = -8.6126e-06
+  a = 0.800: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.38, a = 0.700: mesh 478 nodes, r* ∈ [-30.73, 325.10]; linear growth rates ω₂₁₁,I = -2.2099e-05
+┌ Warning: solve_radial did not converge: |F| = 0.07865993539842922 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+  a = 0.700: |211⟩ not superradiant, no two-cloud plateau sought
+done

@@ -1,0 +1,24 @@
+α = 0.35, a = 0.990: mesh 738 nodes, r* ∈ [-113.14, 382.17]; linear growth rates ω₂₁₁,I = +6.8080e-08
+    Newton  1: A = (1.828722e-02, 8.707687e-05)  L/G = (-2.30e-02, +4.52e-02)
+    Newton  2: A = (1.826850e-02, 8.729060e-05)  L/G = (-1.65e-04, -3.48e-03)
+    Newton  3: A = (1.826855e-02, 8.729102e-05)  L/G = (-4.31e-06, -2.61e-06)
+  a = 0.990: plateau ωN = (53.07, 77.62) after 4 Newton steps; measure = 3.711e-03; Omiya plateau shift δN/N = (+2.734e-03, +9.129e-03)  [124 s]
+α = 0.35, a = 0.970: mesh 633 nodes, r* ∈ [-70.84, 382.17]; linear growth rates ω₂₁₁,I = +6.8670e-08
+    Newton  1: A = (1.837195e-02, 8.762007e-05)  L/G = (-6.93e-03, +1.79e-03)
+    Newton  2: A = (1.837092e-02, 8.761822e-05)  L/G = (+6.20e-05, -3.45e-05)
+  a = 0.970: plateau ωN = (53.25, 77.99) after 3 Newton steps; measure = 3.713e-03; Omiya plateau shift δN/N = (+2.721e-03, +9.162e-03)  [37 s]
+α = 0.35, a = 0.950: mesh 600 nodes, r* ∈ [-57.69, 382.17]; linear growth rates ω₂₁₁,I = +4.6668e-08
+    Newton  1: A = (1.688751e-02, 8.053038e-05)  L/G = (+1.33e-01, +1.75e-03)
+    Newton  2: A = (1.662357e-02, 7.924059e-05)  L/G = (+2.28e-02, +6.05e-04)
+    Newton  3: A = (1.661574e-02, 7.920070e-05)  L/G = (+6.77e-04, +3.78e-05)
+    Newton  4: A = (1.661573e-02, 7.920067e-05)  L/G = (+6.00e-07, +6.99e-08)
+  a = 0.950: plateau ωN = (44.01, 64.62) after 5 Newton steps; measure = 2.907e-03; Omiya plateau shift δN/N = (+2.026e-03, +7.428e-03)  [43 s]
+α = 0.35, a = 0.900: mesh 566 nodes, r* ∈ [-44.35, 382.17]; linear growth rates ω₂₁₁,I = -2.0726e-07
+  a = 0.900: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.35, a = 0.850: mesh 552 nodes, r* ∈ [-38.41, 382.17]; linear growth rates ω₂₁₁,I = -8.3347e-07
+  a = 0.850: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.35, a = 0.800: mesh 543 nodes, r* ∈ [-34.88, 382.17]; linear growth rates ω₂₁₁,I = -1.8843e-06
+  a = 0.800: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.35, a = 0.700: mesh 532 nodes, r* ∈ [-30.73, 382.17]; linear growth rates ω₂₁₁,I = -5.3687e-06
+  a = 0.700: |211⟩ not superradiant, no two-cloud plateau sought
+done

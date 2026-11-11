@@ -1,0 +1,25 @@
+α = 0.42, a = 0.990: mesh 629 nodes, r* ∈ [-113.14, 267.11]; linear growth rates ω₂₁₁,I = +1.5039e-07
+    Newton  1: A = (4.647299e-02, 3.031769e-04)  L/G = (+1.80e-01, -5.94e-03)
+    Newton  2: A = (4.510570e-02, 2.950124e-04)  L/G = (+4.18e-02, -2.31e-03)
+    Newton  3: A = (4.502809e-02, 2.945845e-04)  L/G = (+2.27e-03, -2.44e-04)
+    Newton  4: A = (4.502784e-02, 2.945834e-04)  L/G = (+6.73e-06, -1.49e-06)
+  a = 0.990: plateau ωN = (38.58, 62.56) after 5 Newton steps; measure = 4.462e-03; Omiya plateau shift δN/N = (+3.280e-03, +1.097e-02)  [177 s]
+α = 0.42, a = 0.970: mesh 523 nodes, r* ∈ [-70.84, 267.11]; linear growth rates ω₂₁₁,I = -4.4512e-07
+  a = 0.970: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.42, a = 0.950: mesh 490 nodes, r* ∈ [-57.69, 267.11]; linear growth rates ω₂₁₁,I = -2.3333e-06
+  a = 0.950: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.42, a = 0.900: mesh 457 nodes, r* ∈ [-44.35, 267.11]; linear growth rates ω₂₁₁,I = -1.2809e-05
+  a = 0.900: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.42, a = 0.850: mesh 442 nodes, r* ∈ [-38.41, 267.11]; linear growth rates ω₂₁₁,I = -1.5619e-04
+  a = 0.850: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.42, a = 0.800: mesh 433 nodes, r* ∈ [-34.88, 267.11]; linear growth rates ω₂₁₁,I = -5.6084e-05
+  a = 0.800: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.42, a = 0.700: mesh 423 nodes, r* ∈ [-30.73, 267.11]; linear growth rates ω₂₁₁,I = -1.2543e-04
+┌ Warning: solve_radial did not converge: |F| = 0.0006705806424272013 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 3.205113753265566e-11 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.1076998263616348e-7 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+  a = 0.700: |211⟩ not superradiant, no two-cloud plateau sought
+done

@@ -1,0 +1,27 @@
+α = 0.30, a = 0.990: mesh 861 nodes, r* ∈ [-113.14, 517.90]; linear growth rates ω₂₁₁,I = +2.6807e-08
+    Newton  1: A = (8.513072e-03, 3.035837e-05)  L/G = (-1.03e-01, +7.13e-02)
+    Newton  2: A = (8.374086e-03, 3.056697e-05)  L/G = (+1.23e-02, -2.42e-02)
+    Newton  3: A = (8.371264e-03, 3.058710e-05)  L/G = (+1.36e-05, -9.96e-04)
+    Newton  4: A = (8.371265e-03, 3.058712e-05)  L/G = (-3.53e-07, -3.71e-07)
+  a = 0.990: plateau ωN = (59.99, 83.22) after 5 Newton steps; measure = 2.681e-03; Omiya plateau shift δN/N = (+1.665e-03, +6.992e-03)  [156 s]
+α = 0.30, a = 0.970: mesh 756 nodes, r* ∈ [-70.84, 517.90]; linear growth rates ω₂₁₁,I = +2.7508e-08
+    Newton  1: A = (8.446818e-03, 3.082644e-05)  L/G = (-1.19e-02, +1.08e-03)
+    Newton  2: A = (8.445599e-03, 3.082311e-05)  L/G = (+1.86e-04, -3.49e-05)
+  a = 0.970: plateau ωN = (60.73, 84.3) after 3 Newton steps; measure = 2.720e-03; Omiya plateau shift δN/N = (+1.683e-03, +7.086e-03)  [53 s]
+α = 0.30, a = 0.950: mesh 723 nodes, r* ∈ [-57.69, 517.90]; linear growth rates ω₂₁₁,I = +2.7318e-08
+    Newton  1: A = (8.446286e-03, 3.079219e-05)  L/G = (+3.84e-04, +1.09e-03)
+    Newton  2: A = (8.446289e-03, 3.079218e-05)  L/G = (-2.40e-07, +7.32e-07)
+  a = 0.950: plateau ωN = (60.49, 84.03) after 3 Newton steps; measure = 2.717e-03; Omiya plateau shift δN/N = (+1.664e-03, +7.062e-03)  [48 s]
+α = 0.30, a = 0.900: mesh 690 nodes, r* ∈ [-44.35, 517.90]; linear growth rates ω₂₁₁,I = +1.4778e-08
+    Newton  1: A = (7.491780e-03, 2.730039e-05)  L/G = (+2.03e-01, +2.80e-03)
+    Newton  2: A = (7.229922e-03, 2.632250e-05)  L/G = (+5.37e-02, +1.36e-03)
+    Newton  3: A = (7.211367e-03, 2.625045e-05)  L/G = (+3.76e-03, +1.92e-04)
+    Newton  4: A = (7.211278e-03, 2.625008e-05)  L/G = (+1.85e-05, +1.96e-06)
+  a = 0.900: plateau ωN = (44.62, 62.15) after 5 Newton steps; measure = 2.039e-03; Omiya plateau shift δN/N = (+1.075e-03, +5.132e-03)  [58 s]
+α = 0.30, a = 0.850: mesh 675 nodes, r* ∈ [-38.41, 517.90]; linear growth rates ω₂₁₁,I = -2.7013e-08
+  a = 0.850: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.30, a = 0.800: mesh 666 nodes, r* ∈ [-34.88, 517.90]; linear growth rates ω₂₁₁,I = -1.0761e-07
+  a = 0.800: |211⟩ not superradiant, no two-cloud plateau sought
+α = 0.30, a = 0.700: mesh 655 nodes, r* ∈ [-30.73, 517.90]; linear growth rates ω₂₁₁,I = -4.0799e-07
+  a = 0.700: |211⟩ not superradiant, no two-cloud plateau sought
+done

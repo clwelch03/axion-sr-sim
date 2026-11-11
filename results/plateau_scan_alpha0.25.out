@@ -1,0 +1,68 @@
+α = 0.25, a = 0.990: mesh 1055 nodes, r* ∈ [-113.14, 742.70]; linear growth rates ω₂₁₁,I = +7.9282e-09
+    Newton  1: A = (3.555829e-03, 8.826005e-06)  L/G = (-1.54e-01, +9.96e-02)
+    Newton  2: A = (3.428103e-03, 8.936321e-06)  L/G = (+2.91e-02, -5.40e-02)
+    Newton  3: A = (3.421578e-03, 8.965006e-06)  L/G = (+2.97e-04, -5.13e-03)
+    Newton  4: A = (3.421585e-03, 8.965142e-06)  L/G = (-8.98e-06, -1.31e-05)
+  a = 0.990: plateau ωN = (65.5, 85.81) after 5 Newton steps; measure = 2.236e-03; Omiya plateau shift δN/N = (+4.401e-04, +4.891e-03)  [256 s]
+α = 0.25, a = 0.970: mesh 949 nodes, r* ∈ [-70.84, 742.70]; linear growth rates ω₂₁₁,I = +8.0025e-09
+    Newton  1: A = (3.434458e-03, 8.991558e-06)  L/G = (-4.93e-03, +7.81e-04)
+    Newton  2: A = (3.434369e-03, 8.991422e-06)  L/G = (+3.18e-05, -1.05e-05)
+  a = 0.970: plateau ωN = (65.81, 86.2) after 3 Newton steps; measure = 2.252e-03; Omiya plateau shift δN/N = (+4.343e-04, +4.915e-03)  [72 s]
+α = 0.25, a = 0.950: mesh 916 nodes, r* ∈ [-57.69, 742.70]; linear growth rates ω₂₁₁,I = +8.0357e-09
+    Newton  1: A = (3.442653e-03, 9.005592e-06)  L/G = (-3.02e-03, +8.15e-04)
+    Newton  2: A = (3.442617e-03, 9.005558e-06)  L/G = (+1.18e-05, -6.84e-06)
+  a = 0.950: plateau ωN = (65.95, 86.38) after 3 Newton steps; measure = 2.261e-03; Omiya plateau shift δN/N = (+4.262e-04, +4.927e-03)  [69 s]
+α = 0.25, a = 0.900: mesh 883 nodes, r* ∈ [-44.35, 742.70]; linear growth rates ω₂₁₁,I = +7.5443e-09
+    Newton  1: A = (3.399217e-03, 8.872384e-06)  L/G = (+1.94e-02, +2.42e-03)
+    Newton  2: A = (3.398180e-03, 8.868606e-06)  L/G = (+4.91e-04, +1.23e-04)
+    Newton  3: A = (3.398179e-03, 8.868603e-06)  L/G = (+3.10e-07, +1.58e-07)
+  a = 0.900: plateau ωN = (63.99, 83.74) after 4 Newton steps; measure = 2.207e-03; Omiya plateau shift δN/N = (+3.821e-04, +4.776e-03)  [67 s]
+α = 0.25, a = 0.850: mesh 868 nodes, r* ∈ [-38.41, 742.70]; linear growth rates ω₂₁₁,I = +5.3456e-09
+    Newton  1: A = (3.156824e-03, 8.224423e-06)  L/G = (+1.18e-01, +3.08e-03)
+    Newton  2: A = (3.118590e-03, 8.118433e-06)  L/G = (+1.82e-02, +8.99e-04)
+    Newton  3: A = (3.117695e-03, 8.115765e-06)  L/G = (+4.32e-04, +4.35e-05)
+    Newton  4: A = (3.117695e-03, 8.115764e-06)  L/G = (+2.44e-07, +5.01e-08)
+  a = 0.850: plateau ωN = (54.08, 70.65) after 5 Newton steps; measure = 1.879e-03; Omiya plateau shift δN/N = (+2.723e-04, +4.015e-03)  [69 s]
+α = 0.25, a = 0.800: mesh 859 nodes, r* ∈ [-34.88, 742.70]; linear growth rates ω₂₁₁,I = +5.2410e-10
+    Newton  1: A = (2.465311e-03, 6.423558e-06)  L/G = (+5.08e-01, +3.57e-03)
+    Newton  2: A = (2.031623e-03, 5.292991e-06)  L/G = (+3.93e-01, +3.44e-03)
+    Newton  3: A = (1.800392e-03, 4.685710e-06)  L/G = (+2.16e-01, +2.68e-03)
+    Newton  4: A = (1.731140e-03, 4.501089e-06)  L/G = (+6.19e-02, +1.29e-03)
+    Newton  5: A = (1.725367e-03, 4.485237e-06)  L/G = (+5.05e-03, +2.00e-04)
+    Newton  6: A = (1.725329e-03, 4.485126e-06)  L/G = (+3.39e-05, +2.68e-06)
+  a = 0.800: plateau ωN = (17.09, 22.32) after 7 Newton steps; measure = 6.019e-04; Omiya plateau shift δN/N = (-1.083e-04, +1.094e-03)  [83 s]
+α = 0.25, a = 0.700: mesh 849 nodes, r* ∈ [-30.73, 742.70]; linear growth rates ω₂₁₁,I = -1.9533e-08
+┌ Warning: solve_radial did not converge: |F| = 1.1407541578023455e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.1407541578023455e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.1407541578023455e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.1407541578023455e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.1407541578023455e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.2836953722228385e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.2836953722228385e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.2836953722228385e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.3433698597964454e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.3433698597964454e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.3433698597964454e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.502964419586307e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.502964419586307e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.502964419586307e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.4613310561628688e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+┌ Warning: solve_radial did not converge: |F| = 1.4613310561628688e-10 after 30 iterations
+└ @ AxionCloud /global/u1/c/clwelch/axion-sr-sim-rewrite/src/bvp.jl:625
+  a = 0.700: |211⟩ not superradiant, no two-cloud plateau sought
+done

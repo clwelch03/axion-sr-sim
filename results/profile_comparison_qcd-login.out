@@ -1,0 +1,16 @@
+qcd: chiral potential, E = 5, mesh 861 nodes, r* ∈ [-113.1, 517.9]
+  linear pair            60 s, converged = true, |F| = 5.81e-13
+  single primary         26 s, converged = true, |F| = 3.97e-14
+  small-secondary pair   44 s, converged = true, |F| = 3.95e-13
+  Omiya reference        4 s, converged = true, |F| = 3.01e-13
+  joint pair             32 s, converged = true, |F| = 3.06e-13
+  dE/dr* integrates to [5.000000000519591, 5.0000000000024745] (fundamental_energies [5.000000000519595, 5.000000000002477])
+  dE/dr* integrates to [4.9999999999845395] (fundamental_energies [4.999999999984538])
+  dE/dr* integrates to [4.999993713318268, 0.010000000017117459] (fundamental_energies [4.999993713318274, 0.01000000001711747])
+  dE/dr* integrates to [4.999999999991264, 4.999999999845291] (fundamental_energies [4.999999999991269, 4.999999999845292])
+Spin room a: 0.99 → 0.877 with J = 50.4 fₐ²M² needs fₐ/M_Pl ≤ 0.0473 (fₐ ≤ 5.8e+17 GeV); QCD at that fₐ: mₐ = 9.9e-12 eV, M = 4.1 M☉
+  linear           A = [0.002314589515969338, 7.200164494647769e-6]  E_fund = [5.000000000519595, 5.000000000002477]  ω = [0.29630433914632237, 0.29845226832133326]
+  single primary   A = [0.0023164057976996933]  E_fund = [4.999999999984538]  ω = [0.296303710335703]
+  Omiya reference  A = [0.0023164057976996933, 3.2222071892725225e-7]  E_fund = [4.999993713318274, 0.01000000001711747]  ω = [0.2963037100327132, 0.29845211524858006]
+  joint            A = [0.002317135216340093, 7.20747218780448e-6]  E_fund = [4.999999999991269, 4.999999999845292]  ω = [0.2963035584281992, 0.29845205001478836]
+/global/u1/c/clwelch/axion-sr-sim-rewrite/scripts/../results/profile_comparison_qcd.csv

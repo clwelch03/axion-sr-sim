@@ -1,0 +1,11 @@
+reference solves by continuation: 406.1 s
+P (by continuation)                          converged = true   iterations =  7  |F| = 6.42e-13  ω = 0.2958506484+1.432e-08i, 0.2980402244+8.534e-08i
+Q (by continuation)                          converged = true   iterations =  6  |F| = 7.02e-13  ω = 0.2960025540+1.448e-08i, 0.2981804878+3.600e-08i
+┌ Warning: solve_radial did not converge: |F| = 10.149933910301366 after 30 iterations
+1. F from P                                  converged = false  iterations = 30  |F| = 1.01e+01  ω = 0.2957754811+6.825e-08i, 0.2977500916-2.336e-08i
+2. amplitude jump only (P background)        converged = true   iterations =  7  |F| = 3.36e-14  ω = 0.2958681207+1.416e-08i, 0.2980444527+4.031e-08i
+3. background jump only (P amplitudes)       converged = true   iterations = 15  |F| = 6.26e-13  ω = 0.2959696188+1.464e-08i, 0.2981619898+8.492e-08i
+4. F from P with first-order predictor       converged = true   iterations =  6  |F| = 1.47e-13  ω = 0.2959870665+1.447e-08i, 0.2981662114+4.011e-08i
+5. F from Q (last accepted step)             converged = true   iterations =  6  |F| = 1.60e-14  ω = 0.2959870665+1.447e-08i, 0.2981662114+4.011e-08i
+
+[exited with code 0]

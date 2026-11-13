@@ -251,7 +251,8 @@ factorize(matrix, scaling) = AC.ScaledFactorization(matrix, scaling)
 
 """Fresh evolution cache on the reference problem, as `scripts/evolution_spindown.jl` would build."""
 evolution_cache(state::BenchmarkState; newton_tolerance=state.spec.run_tolerance) =
-    EvolutionCache(state.reference; decay_constant_ratio=DECAY_CONSTANT_RATIO, newton_tol=newton_tolerance)
+    EvolutionCache(state.reference; decay_constant_ratio=DECAY_CONSTANT_RATIO, newton_tol=newton_tolerance,
+                   record_metric_work=true)   # the compared balance terms include the energy pieces
 
 """One `_spindown_rhs!` call at the state, warm-started from the state's own solution."""
 function spindown_rhs_call(state::BenchmarkState, cache=evolution_cache(state))

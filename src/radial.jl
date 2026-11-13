@@ -257,6 +257,61 @@ n_channels(problem::RadialProblem) = n_channels(problem.mode_set)
 n_modes(problem::RadialProblem) = n_modes(problem.mode_set)
 
 """
+    RhsWorkspace{T}(problem)
+
+Scratch arrays for `radial_rhs!` and `rhs_derivatives!` at one radial point:
+a `FieldWorkspace`, the physical profiles `scale · R`, the nonlinear source and
+its Jacobian (element type `T`, possibly a dual number).
+"""
+struct RhsWorkspace{T<:Number}
+    field::FieldWorkspace{T}
+    physical_profiles::Vector{Complex{T}}
+    source::Vector{Complex{T}}
+    source_jacobian::NonlinearSourceJacobian{T}
+end
+
+function RhsWorkspace{T}(problem::RadialProblem) where {T}
+    n_chan = n_channels(problem)
+    RhsWorkspace{T}(FieldWorkspace{T}(problem.quadrature), zeros(Complex{T}, n_chan), zeros(Complex{T}, n_chan),
+                    NonlinearSourceJacobian{T}(n_chan))
+end
+
+"""
+    radial_rhs!(dR, dQ, workspace, problem, s, profiles, slopes, component_frequencies, scale)
+
+In-place `radial_rhs`: writes the derivatives of the profiles and slopes of all
+channels into the complex vectors `dR` and `dQ`.
+"""
+function radial_rhs!(dR::AbstractVector, dQ::AbstractVector, workspace::RhsWorkspace, problem::RadialProblem, s,
+                     profiles::AbstractVector, slopes::AbstractVector, component_frequencies::AbstractVector, scale)
+    background, mode_set, mass_coupling = problem.background, problem.mode_set, problem.mass_coupling
+    a = background.a
+    r = radius(background, s)
+    horizon_function, sum_r2a2 = delta(background, s), r2a2(background, s)
+    workspace.physical_profiles .= scale .* profiles
+    source = nonlinear_source!(workspace.source, workspace.field, problem.quadrature, problem.potential, background,
+                               mass_coupling, s, workspace.physical_profiles)
+    slope_coefficient = -2r * horizon_function / sum_r2a2^2
+    for (component_index, component) in enumerate(mode_set.components)
+        channels = mode_set.component_channels[component_index]
+        frequency = component_frequencies[component_index]
+        m = component.m
+        mixing = problem.mixing[component_index]
+        for (local_index, channel) in enumerate(channels)
+            l = component.ls[local_index]
+            coupled = sum(mixing[local_index, other_local] * profiles[other_channel]
+                          for (other_local, other_channel) in enumerate(channels))
+            delta_B = (sum_r2a2 * frequency - a * m)^2 + horizon_function * (2a * m * frequency - a^2 * frequency^2 - mass_coupling^2 * r^2 - l * (l + 1))
+            forcing = delta_B * profiles[channel] +
+                      horizon_function * (a^2 * (frequency^2 - mass_coupling^2) * coupled + source[channel] / scale)
+            dR[channel] = slopes[channel]
+            dQ[channel] = slope_coefficient * slopes[channel] - forcing / sum_r2a2^2
+        end
+    end
+    return dR, dQ
+end
+
+"""
     radial_rhs(problem, s, profiles, slopes, component_frequencies, scale)
 
 Right-hand side of the first-order system at offset `s`:
@@ -271,26 +326,8 @@ Returns the pair `(dR, dQ)` of vectors over channels.
 """
 function radial_rhs(problem::RadialProblem, s, profiles::AbstractVector, slopes::AbstractVector,
                     component_frequencies::AbstractVector, scale)
-    background, mode_set, mass_coupling = problem.background, problem.mode_set, problem.mass_coupling
-    a = background.a
-    r = radius(background, s)
-    horizon_function, sum_r2a2 = delta(background, s), r2a2(background, s)
-    source = nonlinear_source(problem.quadrature, problem.potential, background, mass_coupling, s, scale .* profiles) ./ scale
-
-    forcing = similar(source)
-    for (component_index, component) in enumerate(mode_set.components)
-        channels = mode_set.component_channels[component_index]
-        frequency = component_frequencies[component_index]
-        m = component.m
-        coupled = problem.mixing[component_index] * profiles[channels]
-        for (local_index, channel) in enumerate(channels)
-            l = component.ls[local_index]
-            delta_B = (sum_r2a2 * frequency - a * m)^2 + horizon_function * (2a * m * frequency - a^2 * frequency^2 - mass_coupling^2 * r^2 - l * (l + 1))
-            forcing[channel] = delta_B * profiles[channel] +
-                               horizon_function * (a^2 * (frequency^2 - mass_coupling^2) * coupled[local_index] + source[channel])
-        end
-    end
-    dR = slopes
-    dQ = (-2r * horizon_function / sum_r2a2^2) .* slopes .- forcing ./ sum_r2a2^2
-    return dR, dQ
+    T = promote_type(field_eltype(problem.quadrature, profiles, scale, s, problem.mass_coupling), real(eltype(slopes)),
+                     real(eltype(component_frequencies)))
+    dR, dQ = zeros(Complex{T}, length(profiles)), zeros(Complex{T}, length(profiles))
+    return radial_rhs!(dR, dQ, RhsWorkspace{T}(problem), problem, s, profiles, slopes, component_frequencies, scale)
 end

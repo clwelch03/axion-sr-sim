@@ -779,7 +779,7 @@ function background_tangents(cache::EvolutionCache, solution::RadialSolution, st
         perturbed = BackgroundState(state.mass + epsilon[1], state.angular_momentum + epsilon[2])
         residual(current_problem(cache, perturbed), layout, unknowns, amplitudes, scale)
     end
-    return -reduce(hcat, [solution.jacobian_factorization \ collect(column) for column in eachcol(residual_partials)])
+    return -(solution.jacobian_factorization \ residual_partials)
 end
 
 """Dual-number tag of `observable_partials` (all partials of one pass share it)."""

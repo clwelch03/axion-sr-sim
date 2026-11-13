@@ -528,6 +528,27 @@ end
         weights[node] * collect(AC.charge_densities(problem, problem.mesh.offsets[node], bilinears))
     end
     @test collect(cloud_charges(solution)) ≈ by_hand rtol=1e-13
+    # Node bilinears against the complex formulas.
+    node = 40
+    node_state, offset = AC.physical_state(layout, unknowns, scale, node), problem.mesh.offsets[node]
+    bilinears = AC.field_bilinears(problem, offset, node_state.profiles, node_state.slopes, frequencies)
+    component_values = AC.component_profiles(problem.quadrature, node_state.profiles)   # [polar node, component]
+    component_dr = AC.component_profiles(problem.quadrature, node_state.slopes) ./ AC.dr_drstar(background, offset)
+    component_dtheta = reduce(hcat, problem.quadrature.angular.harmonics_dtheta[:, channels] * node_state.profiles[channels]
+                                    for channels in mode_set.component_channels)
+    azimuthal = [component.m for component in mode_set.components]
+    @test bilinears.dt_dt ≈ 2abs2.(component_values) * frequencies .^ 2 rtol=1e-13
+    @test bilinears.dphi_dphi ≈ 2abs2.(component_values) * azimuthal .^ 2 rtol=1e-13
+    @test bilinears.dt_dphi ≈ -(2abs2.(component_values) * (frequencies .* azimuthal)) rtol=1e-13
+    @test bilinears.dr_dr ≈ vec(sum(2abs2.(component_dr); dims=2)) rtol=1e-13
+    @test bilinears.dtheta_dtheta ≈ vec(sum(2abs2.(component_dtheta); dims=2)) rtol=1e-13
+    @test bilinears.potential ≈ AC.phase_averaged_potential(problem.quadrature, problem.potential, node_state.profiles) rtol=1e-13
+    # A dual number in the spin alone (plain unknowns) propagates through the densities.
+    densities_at(spin) = AC.integrated_densities(with_background(problem, KerrBackground(spin), problem.mass_coupling), layout,
+                                                 unknowns, scale)
+    spin_step = 1e-5
+    @test ForwardDiff.derivative(densities_at, background.a) ≈
+          (densities_at(background.a + spin_step) .- densities_at(background.a - spin_step)) ./ 2spin_step rtol=1e-6
 
     # Default action balance leaves the energy pieces out; the amplitude rates are the same with them recorded.
     cache = EvolutionCache(problem; decay_constant_ratio=1e-2)

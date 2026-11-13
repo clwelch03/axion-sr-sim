@@ -188,6 +188,33 @@ function _foreach_task(body, indices)
     return nothing
 end
 
+"""
+Run `passes()` and then wait for `task`, which runs concurrently with it. If `passes` throws, `task` is still
+waited for (its own error is then dropped) before the error is rethrown, so that it never outlives the call.
+"""
+function _with_concurrent_task(passes, task::Task)
+    try
+        passes()
+    catch
+        try
+            wait(task)
+        catch
+        end
+        rethrow()
+    end
+    wait(task)
+    return nothing
+end
+
+"""Max norm of `combine.(vector, weights)` without a temporary (`combine` is `*` or `/`)."""
+function _weighted_max_norm(vector::AbstractVector, weights::AbstractVector, combine)
+    largest = zero(eltype(weights))
+    for index in eachindex(vector, weights)
+        largest = max(largest, abs(combine(vector[index], weights[index])))
+    end
+    return largest
+end
+
 # --- residual pieces ----------------------------------------------------------
 
 """Number type of the assembly arithmetic for these inputs (dual numbers propagate)."""
@@ -332,16 +359,17 @@ function residual!(result::AbstractVector, problem::RadialProblem, layout::Unkno
                                          amplitudes, scale)
     end
     make_workspace() = NodeWorkspace{T}(problem)
-    _foreach_in_chunks(1:layout.n_nodes, make_workspace) do workspace, node
-        rhs_block!(view(node_rhs, :, node), workspace, problem, problem.mesh.offsets[node],
-                   view(unknowns, node_range(layout, node)), frequencies, scale)
+    _with_concurrent_task(boundary_task) do
+        _foreach_in_chunks(1:layout.n_nodes, make_workspace) do workspace, node
+            rhs_block!(view(node_rhs, :, node), workspace, problem, problem.mesh.offsets[node],
+                       view(unknowns, node_range(layout, node)), frequencies, scale)
+        end
+        _foreach_in_chunks(1:layout.n_nodes-1, make_workspace) do workspace, interval
+            interval_residual!(view(result, interval_rows(layout, interval)), workspace, problem, interval,
+                               view(unknowns, node_range(layout, interval)), view(unknowns, node_range(layout, interval + 1)),
+                               view(node_rhs, :, interval), view(node_rhs, :, interval + 1), frequencies, scale)
+        end
     end
-    _foreach_in_chunks(1:layout.n_nodes-1, make_workspace) do workspace, interval
-        interval_residual!(view(result, interval_rows(layout, interval)), workspace, problem, interval,
-                           view(unknowns, node_range(layout, interval)), view(unknowns, node_range(layout, interval + 1)),
-                           view(node_rhs, :, interval), view(node_rhs, :, interval + 1), frequencies, scale)
-    end
-    wait(boundary_task)
     return result
 end
 
@@ -709,22 +737,23 @@ function jacobian_blocks!(workspace::JacobianWorkspace, problem::RadialProblem, 
         boundary_jacobian!(wrt_parameters, problem, layout, side, parameter_block, amplitudes, scale)
     end
     make_workspace() = NodeWorkspace{Float64}(problem)
-    _foreach_in_chunks(1:layout.n_nodes, make_workspace) do node_workspace, node
-        block = view(unknowns, node_range(layout, node))
-        rhs_block!(view(node_rhs, :, node), node_workspace, problem, mesh.offsets[node], block, frequencies, scale)
-        rhs_derivatives!(view(node_wrt_state, :, :, node), view(node_wrt_frequencies, :, :, node), node_workspace, problem,
-                         mesh.offsets[node], block, frequencies, scale)
+    _with_concurrent_task(boundary_task) do
+        _foreach_in_chunks(1:layout.n_nodes, make_workspace) do node_workspace, node
+            block = view(unknowns, node_range(layout, node))
+            rhs_block!(view(node_rhs, :, node), node_workspace, problem, mesh.offsets[node], block, frequencies, scale)
+            rhs_derivatives!(view(node_wrt_state, :, :, node), view(node_wrt_frequencies, :, :, node), node_workspace, problem,
+                             mesh.offsets[node], block, frequencies, scale)
+        end
+        _foreach_in_chunks(1:layout.n_nodes-1, make_workspace) do node_workspace, interval
+            left, right = interval, interval + 1
+            interval_jacobian!(view(blocks.wrt_left, :, :, interval), view(blocks.wrt_right, :, :, interval),
+                               view(blocks.wrt_frequencies, :, :, interval), node_workspace, problem, interval,
+                               (view(node_wrt_state, :, :, left), view(node_wrt_frequencies, :, :, left)),
+                               (view(node_wrt_state, :, :, right), view(node_wrt_frequencies, :, :, right)),
+                               view(unknowns, node_range(layout, left)), view(unknowns, node_range(layout, right)),
+                               view(node_rhs, :, left), view(node_rhs, :, right), frequencies, scale)
+        end
     end
-    _foreach_in_chunks(1:layout.n_nodes-1, make_workspace) do node_workspace, interval
-        left, right = interval, interval + 1
-        interval_jacobian!(view(blocks.wrt_left, :, :, interval), view(blocks.wrt_right, :, :, interval),
-                           view(blocks.wrt_frequencies, :, :, interval), node_workspace, problem, interval,
-                           (view(node_wrt_state, :, :, left), view(node_wrt_frequencies, :, :, left)),
-                           (view(node_wrt_state, :, :, right), view(node_wrt_frequencies, :, :, right)),
-                           view(unknowns, node_range(layout, left)), view(unknowns, node_range(layout, right)),
-                           view(node_rhs, :, left), view(node_rhs, :, right), frequencies, scale)
-    end
-    wait(boundary_task)
     return blocks
 end
 
@@ -958,8 +987,8 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
     unknowns = warm ? warm_start_unknowns(guess, scale; change=guess_change) : initial_unknowns(problem, layout, amplitudes, scale)
     scaling = NewtonScaling(problem, layout, _complexify(unknowns[parameter_range(layout)][frequency_range(layout)]))
     assembly = nothing   # Jacobian workspace, built when the first Jacobian is needed and reused
-    scaled_norm(residual_vector) = norm(scaling.row .* residual_vector, Inf)
-    scaled_step_norm(step_vector) = norm(step_vector ./ scaling.column, Inf)
+    scaled_norm(residual_vector) = _weighted_max_norm(residual_vector, scaling.row, *)
+    scaled_step_norm(step_vector) = _weighted_max_norm(step_vector, scaling.column, /)
     current = residual(problem, layout, unknowns, amplitudes, scale)
     current_norm = scaled_norm(current)
     if predicted && current_norm ≥ chord_threshold

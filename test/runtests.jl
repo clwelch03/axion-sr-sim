@@ -438,6 +438,74 @@ end
     @test_throws ArgumentError amplitude_rates(solution; balance=:momentum)
 end
 
+@testset "Balance terms: one dual pass, optional energy pieces" begin
+    background = KerrBackground(0.9)
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
+    mesh = RadialMesh(background; rstar_min=-60.0, rstar_max=250.0, step=0.8)
+    problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh)
+    solution = solve_radial(problem, [3e-3, 1e-4])
+    @test solution.converged
+    state = BackgroundState(1.0, background.a)
+
+    # Dual-profile potential average: the analytic partials equal ForwardDiff through the field reconstruction.
+    channel_count = AC.n_channels(mode_set)
+    profiles = [0.3 * cis(0.7index) / index for index in 1:channel_count]
+    direction = [cis(1.3index) * (1 + 0.1index) for index in 1:channel_count]
+    for potential in (CosinePotential(), ChiralPotential(), QuarticPotential(0.5))
+        reference = ForwardDiff.derivative(epsilon -> AC.phase_averaged_potential(problem.quadrature, potential,
+                                                                                   profiles .+ epsilon .* direction), 0.0)
+        tagged = ForwardDiff.derivative(epsilon -> AC.averaged_potential(problem.quadrature, potential,
+                                                                          profiles .+ epsilon .* direction), 0.0)
+        @test tagged ≈ reference rtol=1e-12
+    end
+
+    # The threaded node integrals reproduce the node-by-node bilinear path.
+    layout, unknowns, scale = solution.layout, solution.unknowns, solution.scale
+    frequencies = AC.real_component_frequencies(problem, layout, unknowns)
+    weights = AC.simpson_weights(problem.mesh.rstar)
+    by_hand = sum(1:layout.n_nodes) do node
+        node_state = AC.physical_state(layout, unknowns, scale, node)
+        bilinears = AC.field_bilinears(problem, problem.mesh.offsets[node], node_state.profiles, node_state.slopes, frequencies)
+        weights[node] * collect(AC.charge_densities(problem, problem.mesh.offsets[node], bilinears))
+    end
+    @test collect(cloud_charges(solution)) ≈ by_hand rtol=1e-13
+
+    # Default action balance leaves the energy pieces out; the amplitude rates are the same with them recorded.
+    cache = EvolutionCache(problem; decay_constant_ratio=1e-2)
+    recorded_cache = EvolutionCache(problem; decay_constant_ratio=1e-2, record_metric_work=true)
+    terms, recorded = balance_terms(cache, solution, state), balance_terms(recorded_cache, solution, state)
+    @test all(isnan, terms.charge_jacobian) && isnan(terms.metric_work) && isnan(terms.derivatives.charges_wrt_mass.energy)
+    @test !any(isnan, recorded.charge_jacobian) && !isnan(recorded.metric_work)
+    @test amplitude_rates(terms, cache) ≈ amplitude_rates(recorded, recorded_cache) rtol=1e-12
+    @test terms.derivatives.actions_wrt_mass ≈ recorded.derivatives.actions_wrt_mass rtol=1e-12
+    @test terms.actions ≈ recorded.actions rtol=1e-12
+    @test terms.charges.energy ≈ recorded.charges.energy rtol=1e-12
+    @test_throws ArgumentError amplitude_rates(terms; balance=:energy)
+    # The spindown right-hand side records the work as NaN unless asked, and reuses the charges and actions of the terms.
+    for (label, rhs_cache) in (("default", EvolutionCache(problem; decay_constant_ratio=1e-2)), ("recorded", recorded_cache))
+        empty!(rhs_cache.diagnostics)
+        rhs_cache.accepted_solution = solution
+        rates = zeros(4)
+        AC._spindown_rhs!(rates, [log.(solution.amplitudes); state.mass; state.angular_momentum], rhs_cache, 0.0)
+        logged = only(rhs_cache.diagnostics)
+        @test isnan(logged.metric_work) == (label == "default")
+        @test logged.actions ≈ terms.actions rtol=1e-10
+    end
+
+    # Exact explicit partial against the central difference (reference) and against four re-solved problems.
+    exact = recorded.derivatives
+    central = background_charge_derivatives(recorded_cache, solution, state; relative_step=1e-6)
+    resolved = balance_terms(recorded_cache, solution, state; resolve_background=true).derivatives
+    for field in fieldnames(BackgroundDerivatives)
+        exact_value, central_value, resolved_value = (collect(getfield(d, field)) for d in (exact, central, resolved))
+        scale_of_field = maximum(abs, exact_value)
+        @test maximum(abs, exact_value .- central_value) ≤ 1e-6 * scale_of_field
+        @test maximum(abs, exact_value .- resolved_value) ≤ 1e-4 * scale_of_field
+    end
+    @test recorded.charge_jacobian ≈ charge_jacobian(solution) .* [state.mass, state.mass^2] rtol=1e-10
+    @test recorded.action_jacobian ≈ state.mass^2 .* action_jacobian(solution) rtol=1e-10
+end
+
 @testset "Evolution: logarithmic state and trajectory" begin
     background = KerrBackground(0.9)
     mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])

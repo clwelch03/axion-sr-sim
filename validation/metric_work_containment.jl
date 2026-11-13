@@ -11,7 +11,7 @@ for rstar_max in (180.0, 250.0, 320.0, 400.0)
     mesh = RadialMesh(background; rstar_min=-60.0, rstar_max, step=0.4)
     problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh)
     solution = solve_radial(problem, [1e-6, 1e-7])
-    terms = balance_terms(EvolutionCache(problem; decay_constant_ratio=1.0, last_solution=solution), solution, state)
+    terms = balance_terms(EvolutionCache(problem; decay_constant_ratio=1.0, record_metric_work=true, last_solution=solution), solution, state)
     rate, derivatives = terms.state_rate, terms.derivatives
     actions = AC.reference_actions(phase_actions(solution), state)
     prediction = sum(actions .* (derivatives.frequencies_wrt_mass .* rate.mass .+ derivatives.frequencies_wrt_angular_momentum .* rate.angular_momentum))

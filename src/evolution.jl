@@ -126,6 +126,7 @@ mutable struct EvolutionCache{P<:RadialProblem, T<:Real}
     initial_mass_coupling::T
     coupling_to_hole::T   # (f_a / M_Pl)²: converts cloud fluxes in f_a² units into black-hole mass rates
     include_metric_work::Bool
+    record_metric_work::Bool   # also compute E, J and the metric work under the action balance (diagnostic only)
     last_solution::Union{Nothing, RadialSolution}
     diagnostics::Vector{EvolutionDiagnostics{T}}
     newton_tol::T
@@ -137,19 +138,24 @@ mutable struct EvolutionCache{P<:RadialProblem, T<:Real}
 end
 
 """
-    EvolutionCache(problem; decay_constant_ratio=0.0, include_metric_work=false, newton_tol=1e-10,
-                   verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing)
+    EvolutionCache(problem; decay_constant_ratio=0.0, include_metric_work=false, record_metric_work=false,
+                   newton_tol=1e-10, verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing)
 
 Fresh cache for an evolution of `problem` (also handy for calling
-`balance_terms` directly).
+`balance_terms` directly). The energy, the angular momentum and the metric work
+are computed only when the energy balance, `include_metric_work` or
+`record_metric_work` asks for them (`_computes_charges`).
 """
-function EvolutionCache(problem::RadialProblem; decay_constant_ratio=0.0, include_metric_work=false, newton_tol=1e-10,
-                        verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing)
+function EvolutionCache(problem::RadialProblem; decay_constant_ratio=0.0, include_metric_work=false, record_metric_work=false,
+                        newton_tol=1e-10, verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing)
     _check_balance(problem, balance)
-    EvolutionCache(problem, problem.mass_coupling, float(decay_constant_ratio)^2, include_metric_work, last_solution,
+    EvolutionCache(problem, problem.mass_coupling, float(decay_constant_ratio)^2, include_metric_work, record_metric_work, last_solution,
                    EvolutionDiagnostics{Float64}[], float(newton_tol), verbose, log_amplitudes, balance,
                    last_solution, false)
 end
+
+"""Whether the balance terms include the energy, angular momentum and metric work: the action balance does not need them."""
+_computes_charges(cache::EvolutionCache) = cache.balance == :energy || cache.include_metric_work || cache.record_metric_work
 
 """Print one progress line per right-hand-side evaluation when the cache is verbose."""
 function _report_step(cache::EvolutionCache, time, amplitudes, solution::RadialSolution, state_text::String)
@@ -292,16 +298,30 @@ real_mode_frequencies(layout::UnknownLayout, unknowns::AbstractVector) =
     real.(_complexify(unknowns[parameter_range(layout)][frequency_range(layout)]))
 
 """
+Row ranges `(charges, actions, frequencies)` of `reference_observables`; `charges`
+is empty without `include_charges`.
+"""
+function observable_ranges(mode_count::Int, include_charges::Bool)
+    first_action = include_charges ? 3 : 1
+    return (charges=1:(include_charges ? 2 : 0), actions=first_action:first_action + mode_count - 1,
+            frequencies=first_action + mode_count:first_action + 2mode_count - 1)
+end
+
+"""
 Everything the balances differentiate, stacked as one vector in reference
-units: `[E, J, N₁ … N_K, ω₁ … ω_K]`. One dual pass of this function gives all
-background derivatives at once.
+units: `[E, J, N₁ … N_K, ω₁ … ω_K]`. Without `include_charges` the energy and
+angular momentum are not evaluated and the vector is `[N₁ … N_K, ω₁ … ω_K]`.
+One dual pass of this function gives all derivatives at once.
 """
 function reference_observables(problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector, scale,
-                               state::BackgroundState)
-    charges = reference_charges(cloud_charges(problem, layout, unknowns, scale), state)
-    vcat(charges.energy, charges.angular_momentum,
-         reference_actions(phase_actions(problem, layout, unknowns, scale), state),
-         reference_frequencies(real_mode_frequencies(layout, unknowns), state))
+                               state::BackgroundState; include_charges::Bool=true)
+    totals = integrated_densities(problem, layout, unknowns, scale; charges=include_charges)
+    component_rows = include_charges ? (3:length(totals)) : (1:length(totals))
+    actions = reference_actions(phase_weights(problem.mode_set) * totals[component_rows], state)
+    frequencies = reference_frequencies(real_mode_frequencies(layout, unknowns), state)
+    include_charges || return vcat(actions, frequencies)
+    charges = reference_charges(Charges(totals[1], totals[2]), state)
+    return vcat(charges.energy, charges.angular_momentum, actions, frequencies)
 end
 
 """Outer horizon radius `M + √(M² − a²)` of a hole with the given mass and angular momentum."""
@@ -406,17 +426,74 @@ struct BackgroundDerivatives{T<:Real}
     frequencies_wrt_angular_momentum::Vector{T}
 end
 
-"""Split a stacked derivative of `reference_observables` along `b` and along `j`."""
-function BackgroundDerivatives(wrt_mass::AbstractVector, wrt_angular_momentum::AbstractVector, mode_count::Int)
-    actions = 3:2 + mode_count
-    frequencies = 3 + mode_count:2 + 2mode_count
-    BackgroundDerivatives(Charges(wrt_mass[1], wrt_mass[2]), Charges(wrt_angular_momentum[1], wrt_angular_momentum[2]),
-                          wrt_mass[actions], wrt_angular_momentum[actions],
-                          wrt_mass[frequencies], wrt_angular_momentum[frequencies])
+"""
+Split a stacked derivative of `reference_observables` along `b` and along `j`.
+Without `include_charges` the charge derivatives are `NaN`.
+"""
+function BackgroundDerivatives(wrt_mass::AbstractVector, wrt_angular_momentum::AbstractVector, mode_count::Int;
+                               include_charges::Bool=true)
+    ranges = observable_ranges(mode_count, include_charges)
+    charges_of(derivative) = include_charges ? Charges(derivative[1], derivative[2]) : Charges(NaN, NaN)
+    BackgroundDerivatives(charges_of(wrt_mass), charges_of(wrt_angular_momentum),
+                          wrt_mass[ranges.actions], wrt_angular_momentum[ranges.actions],
+                          wrt_mass[ranges.frequencies], wrt_angular_momentum[ranges.frequencies])
 end
 
 """
-    background_charge_derivatives(cache, solution, state; relative_step=1e-6)
+    background_tangents(cache, solution, state)
+
+Matrix `[du/db du/dj]` (one column per background parameter) of the response
+of the discretised solution to the black-hole mass and angular momentum at
+fixed amplitudes and fixed tortoise mesh in units of the current mass, by the
+implicit-function theorem `du/db = −J⁻¹ ∂F/∂b|_u` with the factorised Jacobian
+of the converged solution. The partial `∂F/∂b|_u` is exact (ForwardDiff
+through the background, mass coupling and mesh offsets: the outer-boundary
+rows vary as `e^{−κr}` with `d(κr)/dα ≈ 10³`, far too steeply for finite
+differences).
+"""
+function background_tangents(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState)
+    layout, unknowns, scale, amplitudes = solution.layout, solution.unknowns, solution.scale, solution.amplitudes
+    residual_partials = ForwardDiff.jacobian([0.0, 0.0]) do epsilon
+        perturbed = BackgroundState(state.mass + epsilon[1], state.angular_momentum + epsilon[2])
+        residual(current_problem(cache, perturbed), layout, unknowns, amplitudes, scale)
+    end
+    return -reduce(hcat, [solution.jacobian_factorization \ collect(column) for column in eachcol(residual_partials)])
+end
+
+"""Dual-number tag of `observable_partials` (all partials of one pass share it)."""
+struct ObservableTag end
+
+"""
+    observable_partials(cache, solution, state, tangents, amplitude_directions; include_charges=true)
+
+Value vector and derivative matrix of `reference_observables` from one dual
+pass with `2 + K` partial slots: slot 1 is the black-hole mass `b`, slot 2 the
+angular momentum `j`, and slot `2 + i` the amplitude `A_i`. The problem and
+the state carry the explicit `b`, `j` dependence (seeded in slots 1 and 2) and
+the unknown vector is displaced along the columns of `[tangents
+amplitude_directions]`, so that the derivative along `b` and `j` is the total
+derivative `∂O/∂b|_u + (∂O/∂u) du/db` and the derivative along `A_i` is
+`(∂O/∂u) du/dA_i`. Returns `(values, partials)` with `partials[row, slot]`.
+"""
+function observable_partials(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState,
+                             tangents::AbstractMatrix, amplitude_directions::AbstractMatrix; include_charges::Bool=true)
+    directions = hcat(tangents, amplitude_directions)
+    return _observable_partials(cache, solution, state, directions, Val(size(directions, 2)); include_charges)
+end
+
+function _observable_partials(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState,
+                              directions::AbstractMatrix, ::Val{N}; include_charges::Bool) where {N}
+    seed(value, slot) = ForwardDiff.Dual{ObservableTag}(value, ForwardDiff.Partials(ntuple(k -> k == slot ? 1.0 : 0.0, Val(N))))
+    dual_state = BackgroundState(seed(state.mass, 1), seed(state.angular_momentum, 2))
+    dual_unknowns = [ForwardDiff.Dual{ObservableTag}(value, ForwardDiff.Partials(ntuple(slot -> directions[index, slot], Val(N))))
+                     for (index, value) in enumerate(solution.unknowns)]
+    observables = reference_observables(current_problem(cache, dual_state), solution.layout, dual_unknowns, solution.scale,
+                                        dual_state; include_charges)
+    return ForwardDiff.value.(observables), [ForwardDiff.partials(observable, slot) for observable in observables, slot in 1:N]
+end
+
+"""
+    background_charge_derivatives(cache, solution, state; relative_step=nothing, include_charges=true)
 
 `BackgroundDerivatives` at fixed amplitudes and fixed tortoise mesh (in units
 of the current mass). By the implicit-function theorem, for every observable `O`
@@ -424,37 +501,50 @@ of `reference_observables`,
 
     dO/db = ∂O/∂b|_u + (∂O/∂u) du/db,    du/db = −J⁻¹ ∂F/∂b|_u,
 
-where `∂F/∂b|_u` is exact (ForwardDiff through the background, mass coupling
-and mesh offsets: the outer-boundary rows vary as `e^{−κr}` with
-`d(κr)/dα ≈ 10³`, far too steeply for finite differences), `∂O/∂b|_u` is a
-central difference over the background (benign), `J` is the factorised
-Jacobian of the converged solution, and the last term is one dual pass along
-`du/db`, exactly as in `charge_jacobian`.
+where `du/db` is `background_tangents` and both terms come from one dual pass
+of the observables (`observable_partials`), exactly. With a number for
+`relative_step` the explicit partial `∂O/∂b|_u` is instead a central
+difference over the background with that relative step (the earlier
+implementation, kept as a reference; benign for the observables, unlike for
+the residual) and only the last term is a dual pass. Without
+`include_charges` the energy and angular momentum are skipped and their
+derivatives are `NaN`.
 """
 function background_charge_derivatives(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState;
-                                       relative_step=1e-6)
-    problem, layout, unknowns, scale, amplitudes = solution.problem, solution.layout, solution.unknowns, solution.scale,
-                                                   solution.amplitudes
-    function derivative_along(direction::BackgroundState, step)
+                                       relative_step=nothing, include_charges::Bool=true)
+    relative_step === nothing || return central_difference_background_derivatives(cache, solution, state, relative_step;
+                                                                                  include_charges)
+    tangents = background_tangents(cache, solution, state)
+    _, partials = observable_partials(cache, solution, state, tangents, zeros(n_unknowns(solution.layout), 0); include_charges)
+    return BackgroundDerivatives(partials[:, 1], partials[:, 2], n_modes(solution.problem); include_charges)
+end
+
+"""
+    central_difference_background_derivatives(cache, solution, state, relative_step; include_charges=true)
+
+Reference for `background_charge_derivatives`: the explicit partial of the
+observables over the background is a central difference of
+`reference_observables` at `±step` in `b` and in `j`; `via unknowns` is a dual
+pass along each tangent.
+"""
+function central_difference_background_derivatives(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState,
+                                                   relative_step; include_charges::Bool=true)
+    problem, layout, unknowns, scale = solution.problem, solution.layout, solution.unknowns, solution.scale
+    tangents = background_tangents(cache, solution, state)
+    function derivative_along(slot::Int, direction::BackgroundState, step)
         plus = BackgroundState(state.mass + step * direction.mass, state.angular_momentum + step * direction.angular_momentum)
         minus = BackgroundState(state.mass - step * direction.mass, state.angular_momentum - step * direction.angular_momentum)
-        residual_partial = ForwardDiff.derivative(0.0) do epsilon
-            perturbed = BackgroundState(state.mass + epsilon * direction.mass,
-                                        state.angular_momentum + epsilon * direction.angular_momentum)
-            residual(current_problem(cache, perturbed), layout, unknowns, amplitudes, scale)
-        end
-        explicit_partial = (reference_observables(current_problem(cache, plus), layout, unknowns, scale, plus) .-
-                            reference_observables(current_problem(cache, minus), layout, unknowns, scale, minus)) ./ (2step)
-        unknown_direction = -(solution.jacobian_factorization \ residual_partial)
+        explicit_partial = (reference_observables(current_problem(cache, plus), layout, unknowns, scale, plus; include_charges) .-
+                            reference_observables(current_problem(cache, minus), layout, unknowns, scale, minus; include_charges)) ./ (2step)
         via_unknowns = ForwardDiff.derivative(0.0) do epsilon
-            reference_observables(problem, layout, unknowns .+ epsilon .* unknown_direction, scale, state)
+            reference_observables(problem, layout, unknowns .+ epsilon .* tangents[:, slot], scale, state; include_charges)
         end
         return explicit_partial .+ via_unknowns
     end
     mass_step = relative_step * state.mass
     spin_step = relative_step * max(abs(state.angular_momentum), state.mass^2)
-    BackgroundDerivatives(derivative_along(BackgroundState(1.0, 0.0), mass_step),
-                          derivative_along(BackgroundState(0.0, 1.0), spin_step), n_modes(problem))
+    BackgroundDerivatives(derivative_along(1, BackgroundState(1.0, 0.0), mass_step),
+                          derivative_along(2, BackgroundState(0.0, 1.0), spin_step), n_modes(problem); include_charges)
 end
 
 """
@@ -486,6 +576,10 @@ Everything entering the evolving-background balances at one instant, in
 reference units: amplitude derivatives of the charges and of the wave actions,
 background derivatives at fixed amplitudes, charge and action losses, the
 action-based metric work, and the background rates driven by the horizon fluxes.
+Also the cloud's charges and actions, and `background_directions`, the
+matrix `[du/db du/dj]` of `background_tangents`. When the energy, angular
+momentum and metric work were not requested (`_computes_charges`),
+`charge_jacobian`, the charge derivatives and `metric_work` are `NaN`.
 """
 struct BalanceTerms{T<:Real}
     charge_jacobian::Matrix{T}
@@ -495,49 +589,84 @@ struct BalanceTerms{T<:Real}
     action_losses::Vector{T}
     metric_work::T
     state_rate::BackgroundState{T}
+    charges::Charges{T}
+    actions::Vector{T}
+    background_directions::Matrix{T}
 end
 
 """
-    balance_terms(cache, solution, state; resolve_background=false, relative_step=1e-4)
+Derivatives by one dual pass over the observables (`observable_partials`): the
+`(derivatives, charge_matrix, action_matrix, charges, actions)` of `balance_terms`.
+"""
+function _exact_balance_pieces(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState,
+                               tangents::AbstractMatrix, directions::AbstractMatrix, include_charges::Bool)
+    mode_count = n_modes(solution.problem)
+    values, partials = observable_partials(cache, solution, state, tangents, directions; include_charges)
+    rows = observable_ranges(mode_count, include_charges)
+    amplitude_slots = 3:2 + mode_count
+    charges = include_charges ? Charges(values[1], values[2]) : reference_charges(cloud_charges(solution), state)
+    return (derivatives=BackgroundDerivatives(partials[:, 1], partials[:, 2], mode_count; include_charges),
+            charge_matrix=include_charges ? partials[rows.charges, amplitude_slots] : fill(NaN, 2, mode_count),
+            action_matrix=partials[rows.actions, amplitude_slots], charges, actions=values[rows.actions])
+end
+
+"""
+The same pieces as `_exact_balance_pieces`, with the background derivatives from
+central finite differences over four re-solved radial problems (the slow
+reference used for validation) and the Jacobians from `charge_jacobian` and `action_jacobian`.
+"""
+function _resolved_balance_pieces(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState,
+                                  directions::AbstractMatrix, relative_step, include_charges::Bool)
+    mode_count = n_modes(solution.problem)
+    function observables_at(perturbed::BackgroundState)
+        perturbed_solution = solve_radial(current_problem(cache, perturbed), solution.amplitudes; guess=solution, tol=cache.newton_tol)
+        reference_observables(perturbed_solution.problem, perturbed_solution.layout, perturbed_solution.unknowns,
+                              perturbed_solution.scale, perturbed; include_charges)
+    end
+    mass_step = relative_step * state.mass
+    spin_step = relative_step * max(abs(state.angular_momentum), state.mass^2)
+    wrt_mass = (observables_at(BackgroundState(state.mass + mass_step, state.angular_momentum)) .-
+                observables_at(BackgroundState(state.mass - mass_step, state.angular_momentum))) ./ (2mass_step)
+    wrt_spin = (observables_at(BackgroundState(state.mass, state.angular_momentum + spin_step)) .-
+                observables_at(BackgroundState(state.mass, state.angular_momentum - spin_step))) ./ (2spin_step)
+    return (derivatives=BackgroundDerivatives(wrt_mass, wrt_spin, mode_count; include_charges),
+            charge_matrix=include_charges ? charge_jacobian(solution; directions) .* [state.mass, state.mass^2] : fill(NaN, 2, mode_count),
+            action_matrix=state.mass^2 .* action_jacobian(solution; directions),
+            charges=reference_charges(cloud_charges(solution), state),
+            actions=reference_actions(phase_actions(solution), state))
+end
+
+"""
+    balance_terms(cache, solution, state; resolve_background=false, relative_step=1e-4,
+                  include_charges=_computes_charges(cache))
 
 Assemble the balance terms. The background rates are the horizon fluxes times
 `(f_a/M_Pl)²` (see the module docstring). Background derivatives at fixed
-amplitudes and tortoise mesh in units of the current mass come from
-`background_charge_derivatives`; with `resolve_background=true` they are instead
-central finite differences over four re-solved radial problems (the slow
-reference used for validation). The metric work (`metric_work`) is always
-computed and reported, and enters the energy balance only when the cache says so.
+amplitudes and tortoise mesh in units of the current mass, and the amplitude
+Jacobians, come from one dual pass over the observables with the tangent
+directions `du/db`, `du/dj` and the amplitude directions `du/dA_i`
+(`observable_partials`); with `resolve_background=true` the background
+derivatives are instead central finite differences over four re-solved radial
+problems (the slow reference used for validation). The energy, the angular
+momentum and everything derived from them (`charge_jacobian`, the charge
+derivatives, `metric_work`) are computed only with `include_charges`, which by
+default follows the cache (the energy balance, `include_metric_work` or
+`record_metric_work`); the action balance does not use them.
 """
 function balance_terms(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState;
-                       resolve_background=false, relative_step=1e-4)
-    amplitudes, mode_count = solution.amplitudes, n_modes(solution.problem)
+                       resolve_background=false, relative_step=1e-4, include_charges::Bool=_computes_charges(cache))
     inner_flux = outward_flux(solution, 1)
     state_rate = BackgroundState(-cache.coupling_to_hole * inner_flux.energy,
                                  -cache.coupling_to_hole * state.mass * inner_flux.angular_momentum)
-
-    derivatives = if resolve_background
-        function observables_at(perturbed::BackgroundState)
-            perturbed_solution = solve_radial(current_problem(cache, perturbed), amplitudes; guess=solution, tol=cache.newton_tol)
-            reference_observables(perturbed_solution.problem, perturbed_solution.layout, perturbed_solution.unknowns,
-                                  perturbed_solution.scale, perturbed)
-        end
-        mass_step = relative_step * state.mass
-        spin_step = relative_step * max(abs(state.angular_momentum), state.mass^2)
-        wrt_mass = (observables_at(BackgroundState(state.mass + mass_step, state.angular_momentum)) .-
-                    observables_at(BackgroundState(state.mass - mass_step, state.angular_momentum))) ./ (2mass_step)
-        wrt_spin = (observables_at(BackgroundState(state.mass, state.angular_momentum + spin_step)) .-
-                    observables_at(BackgroundState(state.mass, state.angular_momentum - spin_step))) ./ (2spin_step)
-        BackgroundDerivatives(wrt_mass, wrt_spin, mode_count)
-    else
-        background_charge_derivatives(cache, solution, state)
-    end
-
     directions = amplitude_response(solution)
-    charge_matrix = charge_jacobian(solution; directions) .* [state.mass, state.mass^2]
-    action_matrix = state.mass^2 .* action_jacobian(solution; directions)
+    tangents = background_tangents(cache, solution, state)
+    pieces = resolve_background ? _resolved_balance_pieces(cache, solution, state, directions, relative_step, include_charges) :
+                                  _exact_balance_pieces(cache, solution, state, tangents, directions, include_charges)
     frequencies = reference_frequencies(mode_frequencies(solution), state)
-    BalanceTerms(charge_matrix, action_matrix, derivatives, reference_losses(boundary_losses(solution), state),
-                 state.mass .* action_losses(solution), metric_work(derivatives, frequencies, state_rate), state_rate)
+    work = include_charges ? metric_work(pieces.derivatives, frequencies, state_rate) : NaN
+    BalanceTerms(pieces.charge_matrix, pieces.action_matrix, pieces.derivatives,
+                 reference_losses(boundary_losses(solution), state), state.mass .* action_losses(solution), work, state_rate,
+                 pieces.charges, pieces.actions, tangents)
 end
 
 """
@@ -555,6 +684,9 @@ function amplitude_rates(terms::BalanceTerms; balance::Symbol=:action, include_m
         return terms.action_jacobian \ (-terms.action_losses .- drift)
     end
     balance == :energy || throw(ArgumentError("balance must be :energy or :action; got :$balance"))
+    any(isnan, terms.charge_jacobian) &&
+        throw(ArgumentError("these balance terms were assembled without the energy and angular momentum; build the cache " *
+                            "with record_metric_work=true (or balance=:energy) to use the energy balance"))
     drift = rate.mass * derivatives.charges_wrt_mass + rate.angular_momentum * derivatives.charges_wrt_angular_momentum
     work = include_metric_work ? terms.metric_work : 0.0
     return terms.charge_jacobian \ (-collect(terms.losses) .+ [work, 0.0] .- collect(drift))
@@ -595,9 +727,8 @@ function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
     rates[mode_count + 1] = terms.state_rate.mass
     rates[mode_count + 2] = terms.state_rate.angular_momentum
     push!(cache.diagnostics, EvolutionDiagnostics(time, copy(amplitudes), mode_frequencies(solution),
-                                                  reference_charges(cloud_charges(solution), state), terms.losses,
-                                                  state.mass, dimensionless_spin(state), terms.metric_work,
-                                                  reference_actions(phase_actions(solution), state), terms.action_losses))
+                                                  terms.charges, terms.losses, state.mass, dimensionless_spin(state),
+                                                  terms.metric_work, terms.actions, terms.action_losses))
     _report_step(cache, time, amplitudes, solution, "  b = $(state.mass)  j = $(state.angular_momentum)  w = $(terms.metric_work)")
     return nothing
 end
@@ -632,7 +763,7 @@ end
 
 """
     evolve_with_spindown(problem, amplitudes, time_span, decay_constant_ratio; balance=:action,
-                         include_metric_work=false, log_amplitudes=true, initial_step_fraction=0.05,
+                         include_metric_work=false, record_metric_work=false, log_amplitudes=true, initial_step_fraction=0.05,
                          newton_tol=1e-10, verbose=false, initial_background, initial_guess=nothing,
                          reltol, abstol, kwargs...)
 
@@ -649,7 +780,10 @@ The default `balance=:action` uses the wave-action balance (any number of
 modes, no metric-work term). With `balance=:energy`, `include_metric_work` adds
 the action-based `metric_work` to the energy equation; it is off by default so
 that earlier energy-balance runs reproduce, and is of relative order `(f_a/M_Pl)² E` like the
-background-drift terms. The work is recorded in the diagnostics either way.
+background-drift terms. The energy, the angular momentum and the work are computed (and the work
+recorded in the diagnostics) only for the energy balance, with `include_metric_work`, or with
+`record_metric_work=true`; under the default action balance the diagnostics hold `NaN` for the work
+and the amplitude rates are unchanged (`_computes_charges`).
 
 Each radial solve is warm-started from the solution at the last accepted step,
 and a step in which a solve fails is rejected and retried with a smaller step
@@ -665,12 +799,12 @@ from (for example from amplitude continuation); without it the first solve
 starts cold, which can fail in the nonlinear regime.
 """
 function evolve_with_spindown(problem::RadialProblem, amplitudes::AbstractVector, time_span, decay_constant_ratio::Real;
-                              balance::Symbol=:action, include_metric_work=false, log_amplitudes=true,
+                              balance::Symbol=:action, include_metric_work=false, record_metric_work=false, log_amplitudes=true,
                               initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
                               initial_background::BackgroundState=BackgroundState(1.0, problem.background.a),
                               initial_guess=nothing,
                               reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
-    cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, newton_tol, verbose, log_amplitudes, balance,
+    cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, record_metric_work, newton_tol, verbose, log_amplitudes, balance,
                            last_solution=initial_guess)
     initial_amplitudes = collect(float.(amplitudes))
     initial_solution = _solve_cached!(cache, current_problem(cache, initial_background), initial_amplitudes)

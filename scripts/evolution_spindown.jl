@@ -7,7 +7,8 @@
 # (1–2 h; submit to Slurm). The baseline of scripts/evolution_fixed_background.jl (a = 0.9 unless given, α = 0.3, cosine, contained mesh, equal initial
 # occupations, t ≤ 1.5e9) with the black hole absorbing the horizon fluxes: mass b = M/M₀ and angular momentum
 # j = J/M₀² evolve, coupled through (f_a/M_Pl)² (non-reduced Planck mass). Action balance (default), so no
-# metric-work term enters; w is still recorded. Reference units are the initial mass M₀.
+# metric-work term enters; the w column of the diagnostics is NaN unless AXION_RECORD_METRIC_WORK=1 (which also computes
+# E and J derivatives, a few percent more per right-hand-side evaluation). Reference units are the initial mass M₀.
 # The mesh is built for the initial spin and reused, in units of the current mass, as the spin drops.
 # Potential: AXION_POTENTIAL=cosine (default) or free. With the free potential the two modes are uncoupled and f_a
 # enters only through the initial cloud in physical units (κ𝒩₀ with κ = (f_a/M_Pl)²); outputs get the prefix spindown_free_.
@@ -30,6 +31,7 @@ mesh = RadialMesh(background, mass_coupling, mode_set)
 potential_name = get(ENV, "AXION_POTENTIAL", "cosine")
 potential = Dict("cosine" => CosinePotential(), "free" => FreePotential())[potential_name]
 problem = RadialProblem(background, potential, mass_coupling, mode_set; mesh)
+record_metric_work = get(ENV, "AXION_RECORD_METRIC_WORK", "0") == "1"
 target_actions = [3e-6, 3e-6]
 probe = solve_radial(problem, [1e-6, 1e-6])
 amplitudes = probe.amplitudes .* sqrt.(target_actions ./ phase_actions(probe))
@@ -59,7 +61,7 @@ println("potential: $potential_name")
 flush(stdout)
 
 t = @elapsed result = evolve_with_spindown(problem, amplitudes, span, decay_constant_ratio; initial_background, initial_guess,
-                                           saveat=(final_time - start_time) / 60, verbose=true)
+                                           saveat=(final_time - start_time) / 60, verbose=true, record_metric_work)
 println("done: $(length(result.diagnostics)) rhs evals in $(round(t, digits=1))s"); flush(stdout)
 
 open(prefix * "_diagnostics.csv", "w") do io

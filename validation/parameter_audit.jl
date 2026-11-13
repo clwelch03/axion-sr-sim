@@ -31,6 +31,7 @@ Base.@kwdef struct Discretisation
     horizon_offset_ratio::Float64 = 1e-6
     max_order::Int = 3
     n_angular::Int = 1
+    max_step::Float64 = 0.0   # 0: RadialMesh default cap on stretched intervals (min(8 step, quarter wavelength))
     lattice_points::Int = 0   # 0: tensor grid of n_phase² points; otherwise a rank-1 lattice rule (K = 2) with this many points
 end
 
@@ -50,6 +51,7 @@ const STUDIES = Dict(
     "inner" => [Discretisation(horizon_offset_ratio=r) for r in (1e-4, 1e-5, 1e-6, 1e-8)],
     "truncation" => [Discretisation(), Discretisation(max_order=5), Discretisation(n_angular=2)],
     "combined" => [PRODUCTION, FINER],
+    "outer_fine_tail" => [Discretisation(containment=c, max_step=0.8) for c in (1e-4, 1e-6, 1e-8)],
     "lattice" => vcat([Discretisation(lattice_points=m) for m in (31, 61, 85, 101, 151)], [PRODUCTION, Discretisation(n_phase=32)]),
 )
 
@@ -89,7 +91,8 @@ function reference_problem(spec, settings::Discretisation)
     background = KerrBackground(spec.initial_spin)
     mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]; max_order=settings.max_order, n_angular=settings.n_angular)
     mesh = RadialMesh(background, spec.mass_coupling, mode_set; step=settings.step, stretch_factor=settings.stretch_factor,
-                      containment=settings.containment, horizon_offset_ratio=settings.horizon_offset_ratio)
+                      containment=settings.containment, horizon_offset_ratio=settings.horizon_offset_ratio,
+                      max_step=settings.max_step == 0 ? nothing : settings.max_step)
     phase_grid = settings.lattice_points == 0 ? nothing :
         AC.PhaseGrid(rank1_lattice(LATTICE_GENERATORS[settings.lattice_points], settings.lattice_points), mode_set)
     return RadialProblem(background, CosinePotential(), spec.mass_coupling, mode_set; mesh, n_polar=settings.n_polar,
@@ -97,7 +100,7 @@ function reference_problem(spec, settings::Discretisation)
 end
 
 same_layout(settings::Discretisation) =
-    (settings.step, settings.stretch_factor, settings.containment, settings.horizon_offset_ratio, settings.max_order,
+    settings.max_step == 0 && (settings.step, settings.stretch_factor, settings.containment, settings.horizon_offset_ratio, settings.max_order,
      settings.n_angular) == (PRODUCTION.step, PRODUCTION.stretch_factor, PRODUCTION.containment, PRODUCTION.horizon_offset_ratio,
                              PRODUCTION.max_order, PRODUCTION.n_angular)
 
@@ -170,7 +173,7 @@ end
 settings_label(settings::Discretisation) =
     @sprintf("np%d_npol%d_h%g_sf%g_c%g_hr%g_mo%d_na%d", settings.n_phase, settings.n_polar, settings.step, settings.stretch_factor,
              settings.containment, settings.horizon_offset_ratio, settings.max_order, settings.n_angular) *
-    (settings.lattice_points == 0 ? "" : "_lat$(settings.lattice_points)")
+    (settings.max_step == 0 ? "" : "_ms$(settings.max_step)") * (settings.lattice_points == 0 ? "" : "_lat$(settings.lattice_points)")
 
 state_file(directory, study, settings, name) = joinpath(directory, "states", "$(study)_$(settings_label(settings))_$(name).jls")
 

@@ -259,10 +259,10 @@ function spindown_rhs_call(state::BenchmarkState, cache=evolution_cache(state))
     mode_count = length(state.solution.amplitudes)
     state_vector = vcat(log.(state.solution.amplitudes), state.background.mass, state.background.angular_momentum)
     cache.accepted_solution = state.solution
-    cache.solve_failed = false   # a failed call would otherwise make every later call return at once
+    cache.failed_attempt = -1   # a failed call would otherwise make every later call return at once
     rates = zeros(mode_count + 2)
     AC._spindown_rhs!(rates, state_vector, cache, 0.0)
-    cache.solve_failed && error("spindown rhs call: the radial solve did not converge on state '$(state.spec.name)'")
+    cache.failed_attempt == -1 || error("spindown rhs call: the radial solve did not converge on state '$(state.spec.name)'")
     empty!(cache.diagnostics)
     return rates
 end

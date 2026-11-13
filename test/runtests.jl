@@ -152,6 +152,26 @@ end
                           nonlinear_source(quadrature, potential, background, 0.3, s - step, profiles)) ./ 2step rtol=1e-7
 end
 
+@testset "Dual-number source against finite differences" begin
+    # Independent of `nonlinearity_derivative`: central differences of the plain kernel in α, spin, offset and profiles.
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]; n_angular=2)
+    quadrature = FieldQuadrature(mode_set; n_polar=8, n_phase=8)
+    profiles = [0.3 * cis(0.7index) / index for index in 1:AC.n_channels(mode_set)]
+    for potential in (CosinePotential(), ChiralPotential(), QuarticPotential(0.5))
+        function source_reals(inputs)
+            mass_coupling, spin, offset = inputs[1], inputs[2], inputs[3]
+            AC._realify(nonlinear_source(quadrature, potential, KerrBackground(spin), mass_coupling, offset,
+                                         complex.(inputs[4:2:end], inputs[5:2:end])))
+        end
+        inputs = vcat(0.3, 0.9, 4.0, AC._realify(profiles))
+        dual = ForwardDiff.jacobian(source_reals, inputs)
+        step = 1e-5
+        difference = reduce(hcat, [(source_reals(inputs .+ step .* (1:length(inputs) .== k)) .-
+                                    source_reals(inputs .- step .* (1:length(inputs) .== k))) ./ 2step for k in eachindex(inputs)])
+        @test maximum(abs, dual .- difference) < 1e-7 * maximum(abs, difference)
+    end
+end
+
 @testset "Asymptotic series satisfy the radial equation" begin
     background = KerrBackground(0.9)
     mass_coupling = 0.3
@@ -390,6 +410,33 @@ end
         blocks.outer_wrt_parameters[1, 2layout.n_modes + 1] = 1.0   # an outer row depending on a horizon coefficient
         @test_throws ErrorException AC.ScaledFactorization(blocks, scaling)
     end
+    # Three modes and two angular channels per component, with weights and a matrix that needs row exchanges:
+    # random values in every structural slot and a zeroed diagonal entry in every fifth row.
+    for mode_set in (ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2), BoundMode(4, 3, 3)]; max_order=1),
+                     ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]; n_angular=2))
+        problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh, n_phase=6, n_polar=8)
+        layout = AC.UnknownLayout(problem)
+        blocks = AC.JacobianWorkspace(problem, layout).blocks
+        for block in AC._block_arrays(blocks)
+            block .= randn(size(block))
+        end
+        n_frequencies, n_horizon = 2layout.n_modes, 2layout.n_channels
+        blocks.horizon_wrt_parameters[:, n_frequencies + n_horizon + 1:end] .= 0      # horizon rows: no outer coefficients
+        blocks.outer_wrt_parameters[:, n_frequencies + 1:n_frequencies + n_horizon] .= 0   # outer rows: no horizon coefficients
+        matrix = AC.sparse_jacobian(blocks, AC.JacobianPattern(layout))
+        size_total = AC.n_unknowns(layout)
+        for index in 1:5:size_total
+            matrix[index, index] = 0.0
+        end
+        row_weights, column_weights = exp.(randn(size_total)), exp.(randn(size_total))
+        factors = AC.BlockFactorization(matrix, layout, row_weights, column_weights)
+        scaled = Diagonal(row_weights) * matrix * Diagonal(column_weights)
+        right_hand_sides = randn(size_total, 2)
+        solution = factors \ right_hand_sides
+        @test maximum(abs, scaled * solution .- right_hand_sides) < 1e-10 * maximum(abs, right_hand_sides)
+        @test solution ≈ lu(scaled) \ right_hand_sides rtol=1e-6   # random matrices are not well conditioned
+        @test any(factors.middle_pivots .!= (1:size(factors.middle_pivots, 1)))   # rows were exchanged
+    end
     # An entry outside the block structure is rejected.
     layout = AC.UnknownLayout(RadialProblem(background, CosinePotential(), 0.3, ModeSet([BoundMode(2, 1, 1)]); mesh, n_phase=8, n_polar=8))
     size_total = AC.n_unknowns(layout)
@@ -546,9 +593,9 @@ end
     # A dual number in the spin alone (plain unknowns) propagates through the densities.
     densities_at(spin) = AC.integrated_densities(with_background(problem, KerrBackground(spin), problem.mass_coupling), layout,
                                                  unknowns, scale)
-    spin_step = 1e-5
+    spin_step = 1e-4   # smaller steps meet the roundoff of the near-horizon offsets
     @test ForwardDiff.derivative(densities_at, background.a) ≈
-          (densities_at(background.a + spin_step) .- densities_at(background.a - spin_step)) ./ 2spin_step rtol=1e-6
+          (densities_at(background.a + spin_step) .- densities_at(background.a - spin_step)) ./ 2spin_step rtol=1e-5
 
     # Default action balance leaves the energy pieces out; the amplitude rates are the same with them recorded.
     cache = EvolutionCache(problem; decay_constant_ratio=1e-2)
@@ -673,6 +720,85 @@ end
     fixed = evolve_fixed_background(problem, amplitudes, (0.0, final_time); algorithm=Rosenbrock23(), dt=final_time / 2)
     @test amplitude_trajectory(fixed).amplitudes[end, :] ≈ expected rtol=1e-4
     @test fixed.solve_counts.jacobian == 2fixed.solve_counts.jacobians_computed
+end
+
+@testset "solve_radial control flow and floor_tol" begin
+    # Decisions at a full step that does not reduce the residual, and after an accepted step.
+    @test AC._floor_action(false, 1e-12, 1e-4, 1e-10, 1e-10) === nothing                # step above √tol: backtrack
+    @test AC._floor_action(true, 1e-12, 1e-11, 1e-10, 1e-10) == :converged              # chord at its floor
+    @test AC._floor_action(true, 1e-12, 1e-7, 1e-10, 1e-10) == :refactorise             # chord step above tol
+    @test AC._floor_action(true, 1e-9, 1e-11, 1e-10, 1e-8) == :refactorise              # floor_tol is for Newton steps
+    @test AC._floor_action(false, 1e-12, 1e-7, 1e-10, 1e-10) == :converged
+    @test AC._floor_action(false, 1e-9, 1e-11, 1e-10, 1e-10) == :stuck                  # floor above tol
+    @test AC._floor_action(false, 1e-9, 1e-11, 1e-10, 1e-8) == :converged               # ... below floor_tol
+    @test AC._floor_action(false, 1e-9, 1e-7, 1e-10, 1e-10) === nothing
+    @test AC._convergence_status(1e-11, 1e-11, 1.0, 0, false, 1e-10) == (:converged, 0)
+    @test AC._convergence_status(1e-11, 1e-9, 1e-9, 0, true, 1e-10) == (:refactorise, 0)
+    @test AC._convergence_status(1e-11, 1e-9, 1e-9, 1, false, 1e-10) == (:continue, 2)
+    @test AC._convergence_status(1e-11, 1e-9, 1e-9, 2, false, 1e-10) == (:converged, 3)
+    @test AC._convergence_status(1e-11, 1e-4, 1e-4, 2, false, 1e-10) == (:ill_conditioned, 3)
+    @test AC._convergence_status(1e-9, 1e-9, 1e-9, 2, false, 1e-10) == (:continue, 0)
+
+    background = KerrBackground(0.9)
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
+    mesh = RadialMesh(background; rstar_min=-60.0, rstar_max=250.0, step=0.8)
+    problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh)
+    amplitudes = [3e-3, 1e-4]
+    solution = solve_radial(problem, amplitudes)
+    @test solution.converged
+    layout = solution.layout
+    target = amplitudes .* [1.0, 1.3]
+
+    # A bad prediction falls back to the plain warm start: same iterations and unknowns as no prediction.
+    plain = solve_radial(problem, target; guess=solution)
+    bad_change = 10 .* solution.unknowns   # profiles eleven times too large, parameters unchanged
+    bad_change[AC.parameter_range(layout)] .= 0
+    bad = solve_radial(problem, target; guess=solution, guess_change=bad_change)
+    @test bad.converged && bad.iterations == plain.iterations && bad.unknowns == plain.unknowns
+
+    # Chord steps from the guess's factorisation reach the same solution as Newton steps; after a large change a chord
+    # step is rejected and the Jacobian refactorised.
+    log_path, log_io = mktemp()
+    changed = amplitudes .* [1.5, 1.0]
+    chord = redirect_stdout(() -> solve_radial(problem, changed; guess=solution, verbose=true), log_io)
+    close(log_io)
+    newton = solve_radial(problem, changed; guess=solution, reuse_factorization=false)
+    @test chord.converged && newton.converged
+    @test maximum(abs, chord.unknowns .- newton.unknowns) < 1e-8 * maximum(abs, newton.unknowns)
+    @test occursin("rejected", read(log_path, String))
+
+    # A step from a factorisation taken at the reference scale `scale₀` with its frequency entries multiplied by
+    # `scale/scale₀` (`_rescale_frequency_step!`) is the step with that Jacobian's frequency columns divided by it.
+    ratio = 1.2
+    right_hand_side = sin.(1:length(solution.unknowns))
+    frequencies = AC.parameter_range(layout)[AC.frequency_range(layout)]
+    column_factors = ones(length(right_hand_side))
+    column_factors[frequencies] .= 1 / ratio
+    jacobian = AC.jacobian(problem, layout, solution.unknowns, amplitudes, solution.scale)
+    reference = AC.ScaledFactorization(jacobian * Diagonal(column_factors), solution.jacobian_factorization.scaling) \ right_hand_side
+    rescaled = AC._rescale_frequency_step!(solution.jacobian_factorization \ right_hand_side, layout, ratio)
+    @test rescaled ≈ reference rtol=1e-8
+
+    # A tolerance below the residual floor: the solve stops unconverged, unless floor_tol accepts the floor; the
+    # evolution cache passes floor_tol to its solves.
+    unreachable = 1e-17
+    @test !(@test_logs (:warn,) match_mode=:any solve_radial(problem, amplitudes; guess=solution, tol=unreachable, maxiter=4)).converged
+    @test solve_radial(problem, amplitudes; guess=solution, tol=unreachable, floor_tol=1e-9).converged
+    floor_cache = EvolutionCache(problem; newton_tol=unreachable, newton_floor_tol=1e-9, last_solution=solution)
+    @test floor_cache.newton_floor_tol == 1e-9 && EvolutionCache(problem).newton_floor_tol == EvolutionCache(problem).newton_tol
+    @test AC._solve_cached!(floor_cache, problem, amplitudes).converged
+end
+
+@testset "Threaded kernels and concurrent evaluations (subprocesses with 1 and 4 threads)" begin
+    # The suite itself may run on one thread; these subprocesses run the chunked and spawned paths and compare.
+    script = joinpath(@__DIR__, "threads_check.jl")
+    outputs = map((1, 4)) do threads
+        path = tempname()
+        run(`$(Base.julia_cmd()) --project=$(Base.active_project()) -t $threads $script $path`)
+        reinterpret(Float64, read(path))
+    end
+    @test outputs[1][1] == 1.0 && outputs[2][1] == 1.0   # concurrent evaluations equal sequential ones
+    @test outputs[1] == outputs[2]                         # results do not depend on the thread count
 end
 
 end

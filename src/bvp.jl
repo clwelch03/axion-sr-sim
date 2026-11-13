@@ -963,9 +963,7 @@ the scaled step fall below `tol` in the max norm, or when the residual is below
 domains that do not reach far into the tails the scaling is close to the identity.
 A floor above `tol` stops the solve unconverged as soon as a Newton step below
 `tol` fails to reduce the residual (`_floor_action`); with `floor_tol > tol`
-(opt-in) a Newton step at a floor below `floor_tol` counts as converged. The floor is set by the outer-boundary rows, whose roundoff is
-amplified by the envelope row weights: about 1e-14 to 1e-10 on the 690-node
-α = 0.3 meshes, 5e-10 on the 1355-node α = 0.187 mesh.
+(opt-in) a Newton step at a floor below `floor_tol` counts as converged.
 
 With `reuse_factorization` and a warm start, the iteration begins as a chord
 method: steps use the guess's factorised Jacobian (and later the most recent
@@ -982,106 +980,53 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
                       tol=1e-10, floor_tol=tol, maxiter=30, verbose=false, reuse_factorization=true, chord_threshold=1e-3)
     layout = UnknownLayout(problem)
     scale = maximum(amplitudes)
-    warm = guess isa RadialSolution && length(guess.unknowns) == n_unknowns(layout)
-    predicted = warm && guess_change !== nothing && any(!iszero, guess_change)
-    unknowns = warm ? warm_start_unknowns(guess, scale; change=guess_change) : initial_unknowns(problem, layout, amplitudes, scale)
-    scaling = NewtonScaling(problem, layout, _complexify(unknowns[parameter_range(layout)][frequency_range(layout)]))
+    start = _newton_start(problem, layout, amplitudes, scale, guess, guess_change; reuse_factorization, chord_threshold, verbose)
+    scaling, unknowns, current, current_norm = start.scaling, start.unknowns, start.residual, start.residual_norm
+    factorization, factorization_distance, factorization_scale = start.factorization, start.distance, start.factorization_scale
     assembly = nothing   # Jacobian workspace, built when the first Jacobian is needed and reused
-    scaled_norm(residual_vector) = _weighted_max_norm(residual_vector, scaling.row, *)
-    scaled_step_norm(step_vector) = _weighted_max_norm(step_vector, scaling.column, /)
-    current = residual(problem, layout, unknowns, amplitudes, scale)
-    current_norm = scaled_norm(current)
-    if predicted && current_norm ≥ chord_threshold
-        # The prediction is not clearly close: start from the plain warm start if that is closer.
-        plain = warm_start_unknowns(guess, scale)
-        plain_residual = residual(problem, layout, plain, amplitudes, scale)
-        if scaled_norm(plain_residual) < current_norm
-            verbose && println("  prediction |F| = $current_norm worse than the plain warm start; using the latter")
-            unknowns, current, current_norm = plain, plain_residual, scaled_norm(plain_residual)
-        end
-    end
-
-    # Chord steps are only worthwhile near a solution; far from it every rejected step costs a residual.
-    factorization = warm && reuse_factorization && current_norm < chord_threshold ? guess.jacobian_factorization : nothing
-    # Max-norm distance from the current point to where the factorisation was taken. The guess's factorisation
-    # belongs to the current system only if problem and amplitudes are the guess's own.
-    same_system = warm && !predicted && amplitudes == guess.amplitudes && _same_discretisation(problem, guess.problem)
-    factorization_distance = same_system ? 0.0 : Inf
-    # Reference scale of the unknowns when the factorisation was taken (see `_rescale_frequency_step!`).
-    factorization_scale = warm ? float(guess.scale) : float(scale)
-    converged = false
-    iterations = 0
-    stalled = 0
-    previous_step_norm = Inf
+    converged, iterations, stalled, previous_step_norm = false, 0, 0, Inf
     for iteration in 1:maxiter
         iterations = iteration
         chord = factorization !== nothing
         if !chord
             assembly === nothing && (assembly = JacobianWorkspace(problem, layout))
             factorization = _factorised_jacobian(assembly, problem, layout, unknowns, amplitudes, scale, scaling)
-            factorization_distance = 0.0
-            factorization_scale = float(scale)
+            factorization_distance, factorization_scale = 0.0, float(scale)
         end
         step = _rescale_frequency_step!(-(factorization \ current), layout, scale / factorization_scale)
-        # Backtracking line search on the residual norm (Armijo condition); a
-        # chord step must at least halve the residual or it is abandoned.
-        # A small full step that does not reduce the residual may mean the residual is at its roundoff floor
-        # (`_floor_action`); backtracking would then only shrink the step (up to 14 residual evaluations).
-        damping = 1.0
-        trial, trial_residual, trial_norm = unknowns, current, current_norm
-        floor_action = nothing
-        while damping ≥ 1e-4
-            trial = unknowns .+ damping .* step
-            trial_residual = residual(problem, layout, trial, amplitudes, scale)
-            trial_norm = scaled_norm(trial_residual)
-            trial_norm ≤ (1 - 1e-4damping) * current_norm && break
-            damping == 1 && (floor_action = _floor_action(chord, current_norm, scaled_step_norm(step), tol, floor_tol))
-            floor_action === nothing || break
-            damping /= 2
-        end
-        if floor_action == :refactorise
+        search = _line_search(problem, layout, amplitudes, scale, scaling, unknowns, current, current_norm, step, chord, tol, floor_tol)
+        if search.floor_action == :refactorise
             verbose && println("  chord step $iteration does not reduce |F| = $current_norm; refactorising")
             factorization = nothing
             continue
-        elseif floor_action == :converged
+        elseif search.floor_action == :converged
             verbose && println("  $(chord ? "chord" : "newton") $iteration: |F| = $current_norm is at its roundoff floor; converged")
             converged = true
             break
-        elseif floor_action == :stuck
+        elseif search.floor_action == :stuck
             verbose && println("  newton $iteration: |F| = $current_norm is at its roundoff floor, above tol; stopping")
             break
         end
-        if chord && trial_norm > max(current_norm / 2, tol)
-            verbose && println("  chord step $iteration rejected (|F| $current_norm → $trial_norm); refactorising")
+        if chord && search.residual_norm > max(current_norm / 2, tol)
+            verbose && println("  chord step $iteration rejected (|F| $current_norm → $(search.residual_norm)); refactorising")
             factorization = nothing
             continue
         end
-        unknowns, current, current_norm = trial, trial_residual, trial_norm
+        unknowns, current, current_norm = search.unknowns, search.residual, search.residual_norm
         reuse_factorization && current_norm < chord_threshold || (factorization = nothing)
-        factorization_distance += damping * norm(step, Inf)
-        step_norm = damping * scaled_step_norm(step)
-        verbose && println("  $(chord ? "chord" : "newton") $iteration: |step| = $step_norm  |F| = $current_norm  damping = $damping")
-        if current_norm < tol && step_norm < tol
+        factorization_distance += search.damping * norm(step, Inf)
+        step_norm = search.damping * _weighted_max_norm(step, scaling.column, /)
+        verbose && println("  $(chord ? "chord" : "newton") $iteration: |step| = $step_norm  |F| = $current_norm  damping = $(search.damping)")
+        status, stalled = _convergence_status(current_norm, step_norm, previous_step_norm, stalled, chord, tol)
+        if status == :converged
             converged = true
             break
-        end
-        # Residual below tol while the step stops shrinking. With envelope scaling the scaled step can sit at a
-        # roundoff floor of ~1e-9 (tail unknowns measured in units of their envelopes): accept that as converged.
-        # A step that stalls above √tol still means a (nearly) singular system. (Chord steps near convergence
-        # shrink geometrically, which is fine.)
-        if current_norm < tol && step_norm > previous_step_norm / 2
-            stalled += 1
-            if stalled ≥ 3
-                if step_norm < sqrt(tol)
-                    converged = true
-                else
-                    @warn "solve_radial: |F| = $current_norm is below tol but the Newton step is $step_norm; " *
-                          "the system is ill-conditioned"
-                end
-                break
-            end
-        else
-            stalled = 0
+        elseif status == :ill_conditioned
+            @warn "solve_radial: |F| = $current_norm is below tol but the Newton step is $step_norm; the system is ill-conditioned"
+            break
+        elseif status == :refactorise
+            verbose && println("  chord steps below tol shrink slowly; refactorising")
+            factorization = nothing
         end
         previous_step_norm = step_norm
     end
@@ -1096,6 +1041,92 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
     parameters = RadialParameters(layout, unknowns[parameter_range(layout)], amplitudes, scale)
     RadialSolution(problem, layout, collect(float.(amplitudes)), float(scale), unknowns, parameters, factorization,
                    iterations, current_norm, converged)
+end
+
+"""
+    _newton_start(problem, layout, amplitudes, scale, guess, guess_change; reuse_factorization, chord_threshold, verbose)
+
+Starting point of `solve_radial`: the `NewtonScaling` (from the starting frequencies), the starting unknowns, their
+residual and its scaled max norm, and the factorisation to start from (the guess's, for a warm start with a residual
+below `chord_threshold`, else `nothing`) with its max-norm `distance` from the start (`0` only when problem and
+amplitudes are the guess's own, `Inf` otherwise) and the unknowns' reference scale where it was taken. A predicted
+start (`guess_change`) with a residual above `chord_threshold` is replaced by the plain warm start if that is closer.
+"""
+function _newton_start(problem::RadialProblem, layout::UnknownLayout, amplitudes::AbstractVector, scale, guess, guess_change;
+                       reuse_factorization::Bool, chord_threshold, verbose::Bool)
+    warm = guess isa RadialSolution && length(guess.unknowns) == n_unknowns(layout)
+    predicted = warm && guess_change !== nothing && any(!iszero, guess_change)
+    unknowns = warm ? warm_start_unknowns(guess, scale; change=guess_change) : initial_unknowns(problem, layout, amplitudes, scale)
+    scaling = _starting_scaling(problem, layout, unknowns)
+    current = residual(problem, layout, unknowns, amplitudes, scale)
+    current_norm = _weighted_max_norm(current, scaling.row, *)
+    if predicted && current_norm ≥ chord_threshold
+        plain = warm_start_unknowns(guess, scale)
+        plain_residual = residual(problem, layout, plain, amplitudes, scale)
+        if _weighted_max_norm(plain_residual, scaling.row, *) < current_norm
+            verbose && println("  prediction |F| = $current_norm worse than the plain warm start; using the latter")
+            # The scaling follows the start that is used, not the rejected prediction's frequencies.
+            unknowns, current, scaling = plain, plain_residual, _starting_scaling(problem, layout, plain)
+            current_norm = _weighted_max_norm(current, scaling.row, *)
+        end
+    end
+    # Chord steps are only worthwhile near a solution; far from it every rejected step costs a residual.
+    factorization = warm && reuse_factorization && current_norm < chord_threshold ? guess.jacobian_factorization : nothing
+    same_system = warm && !predicted && amplitudes == guess.amplitudes && _same_discretisation(problem, guess.problem)
+    return (; scaling, unknowns, residual=current, residual_norm=current_norm, factorization, distance=same_system ? 0.0 : Inf,
+            factorization_scale=warm ? float(guess.scale) : float(scale))
+end
+
+"""`NewtonScaling` from the mode frequencies of a starting unknown vector."""
+_starting_scaling(problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector) =
+    NewtonScaling(problem, layout, _complexify(unknowns[parameter_range(layout)][frequency_range(layout)]))
+
+"""
+    _line_search(problem, layout, amplitudes, scale, scaling, unknowns, current, current_norm, step, chord, tol, floor_tol)
+
+Backtracking line search on the scaled residual norm along `step` (Armijo condition with factor `1e-4`, halving the
+damping down to `1e-4`; when that is exhausted the last trial is returned). A full step that does not reduce the
+residual is first passed to `_floor_action`, since at a roundoff floor backtracking would only shrink the step. Returns
+the trial unknowns, residual, scaled norm, the damping of that trial and the floor action (or `nothing`).
+"""
+function _line_search(problem::RadialProblem, layout::UnknownLayout, amplitudes::AbstractVector, scale, scaling::NewtonScaling,
+                      unknowns::AbstractVector, current::AbstractVector, current_norm, step::AbstractVector, chord::Bool, tol,
+                      floor_tol)
+    damping, floor_action = 1.0, nothing
+    while true
+        trial = unknowns .+ damping .* step
+        trial_residual = residual(problem, layout, trial, amplitudes, scale)
+        trial_norm = _weighted_max_norm(trial_residual, scaling.row, *)
+        accepted = trial_norm ≤ (1 - 1e-4damping) * current_norm
+        if !accepted && damping == 1
+            floor_action = _floor_action(chord, current_norm, damping * _weighted_max_norm(step, scaling.column, /), tol, floor_tol)
+        end
+        if accepted || floor_action !== nothing || damping / 2 < 1e-4
+            return (; unknowns=trial, residual=trial_residual, residual_norm=trial_norm, damping, floor_action)
+        end
+        damping /= 2
+    end
+end
+
+"""
+    _convergence_status(residual_norm, step_norm, previous_step_norm, stalled, chord, tol)
+
+Convergence test of `solve_radial` after an accepted step, as `(status, stalled)`: `:converged` when residual and step
+are below `tol`. With the residual below `tol` and a step that is not at least halved: a Newton step counts towards
+`stalled`, and after three in a row the scaled step is at a roundoff floor (with envelope scaling about 1e-9, tail
+unknowns being measured in units of their envelopes) and the solve converges if it is below `√tol`, or the system is
+`:ill_conditioned`; a chord step returns `:refactorise`, since a chord iteration that converges slowly needs a new
+Jacobian rather than a roundoff-floor test. Otherwise `:continue` (and `stalled` is reset).
+"""
+function _convergence_status(residual_norm, step_norm, previous_step_norm, stalled::Int, chord::Bool, tol)
+    residual_norm < tol && step_norm < tol && return :converged, stalled
+    if residual_norm < tol && step_norm > previous_step_norm / 2
+        chord && return :refactorise, 0
+        stalled += 1
+        stalled < 3 && return :continue, stalled
+        return (step_norm < sqrt(tol) ? :converged : :ill_conditioned), stalled
+    end
+    return :continue, 0
 end
 
 """Scaled factorisation of the Jacobian at `unknowns`, assembled in `workspace` and factorised from its blocks."""
@@ -1128,6 +1159,8 @@ Jacobian, so `:refactorise` and let a Newton step decide). A Newton step at a re
 `floor_tol` likewise converges. A Newton step below `tol` that does not reduce a residual above `tol` means a
 floor above `tol`: `:stuck`, since repeating the step from the same point gives the same result.
 """
+# The floor is set by the outer-boundary rows, whose roundoff is amplified by the envelope row weights: about 1e-14 to
+# 1e-10 on the 690-node α = 0.3 meshes and 5e-10 on the 1355-node α = 0.187 mesh (speedup/newton measurements).
 function _floor_action(chord::Bool, residual_norm, step_norm, tol, floor_tol)
     step_norm < sqrt(tol) || return nothing
     if chord

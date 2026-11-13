@@ -775,6 +775,15 @@ end
     stub.iter = 5
     cache.newton_tol = 1e-30
     @test_throws ErrorException AC._spindown_rhs!(rates, state_vector, cache, 0.0)
+    # A trial state with negative spin is rejected without a radial solve (and without a DomainError).
+    stub.opts = (adaptive=true,)
+    stub.iter = 6
+    cache.newton_tol = 1e-10
+    solves_before = total_solves(cache.solve_counts)
+    negative_spin_state = vcat(state_vector[1:2], state_vector[3], -0.1)
+    AC._spindown_rhs!(rates, negative_spin_state, cache, 0.0)
+    @test rates == zeros(4) && cache.failed_attempt == 6 && total_solves(cache.solve_counts) == solves_before
+    @test AC._reject_failed_step(negative_spin_state, cache, 0.0)
 end
 
 @testset "solve_radial control flow and floor_tol" begin

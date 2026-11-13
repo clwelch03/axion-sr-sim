@@ -629,6 +629,9 @@ end
 
 dimensionless_spin(state::BackgroundState) = state.angular_momentum / state.mass^2
 
+"""Whether `state` has positive mass and spin `0 ≤ a < 1`, the range `KerrBackground` accepts."""
+is_kerr_black_hole(state::BackgroundState) = state.mass > 0 && 0 ≤ dimensionless_spin(state) < 1
+
 """Radial problem in units of the current black-hole mass for a given background state."""
 function current_problem(cache::EvolutionCache, state::BackgroundState)
     with_background(cache.template, KerrBackground(dimensionless_spin(state)), cache.initial_mass_coupling * state.mass)
@@ -1093,12 +1096,26 @@ initialisation.
 _step_attempt(cache::EvolutionCache) = cache.integrator === nothing ? 0 : cache.integrator.iter
 
 """
+Mark the current step attempt as failed and zero the rates, so that `_reject_failed_step` makes the integrator
+retry with a smaller step; with `adaptive=false` a step cannot be rejected, and this is an error.
+"""
+function _fail_step_attempt!(rates, cache::EvolutionCache, attempt::Int, time, reason::AbstractString)
+    cache.failed_attempt = attempt
+    cache.integrator !== nothing && !cache.integrator.opts.adaptive &&
+        error("t = $time: $reason, and the step cannot be rejected with adaptive=false")
+    rates .= 0
+    cache.verbose && (println("t = ", time, "  ", reason, "; the step will be rejected"); flush(stdout))
+    return nothing
+end
+
+"""
 Right-hand side of the spindown evolution. Every radial solve is warm-started
 from the solution at the last accepted step (moved by `predicted_change` when the
 cache has its tangents), never from a stage of a rejected step: after a rejection the retry's stages can be far from the rejected trial
 stages in both amplitudes and background, and that combination broke the warm
-start (`validation/spindown_warmstart_check.jl`). If a solve still fails, the
-rates are set to zero, the remaining evaluations of the same step attempt are
+start (`validation/spindown_warmstart_check.jl`). If a solve still fails, or a
+trial state is not a Kerr black hole (a too-long step can overshoot to negative
+spin), the rates are set to zero, the remaining evaluations of the same step attempt are
 skipped, and `_reject_failed_step` makes the integrator retry with a smaller
 step. Integrators with their own nonlinear solve (FBDF, SDIRK) may instead give
 up on the attempt themselves; the record is per attempt (`_step_attempt`), so the
@@ -1111,19 +1128,16 @@ function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
         rates .= 0
         return nothing
     end
+    trial_state = BackgroundState(state_vector[end - 1], state_vector[end])
+    is_kerr_black_hole(trial_state) ||
+        return _fail_step_attempt!(rates, cache, attempt, time, "trial state is not a black hole with 0 ≤ a < 1 " *
+                                   "(b = $(trial_state.mass), j = $(trial_state.angular_momentum))")
     evaluation = _spindown_evaluation(state_vector, cache, cache.accepted_solution, cache.accepted_tangents)
     cache.solve_counts.stage += 1
     solution, state, terms = evaluation.solution, evaluation.state, evaluation.terms
     if evaluation.rates === nothing
         cache.solve_counts.failed += 1
-        cache.failed_attempt = attempt
-        cache.integrator !== nothing && !cache.integrator.opts.adaptive &&
-            error("radial solve at t = $time did not converge (|F| = $(solution.residual_norm)) and the step cannot " *
-                  "be rejected with adaptive=false")
-        rates .= 0
-        cache.verbose && (println("t = ", time, "  radial solve failed (|F| = ", solution.residual_norm,
-                                  "); the step will be rejected"); flush(stdout))
-        return nothing
+        return _fail_step_attempt!(rates, cache, attempt, time, "radial solve did not converge (|F| = $(solution.residual_norm))")
     end
     rates .= evaluation.rates
     cache.last_solution, cache.last_rates, cache.last_tangents = solution, evaluation.rates, evaluation.tangents

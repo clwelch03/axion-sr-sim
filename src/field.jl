@@ -49,7 +49,22 @@ end
 function PhaseGrid(n_per_dim::Int, mode_set::ModeSet)
     one_axis = 2pi .* (0:n_per_dim-1) ./ n_per_dim
     torus_points = vec(collect(Iterators.product(ntuple(_ -> one_axis, n_modes(mode_set))...)))
-    phase_factors = [cis(-sum(component.q .* collect(point)))
+    return PhaseGrid(reduce(hcat, collect.(torus_points)), mode_set; n_per_dim)
+end
+
+"""
+    PhaseGrid(points, mode_set; n_per_dim=0)
+
+Equal-weight phase rule on the given points (`points[mode, point]`, angles in
+`[0, 2π)`), with the same tables as the tensor grid. The phase average of
+`e^{+i k·ξ} f` is exact when the rule integrates every exponential that the
+product contains; `n_per_dim` is only a label (`0` for a non-tensor rule).
+The tables take `(components + wavevector slots) × points` memory.
+"""
+function PhaseGrid(points::AbstractMatrix{<:Real}, mode_set::ModeSet; n_per_dim::Int=0)
+    size(points, 1) == n_modes(mode_set) || throw(ArgumentError("points must have one row per bound mode"))
+    torus_points = eachcol(points)
+    phase_factors = [cis(-sum(component.q .* point))
                      for point in torus_points, component in mode_set.components]
 
     # Distinct wavevectors up to sign; a slot stores the representative with the larger lexicographic order.
@@ -70,7 +85,7 @@ function PhaseGrid(n_per_dim::Int, mode_set::ModeSet)
                       for target in components, source in components]
     difference_conjugated = [target.q .- source.q != max(target.q .- source.q, -(target.q .- source.q))
                              for target in components, source in components]
-    averaging_table = [cis(sum(wavevector .* collect(point))) / length(torus_points)
+    averaging_table = [cis(sum(wavevector .* point)) / length(torus_points)
                        for wavevector in wavevectors, point in torus_points]
     # cos(q·ξ) = Re exp(-iq·ξ), sin(q·ξ) = -Im exp(-iq·ξ)
     synthesis = hcat(2 .* real.(phase_factors), -2 .* imag.(phase_factors))
@@ -79,14 +94,28 @@ function PhaseGrid(n_per_dim::Int, mode_set::ModeSet)
               sum_slot, difference_slot, sum_conjugated, difference_conjugated)
 end
 
+"""
+    rank1_lattice(generating_vector, n_points)
+
+Points `ξ_j = 2π (j z mod M) / M`, `j = 0, …, M − 1`, of the rank-1 lattice rule
+with generating vector `z` and `M = n_points`, as `points[mode, point]`. The
+equal-weight average of `e^{+i k·ξ}` over these points is `1` when `k·z ≡ 0
+(mod M)` and `0` otherwise, so the rule is exact for every exponential except
+those whose wavevector `k ≠ 0` has `k·z ≡ 0 (mod M)` (its aliases of `k = 0`).
+"""
+rank1_lattice(generating_vector::AbstractVector{<:Integer}, n_points::Integer) =
+    [2pi * mod(index * entry, n_points) / n_points for entry in generating_vector, index in 0:n_points-1]
+
 n_points(grid::PhaseGrid) = size(grid.phase_factors, 1)
 n_slots(grid::PhaseGrid) = size(grid.jacobian_table, 1) ÷ 2
 
 """
-    FieldQuadrature(mode_set; n_polar=12, n_phase=16)
+    FieldQuadrature(mode_set; n_polar=12, n_phase=16, phase_grid=nothing)
 
 Everything needed to evaluate phase- and polar-averaged nonlinear quantities:
-the polar Gauss–Legendre grid, the phase torus grid, and the mode bookkeeping.
+the polar Gauss–Legendre grid, the phase rule (the tensor grid with `n_phase`
+points per mode unless a `PhaseGrid` is passed as `phase_grid`), and the mode
+bookkeeping.
 """
 struct FieldQuadrature{T<:Real}
     mode_set::ModeSet
@@ -94,8 +123,8 @@ struct FieldQuadrature{T<:Real}
     phase::PhaseGrid{T}
 end
 
-FieldQuadrature(mode_set::ModeSet; n_polar::Int=12, n_phase::Int=16) =
-    FieldQuadrature(mode_set, AngularGrid(n_polar, mode_set), PhaseGrid(n_phase, mode_set))
+FieldQuadrature(mode_set::ModeSet; n_polar::Int=12, n_phase::Int=16, phase_grid::Union{Nothing, PhaseGrid}=nothing) =
+    FieldQuadrature(mode_set, AngularGrid(n_polar, mode_set), something(phase_grid, PhaseGrid(n_phase, mode_set)))
 
 """
     FieldWorkspace{T}(quadrature)

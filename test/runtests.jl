@@ -1,6 +1,6 @@
 using Test
 using AxionCloud
-using ForwardDiff, LinearAlgebra, FastGaussQuadrature
+using ForwardDiff, LinearAlgebra, SparseArrays, FastGaussQuadrature
 const AC = AxionCloud
 
 @testset "AxionCloud" begin

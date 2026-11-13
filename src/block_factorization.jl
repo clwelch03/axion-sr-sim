@@ -167,10 +167,66 @@ function stamp_panels(matrix::SparseMatrixCSC, layout::UnknownLayout, row_weight
     return panels
 end
 
-function BlockFactorization(matrix::SparseMatrixCSC, layout::UnknownLayout, row_weights::AbstractVector,
-                            column_weights::AbstractVector)
+"""
+    stamp_panels(blocks::JacobianBlocks, layout, row_weights, column_weights)
+
+The panels of `stamp_panels` filled from the Jacobian blocks of `jacobian_blocks!` (no sparse matrix). The
+interval panels are filled in parallel over the Julia threads. Throws if the horizon rows have an entry in an
+outer-coefficient column or the outer rows in a horizon-coefficient column.
+"""
+function stamp_panels(blocks::JacobianBlocks, layout::UnknownLayout, row_weights::AbstractVector,
+                      column_weights::AbstractVector)
     node_size, node_count, frequency_count, horizon_count, outer_count, carried_rows = block_dimensions(layout)
-    first_panel, middle_panels, last_panel = stamp_panels(matrix, layout, row_weights, column_weights)
+    any(!iszero, view(blocks.horizon_wrt_parameters, :, frequency_count + horizon_count + 1:size(blocks.horizon_wrt_parameters, 2))) &&
+        error("Jacobian: horizon rows depend on outer coefficients, outside the block structure")
+    any(!iszero, view(blocks.outer_wrt_parameters, :, frequency_count + 1:frequency_count + horizon_count)) &&
+        error("Jacobian: outer rows depend on horizon coefficients, outside the block structure")
+    first_panel = zeros(node_size, horizon_count + node_size + frequency_count)
+    middle_panels = zeros(carried_rows + node_size, 2node_size + frequency_count, node_count - 1)
+    last_panel = zeros(carried_rows + node_size, carried_rows + node_size)
+    last_node_offset = (node_count - 1) * node_size   # first row of the horizon rows and first column of node N, minus 1
+    parameter_offset = node_count * node_size         # likewise for the outer rows and the parameter columns
+    # Weighted copy of `block[:, source_columns]` into `panel[panel_row_offset .+ (1:node_size), panel_columns]`.
+    function stamp!(panel, panel_columns, block, source_columns, row_offset, column_offset, panel_row_offset)
+        for (panel_column, source_column) in zip(panel_columns, source_columns), row in 1:node_size
+            panel[panel_row_offset + row, panel_column] =
+                row_weights[row_offset + row] * block[row, source_column] * column_weights[column_offset + source_column]
+        end
+    end
+    _foreach_in_chunks(1:node_count - 1, () -> nothing) do _, stage
+        panel, row_offset = view(middle_panels, :, :, stage), (stage - 1) * node_size
+        stamp!(panel, 1:node_size, view(blocks.wrt_left, :, :, stage), 1:node_size, row_offset, row_offset, carried_rows)
+        stamp!(panel, node_size + 1:2node_size, view(blocks.wrt_right, :, :, stage), 1:node_size, row_offset,
+               row_offset + node_size, carried_rows)
+        stamp!(panel, 2node_size + 1:2node_size + frequency_count, view(blocks.wrt_frequencies, :, :, stage),
+               1:frequency_count, row_offset, parameter_offset, carried_rows)
+    end
+    # Horizon rows (row block N): columns [horizon coefficients, node 1, frequencies].
+    stamp!(first_panel, 1:horizon_count, blocks.horizon_wrt_parameters, frequency_count + 1:frequency_count + horizon_count,
+           last_node_offset, parameter_offset, 0)
+    stamp!(first_panel, horizon_count + 1:horizon_count + node_size, blocks.horizon_wrt_node, 1:node_size, last_node_offset, 0, 0)
+    stamp!(first_panel, horizon_count + node_size + 1:size(first_panel, 2), blocks.horizon_wrt_parameters, 1:frequency_count,
+           last_node_offset, parameter_offset, 0)
+    # Outer rows (row block N + 1): columns [node N, frequencies, outer coefficients].
+    stamp!(last_panel, 1:node_size, blocks.outer_wrt_node, 1:node_size, parameter_offset, last_node_offset, carried_rows)
+    stamp!(last_panel, node_size + 1:node_size + frequency_count, blocks.outer_wrt_parameters, 1:frequency_count,
+           parameter_offset, parameter_offset, carried_rows)
+    stamp!(last_panel, node_size + frequency_count + 1:node_size + frequency_count + outer_count, blocks.outer_wrt_parameters,
+           frequency_count + horizon_count + 1:frequency_count + horizon_count + outer_count, parameter_offset, parameter_offset,
+           carried_rows)
+    return first_panel, middle_panels, last_panel
+end
+
+"""
+    BlockFactorization(jacobian, layout, row_weights, column_weights)
+
+Factors of `D_r J D_c` for a Jacobian given as a `SparseMatrixCSC` or as `JacobianBlocks`, with the weights
+`D_r = Diagonal(row_weights)`, `D_c = Diagonal(column_weights)`.
+"""
+function BlockFactorization(jacobian::Union{SparseMatrixCSC, JacobianBlocks}, layout::UnknownLayout,
+                            row_weights::AbstractVector, column_weights::AbstractVector)
+    node_size, node_count, frequency_count, horizon_count, outer_count, carried_rows = block_dimensions(layout)
+    first_panel, middle_panels, last_panel = stamp_panels(jacobian, layout, row_weights, column_weights)
     first_pivots = eliminate_leading_columns!(first_panel, horizon_count)
     middle_pivots = zeros(BlasInt, node_size, node_count - 1)
     # Columns of the next panel that the carried rows occupy: node j + 1 (its leading columns) and the frequencies

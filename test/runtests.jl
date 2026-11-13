@@ -383,6 +383,12 @@ end
         @test maximum(abs, block \ right_hand_sides .- reference \ right_hand_sides) < 1e-9 * maximum(abs, reference \ right_hand_sides)
         @test block \ right_hand_sides[:, 1] ≈ reference \ right_hand_sides[:, 1] rtol=1e-9
         @test maximum(abs, jacobian * (block \ right_hand_sides) .- right_hand_sides) < 1e-8 * maximum(abs, right_hand_sides)
+        # Factorising the blocks directly (what solve_radial does) gives the same factors as the sparse matrix.
+        blocks = AC.jacobian_blocks!(AC.JacobianWorkspace(problem, layout), problem, layout, unknowns, amplitudes, scale)
+        @test AC.ScaledFactorization(blocks, scaling) \ right_hand_sides == block \ right_hand_sides
+        @test AC.ScaledFactorization(blocks, scaling; method=:sparse_lu) \ right_hand_sides == reference \ right_hand_sides
+        blocks.outer_wrt_parameters[1, 2layout.n_modes + 1] = 1.0   # an outer row depending on a horizon coefficient
+        @test_throws ErrorException AC.ScaledFactorization(blocks, scaling)
     end
     # An entry outside the block structure is rejected.
     layout = AC.UnknownLayout(RadialProblem(background, CosinePotential(), 0.3, ModeSet([BoundMode(2, 1, 1)]); mesh, n_phase=8, n_polar=8))

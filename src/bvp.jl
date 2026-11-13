@@ -625,7 +625,6 @@ right-hand sides and their derivatives at every node. Used by
 `jacobian_blocks!`; not safe to share between concurrent calls.
 """
 struct JacobianWorkspace
-    layout::UnknownLayout
     blocks::JacobianBlocks{Float64}
     node_rhs::Matrix{Float64}
     node_wrt_state::Array{Float64,3}
@@ -635,7 +634,7 @@ end
 function JacobianWorkspace(problem::RadialProblem, layout::UnknownLayout=UnknownLayout(problem))
     n_state, n_frequency_reals, n_nodes = node_block_size(layout), 2layout.n_modes, layout.n_nodes
     blocks = JacobianBlocks{Float64}((zeros(shape) for shape in _block_shapes(layout))...)
-    JacobianWorkspace(layout, blocks, zeros(n_state, n_nodes), zeros(n_state, n_state, n_nodes),
+    JacobianWorkspace(blocks, zeros(n_state, n_nodes), zeros(n_state, n_state, n_nodes),
                       zeros(n_state, n_frequency_reals, n_nodes))
 end
 
@@ -752,7 +751,7 @@ end
 Sparse Jacobian of `residual` with respect to `unknowns`: block-bidiagonal in
 the node blocks, bordered by the dense parameter columns (see `JacobianBlocks`).
 Returns a new matrix; pass a `workspace` and a `pattern` to reuse them between
-calls.
+calls. `solve_radial` factorises the blocks directly and does not build this matrix.
 """
 jacobian(problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector, amplitudes::AbstractVector, scale;
          workspace::JacobianWorkspace=JacobianWorkspace(problem, layout), pattern::JacobianPattern=JacobianPattern(layout)) =
@@ -877,9 +876,6 @@ function NewtonScaling(problem::RadialProblem, layout::UnknownLayout, mode_frequ
     return NewtonScaling(row, column, layout)
 end
 
-"""Factorization method used by `ScaledFactorization` when none is given (`:block` or `:sparse_lu`)."""
-const DEFAULT_FACTORIZATION_METHOD = Ref(:block)
-
 """
     ScaledFactorization
 
@@ -891,25 +887,31 @@ well-conditioned system without knowing about the scaling.
 `ScaledFactorization(jacobian, scaling; method)` factorises with the block
 elimination of `BlockFactorization` (`method=:block`, which needs the Jacobian structure of
 `scaling.layout`) or with the general sparse LU (`method=:sparse_lu`, UMFPACK, kept as the reference).
-The default `method` is `DEFAULT_FACTORIZATION_METHOD[]`, which validation scripts set to compare the two.
+`jacobian` is a matrix or the `JacobianBlocks` of `jacobian_blocks!` (what `solve_radial` passes).
+The default `method` is `:block`.
 """
 struct ScaledFactorization{F}
     factorization::F
     scaling::NewtonScaling
 end
 
-function ScaledFactorization(jacobian::AbstractMatrix, scaling::NewtonScaling;
-                            method::Symbol=DEFAULT_FACTORIZATION_METHOD[])
+function ScaledFactorization(jacobian::Union{AbstractMatrix, JacobianBlocks}, scaling::NewtonScaling;
+                             method::Symbol=:block)
     if method == :block
-        sparse_matrix = jacobian isa SparseMatrixCSC ? jacobian : sparse(jacobian)   # `sparse` of a sparse matrix copies it
-        factors = BlockFactorization(sparse_matrix, scaling.layout, scaling.row, scaling.column)
+        factors = BlockFactorization(_block_input(jacobian), scaling.layout, scaling.row, scaling.column)
     elseif method == :sparse_lu
-        factors = lu(Diagonal(scaling.row) * jacobian * Diagonal(scaling.column))
+        factors = lu(Diagonal(scaling.row) * _matrix_input(jacobian, scaling.layout) * Diagonal(scaling.column))
     else
         throw(ArgumentError("unknown factorization method $method; use :block or :sparse_lu"))
     end
     return ScaledFactorization(factors, scaling)
 end
+
+# Inputs of the two methods: `BlockFactorization` takes blocks or a sparse matrix, the sparse LU a matrix.
+_block_input(jacobian::Union{SparseMatrixCSC, JacobianBlocks}) = jacobian
+_block_input(jacobian::AbstractMatrix) = sparse(jacobian)
+_matrix_input(jacobian::AbstractMatrix, layout::UnknownLayout) = jacobian
+_matrix_input(blocks::JacobianBlocks, layout::UnknownLayout) = sparse_jacobian(blocks, JacobianPattern(layout))
 
 Base.:\(scaled::ScaledFactorization, right_hand_side::AbstractVecOrMat) =
     scaled.scaling.column .* (scaled.factorization \ (scaled.scaling.row .* right_hand_side))
@@ -955,7 +957,7 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
     predicted = warm && guess_change !== nothing && any(!iszero, guess_change)
     unknowns = warm ? warm_start_unknowns(guess, scale; change=guess_change) : initial_unknowns(problem, layout, amplitudes, scale)
     scaling = NewtonScaling(problem, layout, _complexify(unknowns[parameter_range(layout)][frequency_range(layout)]))
-    assembly = nothing   # Jacobian workspace and pattern, built when the first Jacobian is needed and reused
+    assembly = nothing   # Jacobian workspace, built when the first Jacobian is needed and reused
     scaled_norm(residual_vector) = norm(scaling.row .* residual_vector, Inf)
     scaled_step_norm(step_vector) = norm(step_vector ./ scaling.column, Inf)
     current = residual(problem, layout, unknowns, amplitudes, scale)
@@ -986,7 +988,7 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
         iterations = iteration
         chord = factorization !== nothing
         if !chord
-            assembly === nothing && (assembly = (JacobianWorkspace(problem, layout), JacobianPattern(layout)))
+            assembly === nothing && (assembly = JacobianWorkspace(problem, layout))
             factorization = _factorised_jacobian(assembly, problem, layout, unknowns, amplitudes, scale, scaling)
             factorization_distance = 0.0
             factorization_scale = float(scale)
@@ -1059,7 +1061,7 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
     # (validation/newton_jacobian_accuracy.jl), so refactorise unless the factorisation was taken within tol/10,
     # where they are at the noise floor of the converged solution itself.
     if factorization === nothing || factorization_distance > tol / 10
-        assembly === nothing && (assembly = (JacobianWorkspace(problem, layout), JacobianPattern(layout)))
+        assembly === nothing && (assembly = JacobianWorkspace(problem, layout))
         factorization = _factorised_jacobian(assembly, problem, layout, unknowns, amplitudes, scale, scaling)
     end
     parameters = RadialParameters(layout, unknowns[parameter_range(layout)], amplitudes, scale)
@@ -1067,13 +1069,10 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
                    iterations, current_norm, converged)
 end
 
-"""Scaled factorisation of the Jacobian at `unknowns`, assembled with `assembly = (workspace, pattern)`."""
-function _factorised_jacobian(assembly::Tuple{JacobianWorkspace, JacobianPattern}, problem::RadialProblem, layout::UnknownLayout,
-                              unknowns::AbstractVector, amplitudes::AbstractVector, scale, scaling::NewtonScaling)
-    workspace, pattern = assembly
-    blocks = jacobian_blocks!(workspace, problem, layout, unknowns, amplitudes, scale)
-    return ScaledFactorization(sparse_jacobian(blocks, pattern), scaling)
-end
+"""Scaled factorisation of the Jacobian at `unknowns`, assembled in `workspace` and factorised from its blocks."""
+_factorised_jacobian(workspace::JacobianWorkspace, problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector,
+                     amplitudes::AbstractVector, scale, scaling::NewtonScaling) =
+    ScaledFactorization(jacobian_blocks!(workspace, problem, layout, unknowns, amplitudes, scale), scaling)
 
 """
     _rescale_frequency_step!(step, layout, scale_ratio)

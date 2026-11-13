@@ -576,4 +576,76 @@ end
     @test length(result.diagnostics) < 25
 end
 
+@testset "Finite-difference Jacobian: steps, columns, failures, reuse" begin
+    settings = FiniteDifferenceJacobian(; amplitude_step=1e-3, mass_step=1e-6, angular_momentum_step=2e-6)
+    @test AC._difference_steps(settings, [0.0, 0.0, 1.0, 0.9], 2, true) == [1e-3, 1e-3, 1e-6, 2e-6]
+    @test AC._difference_steps(settings, [2.0, -4.0], 2, false) == [2e-3, 4e-3]
+    @test_throws ArgumentError FiniteDifferenceJacobian(; difference=:backward)
+
+    # Quadratic rates: forward differences are off by step × curvature, central ones exact.
+    linear_part = [1.0 2.0; -3.0 0.5]
+    rates_at(state) = linear_part * state .+ [state[1]^2, 0.0]
+    base_state, steps = [0.3, -0.2], [1e-4, 1e-4]
+    evaluate(perturbation) = (; rates=rates_at(base_state .+ perturbation), solution=nothing)
+    exact = linear_part .+ [2base_state[1] 0.0; 0.0 0.0]
+    forward, _ = AC._difference_jacobian(evaluate, base_state, rates_at(base_state), steps, FiniteDifferenceJacobian())
+    central, _ = AC._difference_jacobian(evaluate, base_state, rates_at(base_state), steps,
+                                         FiniteDifferenceJacobian(; difference=:central))
+    @test forward ≈ exact atol=2e-4
+    @test central ≈ exact atol=1e-9
+
+    # A solve that fails for steps above 3e-5 succeeds after one reduction (1e-4 / 4); one that always fails gives nothing.
+    fragile(perturbation) = maximum(abs, perturbation) > 3e-5 ? (; rates=nothing, solution=nothing) : evaluate(perturbation)
+    reduced, results = AC._difference_jacobian(fragile, base_state, rates_at(base_state), steps,
+                                               FiniteDifferenceJacobian(; step_reductions=1))
+    @test reduced ≈ exact atol=1e-4
+    @test all(result -> result.attempts == 2 && result.step == 2.5e-5, results)
+    failing(perturbation) = (; rates=nothing, solution=nothing)
+    @test AC._difference_jacobian(failing, base_state, rates_at(base_state), steps, settings)[1] === nothing
+
+    # Reuse policy: exact at the computed state, stale for at most max_reuse_steps new states, never after a rejection.
+    store = AC.JacobianStore(2)
+    reuse_twice = FiniteDifferenceJacobian(; max_reuse_steps=2)
+    @test !AC._reuse_stored_jacobian(store, reuse_twice, [0.0, 0.0])   # nothing stored yet
+    store.computed_state, store.age = [0.0, 0.0], 0
+    @test AC._reuse_stored_jacobian(store, reuse_twice, [0.0, 0.0])    # retry at the computed state
+    @test AC._reuse_stored_jacobian(store, reuse_twice, [1.0, 0.0])    # age 1
+    @test !AC._reuse_stored_jacobian(store, reuse_twice, [1.0, 0.0])   # rejected with the stale Jacobian
+    store.computed_state, store.age = [1.0, 0.0], 0
+    @test AC._reuse_stored_jacobian(store, reuse_twice, [2.0, 0.0])    # age 1
+    @test AC._reuse_stored_jacobian(store, reuse_twice, [3.0, 0.0])    # age 2
+    @test !AC._reuse_stored_jacobian(store, reuse_twice, [4.0, 0.0])   # age 3
+    @test !AC._reuse_stored_jacobian(store, FiniteDifferenceJacobian(), [5.0, 0.0])
+end
+
+@testset "Evolution with stiff integrators" begin
+    background = KerrBackground(0.9)
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
+    mesh = RadialMesh(background; rstar_min=-60.0, rstar_max=250.0, step=0.8)
+    problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh)
+    amplitudes = [1e-6, 1e-7]
+    solution = solve_radial(problem, amplitudes)
+    final_time = 0.1 / growth_rates(solution)[1]
+    expected = amplitudes .* exp.(growth_rates(solution) .* final_time)
+    for algorithm in (Rosenbrock23(), Rodas5P())
+        result = evolve_with_spindown(problem, amplitudes, (0.0, final_time), 0.01; algorithm, initial_guess=solution,
+                                      dt=final_time / 2)
+        counts, stats = result.solve_counts, result.ode_solution.stats
+        @test amplitude_trajectory(result).amplitudes[end, :] ≈ expected rtol=1e-4
+        @test counts.stage == length(result.diagnostics) == stats.nf
+        @test counts.failed == 0
+        @test counts.jacobian == 4counts.jacobians_computed
+        # One Jacobian per accepted state; a retried step reuses the one at its (unchanged) starting state.
+        @test counts.jacobians_computed == stats.naccept
+        @test counts.jacobians_reused == stats.nreject
+        # Rosenbrock23 is first-same-as-last. Rodas5P needs up to one solve per accepted step (plus the initial one);
+        # its last stage sits within the matching tolerance of the accepted state when the step changes little.
+        algorithm isa Rosenbrock23 && @test counts.accepted_state == 1
+        algorithm isa Rodas5P && @test counts.accepted_state <= 1 + stats.naccept
+    end
+    fixed = evolve_fixed_background(problem, amplitudes, (0.0, final_time); algorithm=Rosenbrock23(), dt=final_time / 2)
+    @test amplitude_trajectory(fixed).amplitudes[end, :] ≈ expected rtol=1e-4
+    @test fixed.solve_counts.jacobian == 2fixed.solve_counts.jacobians_computed
+end
+
 end

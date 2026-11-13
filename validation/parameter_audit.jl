@@ -102,12 +102,12 @@ function checked_solve(problem, amplitudes; guess=nothing, tol=SOLVE_TOLERANCE, 
 end
 
 """
-The converged state on `problem`: from the stored harness vector when the layout is unchanged, otherwise rebuilt from
+The converged state on `problem`: from the stored harness vector when there is one and the layout is unchanged, otherwise rebuilt from
 scratch (cold solve, or cold solve at 1e-3 of the amplitudes plus 30 amplitude steps at tolerance 1e-10), then
 solved to `SOLVE_TOLERANCE`. Returns the solution and the route taken.
 """
 function converged_state(spec, settings::Discretisation, problem)
-    if spec.name != "takeover" && same_layout(settings)
+    if same_layout(settings) && isfile(H.state_path(spec))
         stored = collect(reinterpret(Float64, read(H.state_path(spec))))
         guess = H.solution_from_unknowns(problem, spec.amplitudes, stored, maximum(spec.amplitudes))
         return checked_solve(problem, spec.amplitudes; guess, floor_tol=floor_tolerance(spec)), "stored vector"

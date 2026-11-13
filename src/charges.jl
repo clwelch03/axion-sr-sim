@@ -59,58 +59,155 @@ end
 """
 potential_slope(potential::AxionPotential, field_value) = field_value - nonlinearity(potential, field_value)
 
-"""
-    averaged_potential(quadrature, potential, profiles)
+"""Allocated `FieldBilinears` over `n_polar` polar nodes."""
+FieldBilinears{T}(n_polar::Int) where {T} = FieldBilinears{T}((zeros(T, n_polar) for _ in 1:6)...)
 
-`⟨U(Φ)⟩_ξ` at each polar node, like `phase_averaged_potential`. For profiles
-that are `ForwardDiff` duals the field is reconstructed from the values only,
-and each partial is the exact derivative `2 Re Σ_q dF_q conj(⟨e^{+iq·ξ} U'(Φ)⟩)`
-(with `dF_q` the partial of the polar-summed profile of component `q`), which
-needs no arithmetic on dual-number matrices.
-"""
-averaged_potential(quadrature::FieldQuadrature, potential::AxionPotential, profiles::AbstractVector) =
-    phase_averaged_potential(quadrature, potential, profiles)
+"""Value type of a possibly dual number type (the type itself for a plain number)."""
+_value_type(::Type{T}) where {T<:Real} = T
+_value_type(::Type{<:ForwardDiff.Dual{Tag, V}}) where {Tag, V} = V
+_partial_count(::Type{<:Real}) = 0
+_partial_count(::Type{<:ForwardDiff.Dual{Tag, V, N}}) where {Tag, V, N} = N
 
-function averaged_potential(quadrature::FieldQuadrature, potential::AxionPotential,
-                            profiles::AbstractVector{Complex{D}}) where {Tag, V<:AbstractFloat, N, D<:ForwardDiff.Dual{Tag, V, N}}
-    value_profiles = complex.(ForwardDiff.value.(real.(profiles)), ForwardDiff.value.(imag.(profiles)))
-    field = reconstruct_field(quadrature, value_profiles)
-    averaged = vec(sum(potential_energy.(Ref(potential), field); dims=1)) ./ n_points(quadrature.phase)
-    slope_average = transpose(project_phases(quadrature, potential_slope.(Ref(potential), field)))   # [polar node, component]
-    partials = ntuple(Val(N)) do slot
-        partial_profiles = complex.(ForwardDiff.partials.(real.(profiles), slot), ForwardDiff.partials.(imag.(profiles), slot))
-        partial_components = component_profiles(quadrature, partial_profiles)                        # [polar node, component]
-        2 .* vec(sum(real.(partial_components) .* real.(slope_average) .+ imag.(partial_components) .* imag.(slope_average); dims=2))
-    end
-    return [D(averaged[node], ForwardDiff.Partials(ntuple(slot -> partials[slot][node], Val(N)))) for node in eachindex(averaged)]
+"""
+    DensityWorkspace{T}(quadrature)
+
+Scratch arrays for the field bilinears and charge densities at one radial node
+(element type `T`, which may be a ForwardDiff dual number): the physical
+profiles and slopes of all channels, the stacked component sums
+`[Re; Im][component, polar node]` of the profiles and of the slopes, the
+`FieldBilinears`, and for the potential average a value-type `FieldWorkspace`
+with buffers for the value profiles, one direction's partial profiles and the
+partials `[polar node, direction]`. One workspace serves one task at a time.
+"""
+struct DensityWorkspace{T<:Number, V<:Real, W<:FieldWorkspace{V}}
+    profiles::Vector{Complex{T}}
+    slopes::Vector{Complex{T}}
+    component_values::Matrix{T}
+    component_slopes::Matrix{T}
+    bilinears::FieldBilinears{T}
+    potential_field::W
+    value_profiles::Vector{Complex{V}}
+    partial_profiles::Vector{Complex{V}}
+    potential_partials::Matrix{V}
+end
+
+function DensityWorkspace{T}(quadrature::FieldQuadrature) where {T}
+    n_chan, n_polar = n_channels(quadrature.mode_set), length(quadrature.angular.x)
+    n_stacked = 2n_components(quadrature.mode_set)
+    V = _value_type(T)
+    potential_field = FieldWorkspace{V}(quadrature)
+    DensityWorkspace{T, V, typeof(potential_field)}(zeros(Complex{T}, n_chan), zeros(Complex{T}, n_chan),
+                                                    zeros(T, n_stacked, n_polar), zeros(T, n_stacked, n_polar),
+                                                    FieldBilinears{T}(n_polar), potential_field, zeros(Complex{V}, n_chan),
+                                                    zeros(Complex{V}, n_chan), zeros(V, n_polar, _partial_count(T)))
 end
 
 """
-    field_bilinears(problem, s, profiles, slopes, real_frequencies)
+    averaged_potential!(averages, workspace, quadrature, potential, profiles)
+
+`⟨U(Φ)⟩_ξ` at each polar node, like `phase_averaged_potential`, written into
+`averages` with the scratch arrays of a `DensityWorkspace`. For a workspace of
+ForwardDiff duals the field is reconstructed from the values only, and each
+partial is the exact derivative `2 Re Σ_q dF_q conj(⟨e^{+iq·ξ} U'(Φ)⟩)` (with
+`dF_q` the partial of the polar-summed profile of component `q`), which needs
+no arithmetic on dual-number matrices.
+"""
+averaged_potential!(averages::AbstractVector, workspace::DensityWorkspace, quadrature::FieldQuadrature,
+                    potential::AxionPotential, profiles::AbstractVector) =
+    phase_averaged_potential!(averages, workspace.potential_field, quadrature, potential, profiles)
+
+function averaged_potential!(averages::AbstractVector, workspace::DensityWorkspace{D}, quadrature::FieldQuadrature,
+                             potential::AxionPotential, profiles::AbstractVector) where {Tag, V, N, D<:ForwardDiff.Dual{Tag, V, N}}
+    plain, partials = workspace.potential_field, workspace.potential_partials
+    n_comp = n_components(quadrature.mode_set)
+    workspace.value_profiles .= _value.(profiles)
+    field = reconstruct_field!(plain, quadrature, workspace.value_profiles)
+    plain.grid_values .= potential_slope.(Ref(potential), field)
+    slope_average = project_phases!(plain.projected, quadrature, plain.grid_values)   # [Re; Im] ⟨e^{+iq·ξ} U′(Φ)⟩
+    for slot in 1:N
+        workspace.partial_profiles .= _partial.(profiles, slot)
+        # The field is built, so the component buffer can take the partial profiles' component sums.
+        partial_components = component_profiles!(plain.component_values, quadrature, workspace.partial_profiles)
+        for node in axes(partials, 1)
+            total = zero(V)
+            for component_index in 1:n_comp
+                total += partial_components[component_index, node] * slope_average[component_index, node] +
+                         partial_components[n_comp + component_index, node] * slope_average[n_comp + component_index, node]
+            end
+            partials[node, slot] = 2total
+        end
+    end
+    plain.grid_values .= potential_energy.(Ref(potential), field)
+    for node in eachindex(averages)
+        value = sum(view(plain.grid_values, :, node)) / n_points(quadrature.phase)
+        averages[node] = D(value, ForwardDiff.Partials(ntuple(slot -> partials[node, slot], Val(N))))
+    end
+    return averages
+end
+
+"""
+    averaged_potential(quadrature, potential, profiles)
+
+Allocating `averaged_potential!`: `⟨U(Φ)⟩_ξ` at each polar node, with exact partials for dual-number profiles.
+"""
+function averaged_potential(quadrature::FieldQuadrature, potential::AxionPotential, profiles::AbstractVector)
+    T = field_eltype(quadrature, profiles)
+    return averaged_potential!(zeros(T, length(quadrature.angular.x)), DensityWorkspace{T}(quadrature), quadrature,
+                               potential, profiles)
+end
+
+"""
+    field_bilinears!(bilinears, workspace, problem, s, profiles, slopes, real_frequencies; potential=problem.potential)
 
 Bilinears at offset `s` from the *physical* profiles and tortoise slopes of all
-channels and the real component frequencies `ω_q`.
+channels and the real component frequencies `ω_q`, written into `bilinears`
+with the scratch arrays of a `DensityWorkspace`.
+"""
+function field_bilinears!(bilinears::FieldBilinears, workspace::DensityWorkspace, problem::RadialProblem, s,
+                          profiles::AbstractVector, slopes::AbstractVector, real_frequencies::AbstractVector;
+                          potential::AxionPotential=problem.potential)
+    quadrature, mode_set = problem.quadrature, problem.mode_set
+    harmonics_dtheta = quadrature.angular.harmonics_dtheta
+    n_comp = n_components(mode_set)
+    values = component_profiles!(workspace.component_values, quadrature, profiles)
+    radial = component_profiles!(workspace.component_slopes, quadrature, slopes)   # ∂F_q/∂r* (stacked)
+    radial_factor = dr_drstar(problem.background, s)
+    T = eltype(bilinears.dt_dt)
+    for node in axes(values, 2)
+        dt_dt = dphi_dphi = dr_dr = dtheta_dtheta = dt_dphi = zero(T)
+        for (component_index, component) in enumerate(mode_set.components)
+            squared = 2 * (values[component_index, node]^2 + values[n_comp + component_index, node]^2)   # 2|F_q|²
+            frequency, m = real_frequencies[component_index], component.m
+            dt_dt += squared * frequency^2
+            dphi_dphi += squared * m^2
+            dt_dphi -= squared * (frequency * m)
+            dr_dr += 2 * ((radial[component_index, node] / radial_factor)^2 +
+                          (radial[n_comp + component_index, node] / radial_factor)^2)
+            real_dtheta = imag_dtheta = zero(T)
+            for channel in mode_set.component_channels[component_index]
+                real_dtheta += harmonics_dtheta[node, channel] * real(profiles[channel])
+                imag_dtheta += harmonics_dtheta[node, channel] * imag(profiles[channel])
+            end
+            dtheta_dtheta += 2 * (real_dtheta^2 + imag_dtheta^2)
+        end
+        bilinears.dt_dt[node], bilinears.dphi_dphi[node], bilinears.dr_dr[node] = dt_dt, dphi_dphi, dr_dr
+        bilinears.dtheta_dtheta[node], bilinears.dt_dphi[node] = dtheta_dtheta, dt_dphi
+    end
+    averaged_potential!(bilinears.potential, workspace, quadrature, potential, profiles)
+    return bilinears
+end
+
+"""
+    field_bilinears(problem, s, profiles, slopes, real_frequencies; potential=problem.potential)
+
+Allocating `field_bilinears!`.
 """
 function field_bilinears(problem::RadialProblem, s, profiles::AbstractVector, slopes::AbstractVector,
                          real_frequencies::AbstractVector; potential::AxionPotential=problem.potential)
-    quadrature, mode_set = problem.quadrature, problem.mode_set
-    harmonics, harmonics_dtheta = quadrature.angular.harmonics, quadrature.angular.harmonics_dtheta
-    azimuthal = [component.m for component in mode_set.components]
-
-    component_values = component_profiles(quadrature, profiles)
-    component_dr = component_profiles(quadrature, slopes) ./ dr_drstar(problem.background, s)
-    component_dtheta = zeros(eltype(component_values), size(component_values))
-    for (component_index, channels) in enumerate(mode_set.component_channels)
-        component_dtheta[:, component_index] = harmonics_dtheta[:, channels] * profiles[channels]
-    end
-
-    squared = 2 .* abs2.(component_values)
-    FieldBilinears(squared * real_frequencies .^ 2,
-                   squared * azimuthal .^ 2,
-                   vec(sum(2 .* abs2.(component_dr); dims=2)),
-                   vec(sum(2 .* abs2.(component_dtheta); dims=2)),
-                   -(squared * (real_frequencies .* azimuthal)),
-                   averaged_potential(quadrature, potential, profiles))
+    T = promote_type(field_eltype(problem.quadrature, profiles, s, problem.background.a), real(eltype(slopes)),
+                     eltype(real_frequencies))
+    return field_bilinears!(FieldBilinears{T}(length(problem.quadrature.angular.x)), DensityWorkspace{T}(problem.quadrature),
+                            problem, s, profiles, slopes, real_frequencies; potential)
 end
 
 """
@@ -125,21 +222,21 @@ function charge_densities(problem::RadialProblem, s, bilinears::FieldBilinears)
     grid = problem.quadrature.angular
     a, r = background.a, radius(background, s)
     horizon_function, sum_r2a2 = delta(background, s), r2a2(background, s)
-    x, weights = grid.x, grid.weights
-    sin2 = 1 .- x .^ 2
-
-    tt_weight = (sum_r2a2^2 .- a^2 * horizon_function .* sin2) ./ sum_r2a2        # −ρ² g^{tt} Δ/(r²+a²)
-    phiphi_weight = (horizon_function .- a^2 .* sin2) ./ (sin2 .* sum_r2a2)         #  ρ² g^{φφ} Δ/(r²+a²)
-    rr_weight = horizon_function^2 / sum_r2a2                                       #  ρ² g^{rr} Δ/(r²+a²)
-    thetatheta_weight = horizon_function / sum_r2a2                                 #  ρ² g^{θθ} Δ/(r²+a²)
-    potential_weight = rho2.(Ref(background), s, x) .* (horizon_function / sum_r2a2)
-    tphi_weight = -2a * r / sum_r2a2                                                #  ρ² g^{tφ} Δ/(r²+a²)
-
-    energy = 2pi * sum(weights .* (tt_weight .* bilinears.dt_dt ./ 2 .+ phiphi_weight .* bilinears.dphi_dphi ./ 2 .+
-                                   rr_weight .* bilinears.dr_dr ./ 2 .+ thetatheta_weight .* bilinears.dtheta_dtheta ./ 2 .+
-                                   potential_weight .* mass_coupling^2 .* bilinears.potential))
-    angular_momentum = 2pi * sum(weights .* (-tt_weight .* bilinears.dt_dphi .+ tphi_weight .* bilinears.dphi_dphi))
-    return Charges(energy, angular_momentum)
+    rr_weight = horizon_function^2 / sum_r2a2                  #  ρ² g^{rr} Δ/(r²+a²)
+    thetatheta_weight = horizon_function / sum_r2a2            #  ρ² g^{θθ} Δ/(r²+a²)
+    tphi_weight = -2a * r / sum_r2a2                           #  ρ² g^{tφ} Δ/(r²+a²)
+    energy = angular_momentum = zero(promote_type(eltype(bilinears.dt_dt), typeof(rr_weight), typeof(mass_coupling)))
+    for (node, x) in enumerate(grid.x)
+        sin2 = 1 - x^2
+        tt_weight = (sum_r2a2^2 - a^2 * horizon_function * sin2) / sum_r2a2       # −ρ² g^{tt} Δ/(r²+a²)
+        phiphi_weight = (horizon_function - a^2 * sin2) / (sin2 * sum_r2a2)        #  ρ² g^{φφ} Δ/(r²+a²)
+        potential_weight = rho2(background, s, x) * (horizon_function / sum_r2a2)
+        energy += grid.weights[node] * (tt_weight * bilinears.dt_dt[node] / 2 + phiphi_weight * bilinears.dphi_dphi[node] / 2 +
+                                        rr_weight * bilinears.dr_dr[node] / 2 + thetatheta_weight * bilinears.dtheta_dtheta[node] / 2 +
+                                        potential_weight * mass_coupling^2 * bilinears.potential[node])
+        angular_momentum += grid.weights[node] * (-tt_weight * bilinears.dt_dphi[node] + tphi_weight * bilinears.dphi_dphi[node])
+    end
+    return Charges(2pi * energy, 2pi * angular_momentum)
 end
 
 """
@@ -197,25 +294,42 @@ function integrated_densities(problem::RadialProblem, layout::UnknownLayout, unk
     frequencies = real_component_frequencies(problem, layout, unknowns)
     weights = simpson_weights(ForwardDiff.value.(mesh.rstar))
     row_count = (charges ? 2 : 0) + (actions ? n_components(problem.mode_set) : 0)
-    element_type = promote_type(eltype(unknowns), typeof(scale), typeof(problem.mass_coupling), eltype(mesh.offsets))
+    element_type = promote_type(eltype(unknowns), typeof(scale), typeof(problem.mass_coupling), eltype(mesh.offsets),
+                                typeof(problem.background.a))
     densities = Matrix{element_type}(undef, row_count, layout.n_nodes)
-    Threads.@threads for node in 1:layout.n_nodes
-        state = physical_state(layout, unknowns, scale, node)
-        offset = mesh.offsets[node]
-        row = 0
-        if charges
-            bilinears = field_bilinears(problem, offset, state.profiles, state.slopes, frequencies)
-            node_charges = charge_densities(problem, offset, bilinears)
-            densities[1, node], densities[2, node] = node_charges.energy, node_charges.angular_momentum
-            row = 2
-        end
-        actions && (densities[row + 1:end, node] = component_action_densities(problem, offset, state.profiles, frequencies))
+    _foreach_in_chunks(1:layout.n_nodes, () -> DensityWorkspace{element_type}(problem.quadrature)) do workspace, node
+        _node_densities!(view(densities, :, node), workspace, problem, layout, unknowns, scale, node, frequencies;
+                         charges, actions)
     end
     totals = zeros(element_type, row_count)
     for node in 1:layout.n_nodes
         totals .+= weights[node] .* view(densities, :, node)
     end
     return totals
+end
+
+"""
+Densities of `integrated_densities` at mesh `node` (`[E, J]` with `charges`, then `n_q` with `actions`), written
+into `column` with the scratch arrays of a `DensityWorkspace`.
+"""
+function _node_densities!(column::AbstractVector, workspace::DensityWorkspace, problem::RadialProblem, layout::UnknownLayout,
+                          unknowns::AbstractVector, scale, node::Int, frequencies::AbstractVector; charges::Bool, actions::Bool)
+    block, offset = view(unknowns, node_range(layout, node)), problem.mesh.offsets[node]
+    for channel in eachindex(workspace.profiles)
+        workspace.profiles[channel] = scale * complex(block[4channel - 3], block[4channel - 2])
+        workspace.slopes[channel] = scale * complex(block[4channel - 1], block[4channel])
+    end
+    row = 0
+    if charges
+        bilinears = field_bilinears!(workspace.bilinears, workspace, problem, offset, workspace.profiles, workspace.slopes,
+                                     frequencies)
+        node_charges = charge_densities(problem, offset, bilinears)
+        column[1], column[2] = node_charges.energy, node_charges.angular_momentum
+        row = 2
+    end
+    actions && component_action_densities!(view(column, row + 1:length(column)), workspace.component_values, problem, offset,
+                                            workspace.profiles, frequencies)
+    return column
 end
 
 """
@@ -260,24 +374,44 @@ function component_charges(solution::RadialSolution, component_index::Int)
 end
 
 """
-    component_action_densities(problem, s, profiles)
+    component_action_densities!(densities, component_values, problem, s, profiles, real_frequencies)
 
 Klein–Gordon charge of every Fourier component per unit tortoise coordinate at
 offset `s`, `dn_q/dr* = 2π Σ_x w ρ² (Δ/(r²+a²)) 2|F_q|² (−g^{tt} ω_q + g^{tφ} m_q)`,
-from the physical profiles and the real component frequencies.
+from the physical profiles and the real component frequencies, written into
+`densities`; `component_values` is scratch for the stacked component profiles.
 """
-function component_action_densities(problem::RadialProblem, s, profiles::AbstractVector, real_frequencies::AbstractVector)
+function component_action_densities!(densities::AbstractVector, component_values::AbstractMatrix, problem::RadialProblem, s,
+                                     profiles::AbstractVector, real_frequencies::AbstractVector)
     background, quadrature, mode_set = problem.background, problem.quadrature, problem.mode_set
     grid = quadrature.angular
+    n_comp = n_components(mode_set)
     a, r = background.a, radius(background, s)
     horizon_function, sum_r2a2 = delta(background, s), r2a2(background, s)
-    sin2 = 1 .- grid.x .^ 2
-    tt_weight = (sum_r2a2^2 .- a^2 * horizon_function .* sin2) ./ sum_r2a2   # −ρ² g^{tt} Δ/(r²+a²)
     tphi_weight = -2a * r / sum_r2a2                                         #  ρ² g^{tφ} Δ/(r²+a²)
-    squared = 2 .* abs2.(component_profiles(quadrature, profiles))           # 2|F_q(x)|², [polar node, component]
-    azimuthal = [component.m for component in mode_set.components]
-    return [2pi * sum(grid.weights .* squared[:, index] .* (tt_weight .* real_frequencies[index] .+ tphi_weight * azimuthal[index]))
-            for index in 1:n_components(mode_set)]
+    values = component_profiles!(component_values, quadrature, profiles)
+    for (component_index, component) in enumerate(mode_set.components)
+        total = zero(eltype(densities))
+        for (node, x) in enumerate(grid.x)
+            tt_weight = (sum_r2a2^2 - a^2 * horizon_function * (1 - x^2)) / sum_r2a2   # −ρ² g^{tt} Δ/(r²+a²)
+            squared = 2 * (values[component_index, node]^2 + values[n_comp + component_index, node]^2)   # 2|F_q|²
+            total += grid.weights[node] * squared * (tt_weight * real_frequencies[component_index] + tphi_weight * component.m)
+        end
+        densities[component_index] = 2pi * total
+    end
+    return densities
+end
+
+"""
+    component_action_densities(problem, s, profiles, real_frequencies)
+
+Allocating `component_action_densities!`.
+"""
+function component_action_densities(problem::RadialProblem, s, profiles::AbstractVector, real_frequencies::AbstractVector)
+    T = promote_type(field_eltype(problem.quadrature, profiles, s, problem.background.a), eltype(real_frequencies))
+    n_stacked, n_polar = 2n_components(problem.mode_set), length(problem.quadrature.angular.x)
+    return component_action_densities!(zeros(T, n_components(problem.mode_set)), zeros(T, n_stacked, n_polar), problem, s,
+                                       profiles, real_frequencies)
 end
 
 """Matrix `[mode, component]` of the integer vectors `q`: `N_i = Σ_q q_i n_q`."""
@@ -369,13 +503,9 @@ function amplitude_response(solution::RadialSolution)
     residual_wrt_amplitudes = ForwardDiff.jacobian(solution.amplitudes) do amplitudes
         boundary_residual(problem, layout, :outer, outer_block, parameter_block, amplitudes, scale)
     end
-    directions = zeros(n_unknowns(layout), layout.n_modes)
-    for mode_index in 1:layout.n_modes
-        forcing = zeros(n_unknowns(layout))
-        forcing[outer_rows(layout)] = -residual_wrt_amplitudes[:, mode_index]
-        directions[:, mode_index] = solution.jacobian_factorization \ forcing
-    end
-    return directions
+    forcing = zeros(n_unknowns(layout), layout.n_modes)
+    forcing[outer_rows(layout), :] = -residual_wrt_amplitudes
+    return solution.jacobian_factorization \ forcing   # one back-substitution with K right-hand sides
 end
 
 """

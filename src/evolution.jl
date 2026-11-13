@@ -189,25 +189,28 @@ mutable struct EvolutionCache{P<:RadialProblem, T<:Real}
     last_tangents::Union{Nothing, SolutionTangents}       # tangents of `last_solution` (spindown with tangent_predictor)
     accepted_tangents::Union{Nothing, SolutionTangents}   # tangents of `accepted_solution`
     solve_counts::RadialSolveCounts
+    newton_floor_tol::T   # `floor_tol` of every `solve_radial` (equal to `newton_tol` unless opted in)
 end
 
 """
     EvolutionCache(problem; decay_constant_ratio=0.0, include_metric_work=false, record_metric_work=false,
-                   newton_tol=1e-10, verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing,
-                   tangent_predictor=true)
+                   newton_tol=1e-10, newton_floor_tol=newton_tol, verbose=false, log_amplitudes=true, balance=:action,
+                   last_solution=nothing, tangent_predictor=true)
 
 Fresh cache for an evolution of `problem` (also handy for calling
 `balance_terms` directly). The energy, the angular momentum and the metric work
 are computed only when the energy balance, `include_metric_work` or
-`record_metric_work` asks for them (`_computes_charges`).
+`record_metric_work` asks for them (`_computes_charges`). `newton_tol` and
+`newton_floor_tol` are the `tol` and `floor_tol` of every radial solve.
 """
 function EvolutionCache(problem::RadialProblem; decay_constant_ratio=0.0, include_metric_work=false, record_metric_work=false,
-                        newton_tol=1e-10, verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing,
-                        tangent_predictor=true)
+                        newton_tol=1e-10, newton_floor_tol=newton_tol, verbose=false, log_amplitudes=true, balance=:action,
+                        last_solution=nothing, tangent_predictor=true)
     _check_balance(problem, balance)
     EvolutionCache(problem, problem.mass_coupling, float(decay_constant_ratio)^2, include_metric_work, record_metric_work, last_solution,
                    EvolutionDiagnostics{Float64}[], float(newton_tol), verbose, log_amplitudes, balance,
-                   last_solution, -1, nothing, tangent_predictor, Float64[], Float64[], nothing, nothing, RadialSolveCounts())
+                   last_solution, -1, nothing, tangent_predictor, Float64[], Float64[], nothing, nothing, RadialSolveCounts(),
+                   float(newton_floor_tol))
 end
 
 """Whether the balance terms include the energy, angular momentum and metric work: the action balance does not need them."""
@@ -268,7 +271,8 @@ end
 function _solve_cached!(cache::EvolutionCache, problem::RadialProblem, amplitudes)
     previous = cache.last_solution
     solution = solve_radial(problem, amplitudes; guess=previous,
-                            guess_change=_amplitude_prediction(cache, problem, previous, amplitudes), tol=cache.newton_tol)
+                            guess_change=_amplitude_prediction(cache, problem, previous, amplitudes), tol=cache.newton_tol,
+                            floor_tol=cache.newton_floor_tol)
     cache.last_solution = solution
     return solution
 end
@@ -515,7 +519,8 @@ nothing.
 function _fixed_background_evaluation(state, cache::EvolutionCache, guess)
     amplitudes = _state_amplitudes(state, n_modes(cache.template), cache.log_amplitudes)
     solution = solve_radial(cache.template, amplitudes; guess,
-                            guess_change=_amplitude_prediction(cache, cache.template, guess, amplitudes), tol=cache.newton_tol)
+                            guess_change=_amplitude_prediction(cache, cache.template, guess, amplitudes), tol=cache.newton_tol,
+                            floor_tol=cache.newton_floor_tol)
     rates = solution.converged ? _fixed_background_rates(solution, amplitudes, cache) : nothing
     return (; rates, solution)
 end
@@ -567,7 +572,8 @@ end
 
 """
     evolve_fixed_background(problem, amplitudes, time_span; balance=:action, log_amplitudes=true,
-                            initial_step_fraction=0.05, newton_tol=1e-10, verbose=false, tangent_predictor=true,
+                            initial_step_fraction=0.05, newton_tol=1e-10, newton_floor_tol=newton_tol, verbose=false,
+                            tangent_predictor=true,
                             algorithm=Tsit5(), jacobian_settings=FiniteDifferenceJacobian(), reltol, abstol, kwargs...)
 
 Integrate the amplitudes with `algorithm` (default Tsit5) on a frozen Kerr
@@ -582,15 +588,19 @@ times the shortest initial e-folding time unless `dt` is passed
 (`initial_step_fraction=nothing` leaves it to Tsit5's heuristic).
 `verbose` prints one line per right-hand-side evaluation. Each radial solve is
 warm-started from the previous one, moved to first order in the amplitude change
-unless `tangent_predictor=false`. Other keyword arguments are passed to `solve`
-(e.g. `saveat`, `dtmax`).
+unless `tangent_predictor=false`. `newton_tol` and `newton_floor_tol` are the
+`tol` and `floor_tol` of `solve_radial`; raise `newton_floor_tol` above
+`newton_tol` (opt-in) only on meshes whose scaled residual cannot reach
+`newton_tol`, such as the 1355-node α = 0.187 mesh (floor 5e-10), so that a
+solve at that floor counts as converged instead of failing. Other keyword
+arguments are passed to `solve` (e.g. `saveat`, `dtmax`).
 """
 function evolve_fixed_background(problem::RadialProblem, amplitudes::AbstractVector, time_span; balance::Symbol=:action,
-                                 log_amplitudes=true, initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
-                                 tangent_predictor=true, algorithm=Tsit5(),
+                                 log_amplitudes=true, initial_step_fraction=0.05, newton_tol=1e-10, newton_floor_tol=newton_tol,
+                                 verbose=false, tangent_predictor=true, algorithm=Tsit5(),
                                  jacobian_settings::FiniteDifferenceJacobian=FiniteDifferenceJacobian(),
                                  reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
-    cache = EvolutionCache(problem; newton_tol, verbose, log_amplitudes, balance, tangent_predictor)
+    cache = EvolutionCache(problem; newton_tol, newton_floor_tol, verbose, log_amplitudes, balance, tangent_predictor)
     initial_amplitudes = collect(float.(amplitudes))
     initial_rates = amplitude_rates(_solve_cached!(cache, problem, initial_amplitudes); balance)
     cache.solve_counts.accepted_state += 1
@@ -802,7 +812,7 @@ function background_tangents(cache::EvolutionCache, solution::RadialSolution, st
         perturbed = BackgroundState(state.mass + epsilon[1], state.angular_momentum + epsilon[2])
         residual(current_problem(cache, perturbed), layout, unknowns, amplitudes, scale)
     end
-    return -reduce(hcat, [solution.jacobian_factorization \ collect(column) for column in eachcol(residual_partials)])
+    return -(solution.jacobian_factorization \ residual_partials)
 end
 
 """Dual-number tag of `observable_partials` (all partials of one pass share it)."""
@@ -987,7 +997,8 @@ function _resolved_balance_pieces(cache::EvolutionCache, solution::RadialSolutio
                                   directions::AbstractMatrix, relative_step, include_charges::Bool)
     mode_count = n_modes(solution.problem)
     function observables_at(perturbed::BackgroundState)
-        perturbed_solution = solve_radial(current_problem(cache, perturbed), solution.amplitudes; guess=solution, tol=cache.newton_tol)
+        perturbed_solution = solve_radial(current_problem(cache, perturbed), solution.amplitudes; guess=solution, tol=cache.newton_tol,
+                                         floor_tol=cache.newton_floor_tol)
         reference_observables(perturbed_solution.problem, perturbed_solution.layout, perturbed_solution.unknowns,
                               perturbed_solution.scale, perturbed; include_charges)
     end
@@ -1144,7 +1155,8 @@ function _spindown_evaluation(state_vector, cache::EvolutionCache, guess, guess_
     state = BackgroundState(state_vector[mode_count + 1], state_vector[mode_count + 2])
     predict = cache.tangent_predictor && guess_tangents !== nothing && guess_tangents.solution === guess
     guess_change = predict ? predicted_change(guess_tangents, amplitudes, state) : nothing
-    solution = solve_radial(current_problem(cache, state), amplitudes; guess, guess_change, tol=cache.newton_tol)
+    solution = solve_radial(current_problem(cache, state), amplitudes; guess, guess_change, tol=cache.newton_tol,
+                            floor_tol=cache.newton_floor_tol)
     solution.converged || return (; amplitudes, state, solution, terms=nothing, rates=nothing, tangents=nothing)
     terms = balance_terms(cache, solution, state)
     return (; amplitudes, state, solution, terms, rates=_spindown_state_rates(terms, amplitudes, cache),
@@ -1251,7 +1263,7 @@ end
 """
     evolve_with_spindown(problem, amplitudes, time_span, decay_constant_ratio; balance=:action,
                          include_metric_work=false, record_metric_work=false, log_amplitudes=true, initial_step_fraction=0.05,
-                         newton_tol=1e-10, verbose=false, initial_background, initial_guess=nothing,
+                         newton_tol=1e-10, newton_floor_tol=newton_tol, verbose=false, initial_background, initial_guess=nothing,
                          tangent_predictor=true, algorithm=Tsit5(), jacobian_settings=FiniteDifferenceJacobian(),
                          callback=nothing, reltol, abstol, kwargs...)
 
@@ -1261,8 +1273,8 @@ Integrate `[A₁ … A_K, b, j]` (or `[ln A₁ … ln A_K, b, j]`, the default) 
 defines the reference units: its `mass_coupling` is `α₀ = M₀ μ` and its mesh is
 reused in units of the current mass at every step. `decay_constant_ratio =
 f_a / M_Pl` (non-reduced Planck mass) sets how strongly the cloud's horizon
-fluxes change the hole. Tolerances, the initial step and `log_amplitudes` are
-as in `evolve_fixed_background`.
+fluxes change the hole. Tolerances (including `newton_floor_tol`), the initial
+step and `log_amplitudes` are as in `evolve_fixed_background`.
 
 The default `balance=:action` uses the wave-action balance (any number of
 modes, no metric-work term). With `balance=:energy`, `include_metric_work` adds
@@ -1309,12 +1321,13 @@ starts cold, which can fail in the nonlinear regime.
 """
 function evolve_with_spindown(problem::RadialProblem, amplitudes::AbstractVector, time_span, decay_constant_ratio::Real;
                               balance::Symbol=:action, include_metric_work=false, record_metric_work=false, log_amplitudes=true,
-                              initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
+                              initial_step_fraction=0.05, newton_tol=1e-10, newton_floor_tol=newton_tol, verbose=false,
                               initial_background::BackgroundState=BackgroundState(1.0, problem.background.a),
                               initial_guess=nothing, tangent_predictor=true, algorithm=Tsit5(),
                               jacobian_settings::FiniteDifferenceJacobian=FiniteDifferenceJacobian(), callback=nothing,
                               reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
-    cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, record_metric_work, newton_tol, verbose, log_amplitudes,
+    cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, record_metric_work, newton_tol, newton_floor_tol,
+                           verbose, log_amplitudes,
                            balance, last_solution=initial_guess, tangent_predictor)
     initial_amplitudes = collect(float.(amplitudes))
     initial_solution = _solve_cached!(cache, current_problem(cache, initial_background), initial_amplitudes)

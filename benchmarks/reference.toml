@@ -1,0 +1,850 @@
+# Regression reference written by benchmarks/regression.jl --write-reference. Do not edit by hand.
+["large_mesh/background_derivatives.actions_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [2.6198279883787962e-5, 5.638842795989007]
+
+["large_mesh/background_derivatives.actions_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.004158150660161756, -3168.548709250094]
+
+["large_mesh/background_derivatives.charges_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [1.0525105538859165, 11.277712521254323]
+
+["large_mesh/background_derivatives.charges_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-591.5535848899905, -6337.101575802932]
+
+["large_mesh/background_derivatives.frequencies_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [4.183903251641619e-6, 4.342147208846995e-7]
+
+["large_mesh/background_derivatives.frequencies_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.0017574624476129896, -0.0007441753274878837]
+
+["large_mesh/balance.action_jacobian"]
+anchor = 0.0
+class = "response"
+values = [1011.2066021351403, -18.83226079858452, -8.237082359727681, 5.328297230016569e8]
+
+["large_mesh/balance.action_losses"]
+anchor = 3.768819332248572e-12
+class = "loss"
+values = [-1.0683010164795065e-12, -3.535661193029152e-12]
+
+["large_mesh/balance.charge_jacobian"]
+anchor = 0.0
+class = "response"
+values = [184.72422789369043, 973.5420805379707, 9.944303633204837e7, 1.0656594377662284e9]
+
+["large_mesh/balance.derivatives.actions_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [2.6198279883787962e-5, 5.638842795989007]
+
+["large_mesh/balance.derivatives.actions_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.004158150660161756, -3168.548709250094]
+
+["large_mesh/balance.derivatives.charges_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [1.0525105538859165, 11.277712521254323]
+
+["large_mesh/balance.derivatives.charges_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-591.5535848899905, -6337.101575802932]
+
+["large_mesh/balance.derivatives.frequencies_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [4.183903251641619e-6, 4.342147208846995e-7]
+
+["large_mesh/balance.derivatives.frequencies_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.0017574624476129896, -0.0007441753274878837]
+
+["large_mesh/balance.losses"]
+anchor = 8.534905373052956e-12
+class = "loss"
+values = [-8.587344745875772e-13, -8.139623402537812e-12]
+
+["large_mesh/balance.metric_work"]
+anchor = 2.3093420974113733e-12
+class = "loss"
+values = [3.825737076019059e-16]
+
+["large_mesh/balance.state_rate"]
+anchor = 0.0
+class = "rate_background"
+values = [-1.9193333896684218e-15, -1.8504293358759633e-14]
+
+["large_mesh/charges.action_losses"]
+anchor = 3.768819332248572e-12
+class = "loss"
+values = [-1.0683010164795065e-12, -3.535661193029152e-12]
+
+["large_mesh/charges.boundary_losses"]
+anchor = 8.534905373052956e-12
+class = "loss"
+values = [-8.587344745875772e-13, -8.139623402537812e-12]
+
+["large_mesh/charges.cloud_charges"]
+anchor = 0.0
+class = "charge"
+values = [50.15502494198272, 537.4745452494888]
+
+["large_mesh/charges.phase_actions"]
+anchor = 0.0
+class = "charge"
+values = [0.0005056033198112347, 268.73701982308506]
+
+["large_mesh/jacobian.frobenius_norm"]
+anchor = 0.0
+class = "jacobian"
+values = [1.7317491168755845e15]
+
+["large_mesh/jacobian.stored_entries"]
+anchor = 0.0
+class = "exact"
+values = [2.9504e6]
+
+["large_mesh/jacobian.times_vector_entries"]
+anchor = 7.636240353037933e11
+class = "jacobian"
+values = [-1.0678307429085367, 0.09104930925652642, 1.118500105448646, -0.5677050568059984, -0.10963283604891821, 0.6612758982679615, 0.19501928037407024, -0.8716067230166796, 0.21485564316420389, 0.284272428876289, -1.2115170435541485, -1.256178846132e12]
+
+["large_mesh/jacobian.times_vector_norm"]
+anchor = 0.0
+class = "jacobian"
+values = [8.919166364446131e14]
+
+["large_mesh/rates.amplitude_rates"]
+anchor = 3.727060271335571e-15
+class = "rate"
+values = [1.0564542208201886e-15, -4.544795108415231e-21]
+
+["large_mesh/rates.fixed_background_amplitude_rates"]
+anchor = 3.727051804888882e-15
+class = "rate"
+values = [1.0564617252197683e-15, 6.672969998243054e-21]
+
+["large_mesh/residual.converged_max_abs"]
+anchor = 2.845742726934797e9
+class = "residual_converged"
+values = [4.440892098500626e-13]
+
+["large_mesh/residual.displaced_entries"]
+anchor = 0.0
+class = "residual"
+values = [-0.00020650893065470022, -9.040150532673019e-18, 1.6727199266878028e-8, 9.630217430391489e-8, 1.898359802828994e-10, -9.525034483759586e-19, -7.630533206502128e-10, 2.2623144623089515e-6, -2.187999354424946e-10, -1.6960385965299225e-17, 2.356605077893667e-16, 6.066027363897292e6]
+
+["large_mesh/residual.displaced_norm"]
+anchor = 0.0
+class = "residual"
+values = [3.074877995112341e9]
+
+["large_mesh/response.action_jacobian"]
+anchor = 0.0
+class = "response"
+values = [1011.2066021351403, -18.83226079858452, -8.237082359727681, 5.328297230016569e8]
+
+["large_mesh/response.charge_jacobian"]
+anchor = 0.0
+class = "response"
+values = [184.72422789369043, 973.5420805379707, 9.944303633204837e7, 1.0656594377662284e9]
+
+["large_mesh/response.direction_1_entries"]
+anchor = 15348.645596561752
+class = "response"
+values = [157907.34723284814, -6.2737028873457e-8, 26.949808866945283, 1.312849252616871e-7, -0.47761108261337726, -2.9025021203935798e-9, -0.7378785782265268, -1383.8719857442784, -0.037697317486971485, -5.0158468956097795e-9, -1.1310934692654811e-7, 1.1104975954250516e6]
+
+["large_mesh/response.direction_2_entries"]
+anchor = 3.1157866669690507e6
+class = "response"
+values = [-1357.778410110858, 8.088716442771398e-10, 13.151296332370705, -17.028762300997734, -0.5010706748541974, 1.5617861111241057e-10, -1.4581182056042985, -2746.736464123619, 0.24720029565769006, -2.452962281501196e-9, -2.2357492159510848e-7, 2.2084649096631836e6]
+
+["large_mesh/response.direction_norms"]
+anchor = 0.0
+class = "response"
+values = [2.4826400990888542e8, 7.033289945377657e10]
+
+["large_mesh/solve.cloud_charges"]
+anchor = 0.0
+class = "solve_charge"
+values = [51.15490752402389, 548.1901132244353]
+
+["large_mesh/solve.iterations"]
+anchor = 0.0
+class = "reported"
+values = [4.0]
+
+["large_mesh/solve.mode_frequencies"]
+anchor = 0.0
+class = "solve_frequency"
+values = [0.1861525961623776, 1.0610848418466163e-9, 0.18663173753949583, 6.5699374767339195e-15]
+
+["large_mesh/solve.unknown_entries"]
+anchor = 3.1393411310358093
+class = "solve_unknown"
+values = [0.1563391849399176, -2.069760489246517e-14, 1.3471760828022942e-5, -5.832566910162118e-6, -4.7791959581423e-7, -9.563826183964453e-16, -7.4509450886623e-7, -0.0013975006068451255, 2.861208476746785e-7, -2.504229348245929e-15, -1.1422876615620283e-13, 1.1214841952835604]
+
+["linear/background_derivatives.actions_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [6.652721499966882e-7, 2.3038039876833444e-7]
+
+["linear/background_derivatives.actions_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-2.9823247695764685e-5, -3.872106115105633e-5]
+
+["linear/background_derivatives.charges_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [2.6619766700747104e-7, 1.1260329466863237e-6]
+
+["linear/background_derivatives.charges_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-2.0427450868758313e-5, -0.00010726537000253588]
+
+["linear/background_derivatives.frequencies_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [9.967265847038189e-5, 8.027855195678297e-6]
+
+["linear/background_derivatives.frequencies_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.008323544103969405, -0.0032077322454301394]
+
+["linear/balance.action_jacobian"]
+anchor = 0.0
+class = "response"
+values = [6.088009112140289, -4.300532671436918e-9, -6.448626115377134e-7, 1962.4901877169575]
+
+["linear/balance.action_losses"]
+anchor = 8.866867545952733e-14
+class = "loss"
+values = [-8.866867545952731e-14, -8.637776209557477e-18]
+
+["linear/balance.charge_jacobian"]
+anchor = 0.0
+class = "response"
+values = [1.8038499239415426, 6.0880091035392265, 585.7082345578829, 3924.9803747890537]
+
+["linear/balance.derivatives.actions_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [6.652721499966882e-7, 2.3038039876833444e-7]
+
+["linear/balance.derivatives.actions_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-2.9823247695764685e-5, -3.872106115105633e-5]
+
+["linear/balance.derivatives.charges_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [2.6619766700747104e-7, 1.1260329466863237e-6]
+
+["linear/balance.derivatives.charges_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-2.0427450868758313e-5, -0.00010726537000253588]
+
+["linear/balance.derivatives.frequencies_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [9.967265847038189e-5, 8.027855195678297e-6]
+
+["linear/balance.derivatives.frequencies_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.008323544103969405, -0.0032077322454301394]
+
+["linear/balance.losses"]
+anchor = 9.249626116765631e-14
+class = "loss"
+values = [-2.6274710711164577e-14, -8.868595101194644e-14]
+
+["linear/balance.metric_work"]
+anchor = 2.4406779346909795e-21
+class = "loss"
+values = [1.91883562855658e-24]
+
+["linear/balance.state_rate"]
+anchor = 0.0
+class = "rate_background"
+values = [-5.727109154462578e-17, -1.9330912050695408e-16]
+
+["linear/charges.action_losses"]
+anchor = 8.866867545952733e-14
+class = "loss"
+values = [-8.866867545952731e-14, -8.637776209557477e-18]
+
+["linear/charges.boundary_losses"]
+anchor = 9.249626116765631e-14
+class = "loss"
+values = [-2.6274710711164577e-14, -8.868595101194644e-14]
+
+["linear/charges.cloud_charges"]
+anchor = 0.0
+class = "charge"
+values = [1.7843059022653951e-6, 9.000329299984022e-6]
+
+["linear/charges.phase_actions"]
+anchor = 0.0
+class = "charge"
+values = [3.000105451361497e-6, 3.0001119243112574e-6]
+
+["linear/jacobian.frobenius_norm"]
+anchor = 0.0
+class = "jacobian"
+values = [223.52466286200058]
+
+["linear/jacobian.stored_entries"]
+anchor = 0.0
+class = "exact"
+values = [1.50336e6]
+
+["linear/jacobian.times_vector_entries"]
+anchor = 0.025905944097214282
+class = "jacobian"
+values = [-1.0675905118006845, 0.9250976704814791, 0.30926987222545527, -0.7282938687507271, 0.8684595571678833, -0.06673084836011661, -0.4405935151588466, 0.6512780996812294, -1.052920136149021, 1.3755825888435198, 1.4313975925202753, 1.1841730549159242]
+
+["linear/jacobian.times_vector_norm"]
+anchor = 0.0
+class = "jacobian"
+values = [134.65381126263415]
+
+["linear/rates.amplitude_rates"]
+anchor = 1.4564548499352403e-14
+class = "rate"
+values = [1.4564477852588363e-14, 4.400361253174426e-21]
+
+["linear/rates.fixed_background_amplitude_rates"]
+anchor = 1.456454819767315e-14
+class = "rate"
+values = [1.456447811201747e-14, 4.401468551860725e-21]
+
+["linear/residual.converged_max_abs"]
+anchor = 0.007400755258943974
+class = "residual_converged"
+values = [7.952622935181175e-16]
+
+["linear/residual.displaced_entries"]
+anchor = 0.0
+class = "residual"
+values = [-0.00045153762375623754, -1.618534657550633e-26, 5.888993549515116e-20, 1.1242573029512688e-16, 2.080341609834638e-16, -6.92962139200254e-5, 2.671056767304229e-14, 2.726221411311387e-22, 1.9128675282254175e-16, -9.591000246175845e-20, 3.114960628505006e-14, 1.8842096548996216e-13]
+
+["linear/residual.displaced_norm"]
+anchor = 0.0
+class = "residual"
+values = [0.053897511013837746]
+
+["linear/response.action_jacobian"]
+anchor = 0.0
+class = "response"
+values = [6.088009112140289, -4.300532671436918e-9, -6.448626115377134e-7, 1962.4901877169575]
+
+["linear/response.charge_jacobian"]
+anchor = 0.0
+class = "response"
+values = [1.8038499239415426, 6.0880091035392265, 585.7082345578829, 3924.9803747890537]
+
+["linear/response.direction_1_entries"]
+anchor = 4409.737717409426
+class = "response"
+values = [305474.91350117873, -7.434736163531172e-27, -3.0622150687677456e-11, -2.0585469972213987e-8, -5.472179996806602e-7, -38371.51067087267, 4.084966812028823e-5, -1.3498896333269112e-13, 3.488283855986786e-7, 1.2572911180744318e-10, -9.133309370421854e-16, -0.004897193834068684]
+
+["linear/response.direction_2_entries"]
+anchor = 370345.98104765045
+class = "response"
+values = [-0.03569566390057204, -5.8758277185262985e-15, -1.9742263662611475e-8, -3.317890537504893e-6, 4.880293699086297e-14, 0.003927870107698108, 0.026335998676056318, -8.702810785777666e-11, 5.622287960187402e-5, -1.8478681419998228e-17, 0.007131245261995564, -3.157246948710753]
+
+["linear/response.direction_norms"]
+anchor = 0.0
+class = "response"
+values = [4.4597002565589294e7, 5.255595345721344e9]
+
+["linear/solve.cloud_charges"]
+anchor = 0.0
+class = "solve_charge"
+values = [1.802325303174511e-6, 9.12105933141406e-6]
+
+["linear/solve.iterations"]
+anchor = 0.0
+class = "reported"
+values = [5.0]
+
+["linear/solve.mode_frequencies"]
+anchor = 0.0
+class = "solve_frequency"
+values = [0.29629524825196824, 1.4777910987640997e-8, 0.29845125298667696, 1.4395863264223969e-12]
+
+["linear/solve.unknown_entries"]
+anchor = 0.004346155424296894
+class = "solve_unknown"
+values = [0.30106265294883655, -6.170321363043769e-24, -3.078721629962011e-17, -1.0245948364721138e-14, -1.7977878420634169e-13, -0.03781835791970134, 4.107053401509675e-11, -1.3572378668741845e-19, 1.7362365712076866e-13, 4.130777443570831e-17, 2.2021886339722494e-11, -4.923632714837864e-9]
+
+[metadata]
+blas_threads = 1
+commit = "b4c4100870"
+cpu_model = "Intel(R) Xeon(R) Gold 6330 CPU @ 2.00GHz"
+hostname = "n0001.lr7"
+julia_threads = 1
+julia_version = "1.13.0"
+source_modified = false
+timestamp = "2026-11-12T23:43:27"
+
+["nonlinear/background_derivatives.actions_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [0.015426524812399159, 0.4369180634664908]
+
+["nonlinear/background_derivatives.actions_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.6921353752358738, -73.83264980446953]
+
+["nonlinear/background_derivatives.charges_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [0.1350284757746158, 0.8892626534749549]
+
+["nonlinear/background_derivatives.charges_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-22.26039804018695, -148.35743498263474]
+
+["nonlinear/background_derivatives.frequencies_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [9.872951100329622e-5, 7.920553031085807e-6]
+
+["nonlinear/background_derivatives.frequencies_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.008277741085976897, -0.0031912319886069906]
+
+["nonlinear/balance.action_jacobian"]
+anchor = 0.0
+class = "response"
+values = [943.7287015338812, -1.2637709653955767, -21.083507437078897, 2.780211456012415e6]
+
+["nonlinear/balance.action_losses"]
+anchor = 2.2239294332539032e-11
+class = "loss"
+values = [2.1747943809754196e-11, -1.3733244668837353e-11]
+
+["nonlinear/balance.charge_jacobian"]
+anchor = 0.0
+class = "response"
+values = [279.2777519888728, 941.2011596030886, 829791.6401727808, 5.560401828517392e6]
+
+["nonlinear/balance.derivatives.actions_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [0.015426524812399159, 0.4369180634664908]
+
+["nonlinear/balance.derivatives.actions_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.6921353752358738, -73.83264980446953]
+
+["nonlinear/balance.derivatives.charges_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [0.1350284757746158, 0.8892626534749549]
+
+["nonlinear/balance.derivatives.charges_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-22.26039804018695, -148.35743498263474]
+
+["nonlinear/balance.derivatives.frequencies_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [9.872951100329622e-5, 7.920553031085807e-6]
+
+["nonlinear/balance.derivatives.frequencies_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.008277741085976897, -0.0031912319886069906]
+
+["nonlinear/balance.losses"]
+anchor = 7.55231355693016e-12
+class = "loss"
+values = [2.3456608752924576e-12, -5.718545527920506e-12]
+
+["nonlinear/balance.metric_work"]
+anchor = 2.1694449622238517e-13
+class = "loss"
+values = [-9.079289201897422e-17]
+
+["nonlinear/balance.state_rate"]
+anchor = 0.0
+class = "rate_background"
+values = [4.79090182113784e-15, -1.5677735979887085e-14]
+
+["nonlinear/charges.action_losses"]
+anchor = 2.2340716594939323e-11
+class = "loss"
+values = [2.1847125268965895e-11, -1.3795875106817226e-11]
+
+["nonlinear/charges.boundary_losses"]
+anchor = 7.55231355693016e-12
+class = "loss"
+values = [2.3456608752924576e-12, -5.744624944668553e-12]
+
+["nonlinear/charges.cloud_charges"]
+anchor = 0.0
+class = "charge"
+values = [1.7307665693979553, 11.581559044044246]
+
+["nonlinear/charges.phase_actions"]
+anchor = 0.0
+class = "charge"
+values = [0.07009118697629924, 5.755733928533974]
+
+["nonlinear/jacobian.frobenius_norm"]
+anchor = 0.0
+class = "jacobian"
+values = [230.76178842517527]
+
+["nonlinear/jacobian.stored_entries"]
+anchor = 0.0
+class = "exact"
+values = [1.50336e6]
+
+["nonlinear/jacobian.times_vector_entries"]
+anchor = 0.021980363426273315
+class = "jacobian"
+values = [-1.0675928439990738, 0.8466134467664035, 0.3092692515403394, -0.727595805741808, 0.8685219100390578, -0.05726619609379863, -0.4405935317319459, 0.6512614286576891, -1.0529136838300455, 1.36580914420919, 1.4314411183748383, 1.181886622192251]
+
+["nonlinear/jacobian.times_vector_norm"]
+anchor = 0.0
+class = "jacobian"
+values = [139.19983605408294]
+
+["nonlinear/rates.amplitude_rates"]
+anchor = 2.3569300200935605e-14
+class = "rate"
+values = [-2.3040815978450015e-14, 5.05886024842475e-18]
+
+["nonlinear/rates.fixed_background_amplitude_rates"]
+anchor = 2.345854466254824e-14
+class = "rate"
+values = [-2.2939971123588087e-14, 4.906787813286979e-18]
+
+["nonlinear/residual.converged_max_abs"]
+anchor = 0.01761186707507065
+class = "residual_converged"
+values = [7.1878267227099e-15]
+
+["nonlinear/residual.displaced_entries"]
+anchor = 0.0
+class = "residual"
+values = [-0.0006511497071504386, 1.4412063134362652e-19, 1.0800878488704607e-13, 2.3050754092339693e-11, 5.00161012074497e-12, -7.107170659236873e-5, 5.1808167105277996e-8, 2.409267488224361e-16, 4.3976966912117437e-11, -6.292937065144044e-16, 2.63449961038464e-13, 4.417771417299667e-7]
+
+["nonlinear/residual.displaced_norm"]
+anchor = 0.0
+class = "residual"
+values = [0.17796574271031693]
+
+["nonlinear/response.action_jacobian"]
+anchor = 0.0
+class = "response"
+values = [952.3560754819187, -1.2753240999833229, -21.27624853152719, 2.8056275780892903e6]
+
+["nonlinear/response.charge_jacobian"]
+anchor = 0.0
+class = "response"
+values = [280.55139768199786, 949.8054272819505, 833575.9034775762, 5.611233879930049e6]
+
+["nonlinear/response.direction_1_entries"]
+anchor = 29.875705782797095
+class = "response"
+values = [2963.8667371902297, 7.175154592942948e-17, -3.7610556585229684e-7, -2.986989896631638e-5, -8.803506312434078e-5, -262.9246264570092, 0.5302775945550778, -1.7484802110700196e-9, 0.0005365352398063246, 1.1889373549533279e-8, -1.731512109451075e-7, -62.246861941571495]
+
+["nonlinear/response.direction_2_entries"]
+anchor = 2530.4303143675907
+class = "response"
+values = [-72.03989476968427, 8.75843678971751e-11, -2.697868673170423e-5, -0.0005352277682459513, 1.6632491378417397e-6, 5.6906575778936235, 38.039606009908184, -1.2556439255080675e-7, 0.009606586990010579, -4.3776646447187366e-10, 3.8476839812546296e-5, -4466.271245005416]
+
+["nonlinear/response.direction_norms"]
+anchor = 0.0
+class = "response"
+values = [303789.18783922965, 3.602480628940472e7]
+
+["nonlinear/solve.cloud_charges"]
+anchor = 0.0
+class = "solve_charge"
+values = [1.7651402518522026, 11.812957166746381]
+
+["nonlinear/solve.iterations"]
+anchor = 0.0
+class = "reported"
+values = [5.0]
+
+["nonlinear/solve.mode_frequencies"]
+anchor = 0.0
+class = "solve_frequency"
+values = [0.2949842410521399, -1.550547526321973e-10, 0.2971104782918314, 1.1967340052370216e-12]
+
+["nonlinear/solve.unknown_entries"]
+anchor = 0.01048513609353653
+class = "solve_unknown"
+values = [0.43626134252609894, 1.2339855113261462e-16, -5.647170112038259e-11, -2.2203506584579324e-9, -4.319459746945965e-9, -0.03870122851403072, 7.96250300040425e-5, -2.628313572998557e-13, 3.9883466661125974e-8, 5.831871286023325e-13, 1.8589452155010694e-10, -0.009346155297536482]
+
+["plateau/background_derivatives.actions_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [6.220454356322594, 3.4631398638782726e-7]
+
+["plateau/background_derivatives.actions_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-285.96077993411257, -6.06711430704899e-5]
+
+["plateau/background_derivatives.charges_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [1.8466600668260267, 6.220455039692129]
+
+["plateau/background_derivatives.charges_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-85.00257924026336, -285.96090125807535]
+
+["plateau/background_derivatives.frequencies_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [9.283350799506145e-5, 7.419981401173325e-6]
+
+["plateau/background_derivatives.frequencies_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.008090938001403092, -0.003136280668075142]
+
+["plateau/balance.action_jacobian"]
+anchor = 0.0
+class = "response"
+values = [20269.916325159393, -2.206835893503306e-5, -8.45012096960489, 2741.8195753121086]
+
+["plateau/balance.action_losses"]
+anchor = 7.961891284606077e-14
+class = "loss"
+values = [-7.961535355199974e-14, -2.19551573000991e-15]
+
+["plateau/balance.charge_jacobian"]
+anchor = 0.0
+class = "response"
+values = [6008.788686637197, 20269.916281022663, 815.9532808406558, 5475.189029654605]
+
+["plateau/balance.derivatives.actions_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [6.220454356322594, 3.4631398638782726e-7]
+
+["plateau/balance.derivatives.actions_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-285.96077993411257, -6.06711430704899e-5]
+
+["plateau/balance.derivatives.charges_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [1.8466600668260267, 6.220455039692129]
+
+["plateau/balance.derivatives.charges_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-85.00257924026336, -285.96090125807535]
+
+["plateau/balance.derivatives.frequencies_wrt_angular_momentum"]
+anchor = 0.0
+class = "derivative"
+values = [9.283350799506145e-5, 7.419981401173325e-6]
+
+["plateau/balance.derivatives.frequencies_wrt_mass"]
+anchor = 0.0
+class = "derivative"
+values = [-0.008090938001403092, -0.003136280668075142]
+
+["plateau/balance.losses"]
+anchor = 8.896644608836544e-14
+class = "loss"
+values = [-2.4256457555695425e-14, -8.400638501201957e-14]
+
+["plateau/balance.metric_work"]
+anchor = 9.56311618336212e-15
+class = "loss"
+values = [1.1813998234878686e-17]
+
+["plateau/balance.state_rate"]
+anchor = 0.0
+class = "rate_background"
+values = [-5.2874197272858367e-17, -1.831168123056105e-16]
+
+["plateau/charges.action_losses"]
+anchor = 8.112166005972574e-14
+class = "loss"
+values = [-8.111803358666111e-14, -2.2369544413398303e-15]
+
+["plateau/charges.boundary_losses"]
+anchor = 8.896644608836544e-14
+class = "loss"
+values = [-2.4256457555695425e-14, -8.559194246934077e-14]
+
+["plateau/charges.cloud_charges"]
+anchor = 0.0
+class = "charge"
+values = [8.6612172239503, 29.76887637629932]
+
+["plateau/charges.phase_actions"]
+anchor = 0.0
+class = "charge"
+values = [29.76886670989932, 4.833199980866077e-6]
+
+["plateau/evolution.accepted_steps"]
+anchor = 0.0
+class = "reported"
+values = [4.0]
+
+["plateau/evolution.amplitude_1"]
+anchor = 0.0
+class = "trajectory_amplitude"
+values = [0.0028077355300000014, 0.0028077320144710947, 0.0028077345344043234, 0.0028077350864004766, 0.002807735367868228]
+
+["plateau/evolution.amplitude_2"]
+anchor = 0.0
+class = "trajectory_amplitude"
+values = [3.396133200000001e-9, 3.5460029223002674e-9, 3.618626385584118e-9, 3.6985711556161328e-9, 3.732024358589832e-9]
+
+["plateau/evolution.black_hole_angular_momentum"]
+anchor = 0.0
+class = "trajectory_background"
+values = [0.8374944341429903, 0.8374946195591563, 0.8374944842232612, 0.8374944536700809, 0.8374944381861593]
+
+["plateau/evolution.black_hole_mass"]
+anchor = 0.0
+class = "trajectory_background"
+values = [0.9814753887857007, 0.9814754440197122, 0.9814754040356775, 0.9814753951300436, 0.9814753906043928]
+
+["plateau/evolution.rhs_calls"]
+anchor = 0.0
+class = "reported"
+values = [31.0]
+
+["plateau/evolution.rhs_diagnostics_logged"]
+anchor = 0.0
+class = "reported"
+values = [31.0]
+
+["plateau/evolution.times"]
+anchor = 0.0
+class = "trajectory_time"
+values = [1.5e9, 1.6831476551300983e9, 1.7691323411532137e9, 1.8618112352408073e9, 1.9e9]
+
+["plateau/jacobian.frobenius_norm"]
+anchor = 0.0
+class = "jacobian"
+values = [223.90550339581512]
+
+["plateau/jacobian.stored_entries"]
+anchor = 0.0
+class = "exact"
+values = [1.50336e6]
+
+["plateau/jacobian.times_vector_entries"]
+anchor = 0.022499049027253346
+class = "jacobian"
+values = [-1.0675928466673315, 0.8391813185135708, 0.30928670932561725, -0.7254477612317323, 0.8687125687116297, -0.024182552900989706, -0.4405935831968774, 0.6512105696253807, -1.0528938374366614, 1.33598346797747, 1.4313896428722543, 1.1841623705451407]
+
+["plateau/jacobian.times_vector_norm"]
+anchor = 0.0
+class = "jacobian"
+values = [135.21154310928824]
+
+["plateau/rates.amplitude_rates"]
+anchor = 2.942337653641892e-17
+class = "rate"
+values = [3.2383578707290728e-18, 8.007502305118522e-19]
+
+["plateau/rates.fixed_background_amplitude_rates"]
+anchor = 2.8761931513643066e-17
+class = "rate"
+values = [3.8553267772512834e-18, 7.85917774889342e-19]
+
+["plateau/residual.converged_max_abs"]
+anchor = 0.00782938651834169
+class = "residual_converged"
+values = [1.4758945396407918e-15]
+
+["plateau/residual.displaced_entries"]
+anchor = 0.0
+class = "residual"
+values = [-0.0006626441047683801, 1.3269314918570884e-28, 7.648721048216857e-20, 3.925090847878733e-13, 2.3273392202604e-9, -7.722760390584007e-5, 4.515741006309845e-14, 2.7275667402546164e-22, 1.0885725413894226e-12, 1.353910032407071e-13, 3.224157070749868e-15, 4.947475515885755e-13]
+
+["plateau/residual.displaced_norm"]
+anchor = 0.0
+class = "residual"
+values = [0.0542227674887855]
+
+["plateau/response.action_jacobian"]
+anchor = 0.0
+class = "response"
+values = [21042.29613504845, -2.2909267925744952e-5, -8.772110598143312, 2846.29588633176]
+
+["plateau/response.charge_jacobian"]
+anchor = 0.0
+class = "response"
+values = [6122.200062572511, 21042.2960892299, 831.3537865174267, 5683.81966206537]
+
+["plateau/response.direction_1_entries"]
+anchor = 1.6174610813743184
+class = "response"
+values = [157.20159419911167, 9.554845438588129e-23, -1.394912391634882e-14, -3.15691137589158e-8, -0.002127388254846007, -14.754981457617161, 2.380188821326805e-8, 7.9147123045303e-17, 6.856066038171491e-7, -2.0530247366467773e-7, 3.1656711349517415e-9, -2.5440306457848656e-6]
+
+["plateau/response.direction_2_entries"]
+anchor = 141.722634282406
+class = "response"
+values = [-0.07129271887386616, 3.575147493941518e-18, -2.3059878774592443e-8, -0.013160504723313779, 7.606572337377532e-7, 0.006008462361935232, 0.04001481183472803, 5.080326025893999e-11, 0.2870984663386214, 1.4504078572754837e-10, 0.0006632548835581847, -4.057178260927463]
+
+["plateau/response.direction_norms"]
+anchor = 0.0
+class = "response"
+values = [16657.94440820717, 2.0374402820621636e6]
+
+["plateau/solve.cloud_charges"]
+anchor = 0.0
+class = "solve_charge"
+values = [8.66130855299582, 29.769219356177793]
+
+["plateau/solve.iterations"]
+anchor = 0.0
+class = "reported"
+values = [4.0]
+
+["plateau/solve.mode_frequencies"]
+anchor = 0.0
+class = "solve_frequency"
+values = [0.2909470558459597, 5.675068364180599e-13, 0.2929790919095512, 2.3141879661228195e-10]
+
+["plateau/solve.unknown_entries"]
+anchor = 0.004568279656471333
+class = "solve_unknown"
+values = [0.4439655827001643, -6.163887164340477e-26, -3.994601187448799e-17, -4.514257712084726e-11, -2.0058997062239967e-6, -0.04172309386223796, 6.931475396299186e-11, 8.80552931653557e-20, 9.848066911342275e-10, -1.93670914777433e-10, 2.275119658079729e-12, -7.027841921445503e-9]

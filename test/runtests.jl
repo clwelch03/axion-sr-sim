@@ -580,6 +580,8 @@ end
     settings = FiniteDifferenceJacobian(; amplitude_step=1e-3, mass_step=1e-6, angular_momentum_step=2e-6)
     @test AC._difference_steps(settings, [0.0, 0.0, 1.0, 0.9], 2, true) == [1e-3, 1e-3, 1e-6, 2e-6]
     @test AC._difference_steps(settings, [2.0, -4.0], 2, false) == [2e-3, 4e-3]
+    @test AC._difference_steps(settings, [0.0, -4.0], 2, false) == [4e-3, 4e-3]   # zero amplitude: largest |A|
+    @test AC._difference_steps(settings, [0.0, 0.0, 1.0, 0.9], 2, false) == [1e-3, 1e-3, 1e-6, 2e-6]
     @test_throws ArgumentError FiniteDifferenceJacobian(; difference=:backward)
 
     # Quadratic rates: forward differences are off by step × curvature, central ones exact.
@@ -627,25 +629,78 @@ end
     solution = solve_radial(problem, amplitudes)
     final_time = 0.1 / growth_rates(solution)[1]
     expected = amplitudes .* exp.(growth_rates(solution) .* final_time)
-    for algorithm in (Rosenbrock23(), Rodas5P())
+    for algorithm in (Rosenbrock23(), Rodas5P(), FBDF())
         result = evolve_with_spindown(problem, amplitudes, (0.0, final_time), 0.01; algorithm, initial_guess=solution,
                                       dt=final_time / 2)
         counts, stats = result.solve_counts, result.ode_solution.stats
+        final_state = result.ode_solution.u[end]
         @test amplitude_trajectory(result).amplitudes[end, :] ≈ expected rtol=1e-4
         @test counts.stage == length(result.diagnostics) == stats.nf
         @test counts.failed == 0
         @test counts.jacobian == 4counts.jacobians_computed
+        # The final radial solution is at the final state, whatever the integrator's last evaluation was.
+        cache = AC.EvolutionCache(problem; decay_constant_ratio=0.01)
+        @test AC._solution_at_state(result.final_radial_solution, final_state, cache)
+        if algorithm isa FBDF
+            # FBDF asks for a Jacobian only when its Newton iteration converges slowly, at its last accepted state;
+            # that state's derivative comes from the iteration, so each new Jacobian costs one accepted-state solve.
+            @test counts.jacobians_computed <= stats.naccept + stats.nreject
+            @test counts.accepted_state <= 2 + counts.jacobians_computed
+            continue
+        end
         # One Jacobian per accepted state; a retried step reuses the one at its (unchanged) starting state.
         @test counts.jacobians_computed == stats.naccept
         @test counts.jacobians_reused == stats.nreject
-        # Rosenbrock23 is first-same-as-last. Rodas5P needs up to one solve per accepted step (plus the initial one);
-        # its last stage sits within the matching tolerance of the accepted state when the step changes little.
+        # Rosenbrock23 is first-same-as-last. Rodas5P needs up to one solve per accepted step (plus the initial one
+        # and the final one); its last stage sits within the matching tolerance of the accepted state when the step
+        # changes little.
         algorithm isa Rosenbrock23 && @test counts.accepted_state == 1
-        algorithm isa Rodas5P && @test counts.accepted_state <= 1 + stats.naccept
+        algorithm isa Rodas5P && @test counts.accepted_state <= 2 + stats.naccept
     end
     fixed = evolve_fixed_background(problem, amplitudes, (0.0, final_time); algorithm=Rosenbrock23(), dt=final_time / 2)
     @test amplitude_trajectory(fixed).amplitudes[end, :] ≈ expected rtol=1e-4
     @test fixed.solve_counts.jacobian == 2fixed.solve_counts.jacobians_computed
+    fixed_rodas = evolve_fixed_background(problem, amplitudes, (0.0, final_time); algorithm=Rodas5P(), dt=final_time / 2)
+    @test AC._solution_at_state(fixed_rodas.final_radial_solution, fixed_rodas.ode_solution.u[end],
+                                AC.EvolutionCache(problem))
+end
+
+"""Stand-in for an `OrdinaryDiffEq` integrator: the fields `_spindown_rhs!` reads."""
+mutable struct IntegratorStub
+    iter::Int
+    opts::NamedTuple{(:adaptive,), Tuple{Bool}}
+end
+
+@testset "Failed radial solves are rejected per step attempt" begin
+    background = KerrBackground(0.9)
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
+    mesh = RadialMesh(background; rstar_min=-60.0, rstar_max=250.0, step=0.8)
+    problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh)
+    solution = solve_radial(problem, [1e-6, 1e-7])
+    state_vector = [log.(solution.amplitudes); 1.0; 0.9]
+    cache = AC.EvolutionCache(problem; decay_constant_ratio=0.01)
+    cache.accepted_solution = solution
+    stub = IntegratorStub(3, (adaptive=true,))
+    cache.integrator = stub
+    rates = ones(4)
+    # A tolerance below roundoff makes the solve fail: zero rates, the attempt is marked and later evaluations of it skipped.
+    cache.newton_tol = 1e-30
+    AC._spindown_rhs!(rates, state_vector, cache, 0.0)
+    @test rates == zeros(4) && cache.failed_attempt == 3 && cache.solve_counts.failed == 1
+    @test AC._reject_failed_step(state_vector, cache, 0.0)
+    AC._spindown_rhs!(rates, state_vector, cache, 0.0)
+    @test cache.solve_counts.stage == 1
+    # The next attempt solves again even if `isoutofdomain` was never called (the integrator's own Newton gave up).
+    cache.newton_tol = 1e-10
+    stub.iter = 4
+    @test !AC._reject_failed_step(state_vector, cache, 0.0)
+    AC._spindown_rhs!(rates, state_vector, cache, 0.0)
+    @test cache.solve_counts.stage == 2 && all(!iszero, rates)
+    # With a fixed step the failure cannot be rejected: the evolution stops.
+    stub.opts = (adaptive=false,)
+    stub.iter = 5
+    cache.newton_tol = 1e-30
+    @test_throws ErrorException AC._spindown_rhs!(rates, state_vector, cache, 0.0)
 end
 
 end

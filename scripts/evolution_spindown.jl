@@ -14,7 +14,7 @@
 # enters only through the initial cloud in physical units (κ𝒩₀ with κ = (f_a/M_Pl)²); outputs get the prefix spindown_free_.
 # Writes results/spindown_a<spin>_alpha0.3_fa<f_a/M_Pl>_{diagnostics,solution}.csv. The verbose log (one line per
 # rhs evaluation, including b and j) is the fallback record if the run stops early.
-# Integrator: AXION_ALGORITHM=tsit5 (default), rosenbrock23 or rodas5p; AXION_TOLERANCE sets reltol = abstol (default:
+# Integrator: AXION_ALGORITHM=tsit5 (default), rosenbrock23, rodas5p or fbdf; AXION_TOLERANCE sets reltol = abstol (default:
 # the library's 1e-7). The stiff integrators get the library's finite-difference Jacobian, and their outputs the
 # suffix _<algorithm>. For a run with Julia threads (-t n), BLAS runs on one thread so that the Jacobian's concurrent
 # solves do not oversubscribe the cores.
@@ -47,7 +47,7 @@ amplitudes = probe.amplitudes .* sqrt.(target_actions ./ phase_actions(probe))
 seeded = solve_radial(problem, amplitudes; guess=probe)
 @printf("seed: A = (%.6e, %.6e), N = (%.6e, %.6e)\n", amplitudes..., phase_actions(seeded)...)
 algorithm_name = get(ENV, "AXION_ALGORITHM", "tsit5")
-algorithm = Dict("tsit5" => Tsit5(), "rosenbrock23" => Rosenbrock23(), "rodas5p" => Rodas5P())[algorithm_name]
+algorithm = Dict("tsit5" => Tsit5(), "rosenbrock23" => Rosenbrock23(), "rodas5p" => Rodas5P(), "fbdf" => FBDF())[algorithm_name]
 tolerance_options = haskey(ENV, "AXION_TOLERANCE") ?
     (reltol=parse(Float64, ENV["AXION_TOLERANCE"]), abstol=parse(Float64, ENV["AXION_TOLERANCE"])) : (;)
 checkpoint_minutes = parse(Float64, get(ENV, "AXION_CHECKPOINT_MINUTES", "Inf"))
@@ -98,7 +98,7 @@ function write_checkpoint!(integrator)
     (time() - last_checkpoint[]) / 60 < checkpoint_minutes && return nothing
     state, cache = integrator.u, integrator.p
     checkpoint = (; first_time, time=integrator.t, amplitudes=exp.(state[1:2]), background=BackgroundState(state[3], state[4]),
-                  solution=cache.accepted_solution, dt=integrator.dt, diagnostics=vcat(earlier_diagnostics, cache.diagnostics),
+                  solution=accepted_radial_solution!(integrator), dt=integrator.dt, diagnostics=vcat(earlier_diagnostics, cache.diagnostics),
                   saved=vcat(earlier_saved, saved_rows(integrator.sol.t, integrator.sol.u)))
     serialize(checkpoint_path * ".tmp", checkpoint)
     mv(checkpoint_path * ".tmp", checkpoint_path; force=true)   # atomic replacement: a kill never leaves half a file

@@ -79,7 +79,8 @@ end
 Radial solves of one evolution by purpose: `stage` (right-hand-side evaluations
 requested by the integrator, the entries of the diagnostics log), `jacobian`
 (perturbed solves of the finite-difference Jacobian), `accepted_state` (the
-initial solve, and the solves at accepted states that a new Jacobian needs when
+initial solve, and the solves at accepted states that a new Jacobian, a
+callback's `accepted_radial_solution!` or the final radial solution needs when
 the integrator's last stage is not there), and `failed` (solves of any purpose
 that did not converge, included in the other counts). `jacobians_computed` and
 `jacobians_reused` count Jacobian requests by outcome.
@@ -103,8 +104,8 @@ total_solves(counts::RadialSolveCounts) = counts.stage + counts.jacobian + count
 
 Output of a driver: the `OrdinaryDiffEq` solution object (state `[A₁, …, A_K]` or
 `[A₁, …, A_K, b, j]`, with `ln A` in place of `A` when `log_amplitudes` is true),
-the diagnostics log (one entry per integrator stage evaluation), the final
-radial solution, and the radial solves by purpose (`RadialSolveCounts`). Read
+the diagnostics log (one entry per integrator stage evaluation), the radial
+solution at the final state, and the radial solves by purpose (`RadialSolveCounts`). Read
 the amplitudes with `amplitude_trajectory` rather than from `ode_solution.u`
 directly.
 """
@@ -179,8 +180,9 @@ mutable struct EvolutionCache{P<:RadialProblem, T<:Real}
     verbose::Bool
     log_amplitudes::Bool
     balance::Symbol       # :energy or :action
-    accepted_solution::Union{Nothing, RadialSolution}   # radial solution at the last accepted step (spindown warm start)
-    solve_failed::Bool    # a radial solve in the current step attempt did not converge (spindown rejects the step)
+    accepted_solution::Union{Nothing, RadialSolution}   # last stage of the last accepted step (spindown warm start; see `_record_accepted_solution!`)
+    failed_attempt::Int   # step attempt (`_step_attempt`) in which a radial solve did not converge, −1 if none (spindown rejects it)
+    integrator::Any       # the running integrator, `nothing` outside `evolve_with_spindown` (read by `_step_attempt`)
     tangent_predictor::Bool   # start solves from a first-order prediction (`predicted_change`, `_amplitude_prediction`)
     last_rates::Vector{T}       # integrator-state rates at `last_solution` (spindown)
     accepted_rates::Vector{T}   # integrator-state rates at `accepted_solution` (spindown)
@@ -205,7 +207,7 @@ function EvolutionCache(problem::RadialProblem; decay_constant_ratio=0.0, includ
     _check_balance(problem, balance)
     EvolutionCache(problem, problem.mass_coupling, float(decay_constant_ratio)^2, include_metric_work, record_metric_work, last_solution,
                    EvolutionDiagnostics{Float64}[], float(newton_tol), verbose, log_amplitudes, balance,
-                   last_solution, false, tangent_predictor, Float64[], Float64[], nothing, nothing, RadialSolveCounts())
+                   last_solution, -1, nothing, tangent_predictor, Float64[], Float64[], nothing, nothing, RadialSolveCounts())
 end
 
 """Whether the balance terms include the energy, angular momentum and metric work: the action balance does not need them."""
@@ -372,10 +374,17 @@ function _reuse_stored_jacobian(store::JacobianStore, settings::FiniteDifference
     return !repeated && store.age <= settings.max_reuse_steps
 end
 
-"""Absolute difference steps of the state entries (`ln A` or `A`, then `b` and `j` when present)."""
+"""
+Absolute difference steps of the state entries (`ln A` or `A`, then `b` and `j` when present). Without
+`log_amplitudes` the amplitude steps are `amplitude_step` relative to `|A_k|`; a zero amplitude gets
+`amplitude_step` times the largest `|A_i|` (or `amplitude_step` itself if all vanish), so that no step is zero.
+"""
 function _difference_steps(settings::FiniteDifferenceJacobian, state::AbstractVector, mode_count::Int, log_amplitudes::Bool)
+    amplitude_sizes = abs.(state[1:mode_count])
+    largest_size = maximum(amplitude_sizes)
+    fallback_size = largest_size > 0 ? largest_size : 1.0
     amplitude_steps = log_amplitudes ? fill(settings.amplitude_step, mode_count) :
-                                       settings.amplitude_step .* abs.(state[1:mode_count])
+                                       settings.amplitude_step .* ifelse.(amplitude_sizes .> 0, amplitude_sizes, fallback_size)
     length(state) == mode_count && return amplitude_steps
     return vcat(amplitude_steps, settings.mass_step, settings.angular_momentum_step)
 end
@@ -531,6 +540,18 @@ function _fixed_background_jacobian!(jacobian_matrix, state, cache::EvolutionCac
                     (base_solution, perturbation) -> _fixed_background_evaluation(state .+ perturbation, cache, base_solution))
 end
 
+"""
+Radial solution at the final state of a fixed-background integration: the last stage's solution if it is there
+(first-same-as-last integrators), otherwise one more solve from it (counted as an accepted-state solve).
+"""
+function _final_fixed_background_solution!(cache::EvolutionCache, final_state)
+    _solution_at_state(cache.last_solution, final_state, cache) && return cache.last_solution
+    evaluation = _fixed_background_evaluation(final_state, cache, cache.last_solution)
+    cache.solve_counts.accepted_state += 1
+    evaluation.rates === nothing && error("radial solve at the final state did not converge")
+    return evaluation.solution
+end
+
 function _fixed_background_rhs!(rates, state, cache::EvolutionCache, time)
     amplitudes = _state_amplitudes(state, n_modes(cache.template), cache.log_amplitudes)
     solution = _solve_cached!(cache, cache.template, amplitudes)
@@ -578,8 +599,10 @@ function evolve_fixed_background(problem::RadialProblem, amplitudes::AbstractVec
     store = JacobianStore(length(initial_state))
     jacobian! = (matrix, state, cache, time) -> _fixed_background_jacobian!(matrix, state, cache, jacobian_settings, store, time)
     ode = ODEProblem(_ode_function(_fixed_background_rhs!, jacobian!), initial_state, time_span, cache)
-    ode_solution = solve(ode, algorithm; reltol, abstol, solver_options...)
-    EvolutionResult(ode_solution, cache.diagnostics, cache.last_solution, log_amplitudes, cache.solve_counts)
+    integrator = init(ode, algorithm; reltol, abstol, solver_options...)
+    ode_solution = solve!(integrator)
+    EvolutionResult(ode_solution, cache.diagnostics, _final_fixed_background_solution!(cache, integrator.u),
+                    log_amplitudes, cache.solve_counts)
 end
 
 # --- evolving background --------------------------------------------------------
@@ -1051,16 +1074,29 @@ amplitude_rates(terms::BalanceTerms, cache::EvolutionCache) =
     amplitude_rates(terms; cache.balance, include_metric_work=cache.include_metric_work)
 
 """
+Number of the integrator's current step attempt: `integrator.iter`, which
+`OrdinaryDiffEqCore` increments at the start of every attempt, accepted or not
+(`loopheader!`); 0 outside an integration and during the integrator's
+initialisation.
+"""
+_step_attempt(cache::EvolutionCache) = cache.integrator === nothing ? 0 : cache.integrator.iter
+
+"""
 Right-hand side of the spindown evolution. Every radial solve is warm-started
 from the solution at the last accepted step (moved by `predicted_change` when the
 cache has its tangents), never from a stage of a rejected step: after a rejection the retry's stages can be far from the rejected trial
 stages in both amplitudes and background, and that combination broke the warm
 start (`validation/spindown_warmstart_check.jl`). If a solve still fails, the
-rates are set to zero, the remaining stages of the step are skipped, and
-`_reject_failed_step` makes the integrator retry with a smaller step.
+rates are set to zero, the remaining evaluations of the same step attempt are
+skipped, and `_reject_failed_step` makes the integrator retry with a smaller
+step. Integrators with their own nonlinear solve (FBDF, SDIRK) may instead give
+up on the attempt themselves; the record is per attempt (`_step_attempt`), so the
+next attempt solves normally either way. With `adaptive=false` a step cannot be
+rejected, and a failed solve stops the evolution with an error.
 """
 function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
-    if cache.solve_failed
+    attempt = _step_attempt(cache)
+    if cache.failed_attempt == attempt
         rates .= 0
         return nothing
     end
@@ -1069,7 +1105,10 @@ function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
     solution, state, terms = evaluation.solution, evaluation.state, evaluation.terms
     if evaluation.rates === nothing
         cache.solve_counts.failed += 1
-        cache.solve_failed = true
+        cache.failed_attempt = attempt
+        cache.integrator !== nothing && !cache.integrator.opts.adaptive &&
+            error("radial solve at t = $time did not converge (|F| = $(solution.residual_norm)) and the step cannot " *
+                  "be rejected with adaptive=false")
         rates .= 0
         cache.verbose && (println("t = ", time, "  radial solve failed (|F| = ", solution.residual_norm,
                                   "); the step will be rejected"); flush(stdout))
@@ -1124,17 +1163,19 @@ _perturbed_spindown_evaluation(cache::EvolutionCache, base_solution::RadialSolut
 """
 Radial solution and rates at the last accepted state `state_vector`. After a
 step of a first-same-as-last integrator the cache already holds them; otherwise
-it holds the last stage of the accepted step, from which one solve at the
-accepted state is done (and kept). If that solve fails the evolution stops with
-an error, since an accepted step cannot be rejected afterwards.
+it holds a nearby solution (`_record_accepted_solution!`), from which one solve
+at the accepted state is done (and kept). If that solve fails the evolution stops with
+an error, since an accepted step cannot be rejected afterwards; with `required=false`
+it returns `(nothing, nothing)` instead.
 """
-function _accepted_evaluation!(cache::EvolutionCache, state_vector, time)
+function _accepted_evaluation!(cache::EvolutionCache, state_vector, time; required::Bool=true)
     _solution_at_state(cache.accepted_solution, state_vector, cache) &&
         return cache.accepted_solution, cache.accepted_rates
     evaluation = _spindown_evaluation(state_vector, cache, cache.accepted_solution, cache.accepted_tangents)
     cache.solve_counts.accepted_state += 1
     if evaluation.rates === nothing
         cache.solve_counts.failed += 1
+        required || return nothing, nothing
         error("radial solve at the accepted state t = $time did not converge")
     end
     cache.accepted_solution, cache.accepted_rates, cache.accepted_tangents =
@@ -1156,25 +1197,26 @@ function _spindown_jacobian!(jacobian_matrix, state_vector, cache::EvolutionCach
 end
 
 """
-`isoutofdomain` for the spindown integrator: reject the step if any radial
-solve in it failed (the integrator then shrinks the step by `qmin`), and clear
-the flag for the next attempt. Called once per step attempt, after the last stage.
+`isoutofdomain` for the spindown integrator: reject the step attempt if a
+radial solve in it failed (the integrator then shrinks the step by `qmin`).
+`OrdinaryDiffEqCore` calls it after the last stage of an adaptive attempt,
+except when the integrator's own nonlinear solve has already failed the
+attempt; nothing needs clearing, since the failure is recorded per attempt.
 """
-function _reject_failed_step(state_vector, cache::EvolutionCache, time)
-    failed = cache.solve_failed
-    cache.solve_failed = false
-    return failed
-end
+_reject_failed_step(state_vector, cache::EvolutionCache, time) = cache.failed_attempt == _step_attempt(cache)
 
 """
-Callback after every accepted step: keep the step's last stage solution, its
-rates and its tangents as the warm start of the next step's solves. Stages of
-rejected attempts are never used, since after a rejection the retry's stages can
-be far from the rejected ones (`_spindown_rhs!`). A first-same-as-last integrator
-(Tsit5, Rosenbrock23) evaluates the right-hand side at the accepted state as its
-last stage, so this is the solution there; for other integrators (Rodas5P, FBDF)
-it is a nearby stage, and the solve at the accepted state is done only when a
-Jacobian needs it (`_accepted_evaluation!`).
+Callback after every accepted step: keep the step's last right-hand-side
+solution, its rates and its tangents as the warm start of the next step's
+solves. Stages of rejected attempts are never used, since after a rejection the
+retry's stages can be far from the rejected ones (`_spindown_rhs!`). A
+first-same-as-last integrator (Tsit5, Rosenbrock23) evaluates the right-hand
+side at the accepted state as its last stage, so this is the solution there; for
+other integrators it is a nearby state (Rodas5P: its last stage; FBDF and the
+other implicit methods: the last Newton iterate at the new time, since they form
+the derivative at the accepted state from the converged iteration without
+evaluating it there). The solve at the accepted state itself is done only when
+a Jacobian or `accepted_radial_solution!` needs it (`_accepted_evaluation!`).
 """
 function _record_accepted_solution!(integrator)
     cache = integrator.p
@@ -1182,6 +1224,28 @@ function _record_accepted_solution!(integrator)
         cache.last_solution, cache.last_rates, cache.last_tangents
     u_modified!(integrator, false)
     return nothing
+end
+
+"""
+    accepted_radial_solution!(integrator)
+
+Radial solution at the accepted state `integrator.u` of an `evolve_with_spindown`
+integration, for callbacks (for example one that writes checkpoints). For a
+first-same-as-last integrator it is the stored last stage; otherwise one radial
+solve is made, and kept as the next step's warm start and Jacobian base.
+"""
+accepted_radial_solution!(integrator) = first(_accepted_evaluation!(integrator.p, integrator.u, integrator.t))
+
+"""
+Radial solution at the final state of a finished spindown integration (one more solve unless the last accepted
+step's stored solution is there). If that solve fails, warn and return the stored solution.
+"""
+function _final_spindown_solution!(cache::EvolutionCache, integrator)
+    solution, _ = _accepted_evaluation!(cache, integrator.u, integrator.t; required=false)
+    solution === nothing || return solution
+    @warn "radial solve at the final state t = $(integrator.t) did not converge; final_radial_solution is the last " *
+          "accepted step's stored solution (amplitudes $(cache.accepted_solution.amplitudes))"
+    return cache.accepted_solution
 end
 
 """
@@ -1217,9 +1281,12 @@ replaces the Newton iterations a plain warm start needs for the change of
 background. A step in which a solve fails is rejected and retried with a smaller step
 (`_spindown_rhs!`). If the step size then reaches the integrator's minimum, the
 integration stops with a non-success return code instead of using an
-unconverged solution. `isoutofdomain` is used internally. A `callback` (for
-example one that writes checkpoints) runs after the accepted-step bookkeeping,
-so `integrator.p.accepted_solution` is the radial solution at `integrator.u`.
+unconverged solution; with `adaptive=false` a failed solve stops it with an
+error. `isoutofdomain` is used internally. A `callback` (for example one that
+writes checkpoints) runs after the accepted-step bookkeeping; it gets the radial
+solution at `integrator.u` from `accepted_radial_solution!(integrator)`, which
+costs one solve for integrators that are not first-same-as-last.
+`result.final_radial_solution` is the solution at the final state.
 
 On the |211⟩ plateau the hole relaxes onto the superradiance threshold on a
 time scale far shorter than the slow evolution, and Tsit5's step is held at its
@@ -1267,7 +1334,11 @@ function evolve_with_spindown(problem::RadialProblem, amplitudes::AbstractVector
     accepted_step_callback = DiscreteCallback((state, time, integrator) -> true, _record_accepted_solution!;
                                               save_positions=(false, false))
     callbacks = callback === nothing ? accepted_step_callback : CallbackSet(accepted_step_callback, callback)
-    ode_solution = solve(ode, algorithm; reltol, abstol, callback=callbacks, isoutofdomain=_reject_failed_step,
-                         solver_options...)
-    EvolutionResult(ode_solution, cache.diagnostics, cache.last_solution, log_amplitudes, cache.solve_counts)
+    integrator = init(ode, algorithm; reltol, abstol, callback=callbacks, isoutofdomain=_reject_failed_step,
+                      solver_options...)
+    cache.integrator = integrator
+    ode_solution = solve!(integrator)
+    final_solution = _final_spindown_solution!(cache, integrator)
+    cache.integrator = nothing
+    EvolutionResult(ode_solution, cache.diagnostics, final_solution, log_amplitudes, cache.solve_counts)
 end

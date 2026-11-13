@@ -50,6 +50,9 @@ const STUDIES = Dict(
 
 const SOLVE_TOLERANCE = 1e-12
 const FLOOR_TOLERANCE = 1e-9
+# The α = 0.187 mesh has a residual floor between 2e-10 and 1e-9 that depends on the mesh and moves above 1e-9 after a
+# perturbation; its solves accept a floor up to 3e-9.
+floor_tolerance(spec) = spec.name == "large_mesh" ? 3e-9 : FLOOR_TOLERANCE
 
 """The takeover state: t = 2.94e10 of the restart run (|322⟩ rising fast while |211⟩ falls), not in the harness."""
 const TAKEOVER = H.StateSpec("takeover", "|322> takeover, t = 2.9408e10 of log 61110567's solution CSV", 0.3, 0.9,
@@ -75,8 +78,8 @@ same_layout(settings::Discretisation) =
                              PRODUCTION.max_order, PRODUCTION.n_angular)
 
 """Solve that throws on failure (caught by the caller, which records the failure)."""
-function checked_solve(problem, amplitudes; guess=nothing, tol=SOLVE_TOLERANCE)
-    solution = solve_radial(problem, amplitudes; guess, tol, floor_tol=max(tol, FLOOR_TOLERANCE))
+function checked_solve(problem, amplitudes; guess=nothing, tol=SOLVE_TOLERANCE, floor_tol=FLOOR_TOLERANCE)
+    solution = solve_radial(problem, amplitudes; guess, tol, floor_tol=max(tol, floor_tol))
     solution.converged || error("solve did not converge at amplitudes $amplitudes (|F| = $(solution.residual_norm))")
     return solution
 end
@@ -90,14 +93,15 @@ function converged_state(spec, settings::Discretisation, problem)
     if spec.name != "takeover" && same_layout(settings)
         stored = collect(reinterpret(Float64, read(H.state_path(spec))))
         guess = H.solution_from_unknowns(problem, spec.amplitudes, stored, maximum(spec.amplitudes))
-        return checked_solve(problem, spec.amplitudes; guess), "stored vector"
+        return checked_solve(problem, spec.amplitudes; guess, floor_tol=floor_tolerance(spec)), "stored vector"
     end
     guess = nothing
     factors = spec.construction == :cold ? [1.0] : exp.(range(log(1e-3), 0.0; length=30))
     for factor in factors
-        guess = checked_solve(problem, spec.amplitudes .* factor; guess, tol=max(1e-10, spec.solve_tolerance))
+        guess = checked_solve(problem, spec.amplitudes .* factor; guess, tol=max(1e-10, spec.solve_tolerance),
+                              floor_tol=floor_tolerance(spec))
     end
-    return checked_solve(problem, spec.amplitudes; guess), spec.construction == :cold ? "cold solve" : "continuation"
+    return checked_solve(problem, spec.amplitudes; guess, floor_tol=floor_tolerance(spec)), spec.construction == :cold ? "cold solve" : "continuation"
 end
 
 """Background state of a spec and the problem there (current-mass units, mesh of the reference problem)."""
@@ -128,7 +132,7 @@ perturbed_point(spec, solution) =
                      H.background_state(spec).angular_momentum * H.PERTURBATION_BACKGROUND_FACTORS[2]))
 
 """Production Newton tolerances for a state (the α = 0.187 mesh needs the opt-in floor tolerance)."""
-production_tolerances(spec) = spec.name == "large_mesh" ? (tol=1e-10, floor_tol=1e-9) : (tol=1e-10, floor_tol=1e-10)
+production_tolerances(spec) = (tol=1e-10, floor_tol=spec.name == "large_mesh" ? floor_tolerance(spec) : 1e-10)
 
 """Minimum wall time over `repeats` perturbed right-hand-side calls at production tolerances (after one warm-up)."""
 function time_rhs(spec, reference, solution; repeats=3)
@@ -171,7 +175,7 @@ function run_solve(study, directory, names)
             build_seconds = @elapsed (solution, route) = converged_state(spec, settings, problem)
             serialize(state_file(directory, study, settings, name), solution.unknowns)
             frequencies = mode_frequencies(solution)
-            cache = audit_cache(reference; tol=SOLVE_TOLERANCE, floor_tol=FLOOR_TOLERANCE)
+            cache = audit_cache(reference; tol=SOLVE_TOLERANCE, floor_tol=floor_tolerance(spec))
             rates, _ = rhs_rates(cache, solution, solution.amplitudes, H.background_state(spec))
             quantities = vcat(real.(frequencies), imag.(frequencies), rates)
             append_row(csv, [study, label, name, "quantities", Threads.nthreads(), length(reference.mesh.rstar),
@@ -246,7 +250,7 @@ function run_tolerance(directory, names)
         amplitudes, background = perturbed_point(spec, solution)
         for tol in (1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12)
             try
-                cache = audit_cache(reference; tol, floor_tol=max(tol, FLOOR_TOLERANCE))
+                cache = audit_cache(reference; tol, floor_tol=max(tol, floor_tolerance(spec)))
                 rates, evaluated = rhs_rates(cache, solution, amplitudes, background)
                 seconds = minimum(@elapsed(rhs_rates(cache, solution, amplitudes, background)) for _ in 1:3)
                 frequencies = mode_frequencies(evaluated)

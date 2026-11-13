@@ -895,16 +895,26 @@ Base.:\(scaled::ScaledFactorization, right_hand_side::AbstractVecOrMat) =
     scaled.scaling.column .* (scaled.factorization \ (scaled.scaling.row .* right_hand_side))
 
 """
-    solve_radial(problem, amplitudes; guess=nothing, tol=1e-10, maxiter=30, verbose=false,
-                 reuse_factorization=true, chord_threshold=1e-3)
+    solve_radial(problem, amplitudes; guess=nothing, guess_change=nothing, tol=1e-10, floor_tol=tol, maxiter=30,
+                 verbose=false, reuse_factorization=true, chord_threshold=1e-3)
 
 Solve the coupled radial boundary-value problem at the prescribed amplitudes.
 `guess` may be a previous `RadialSolution` (warm start, rescaled to the new
-amplitudes) or `nothing` for the hydrogenic initial guess. The Newton system
+amplitudes) or `nothing` for the hydrogenic initial guess. `guess_change`, in
+units of `guess.scale`, is added to the guess's unknowns before rescaling, for
+example a first-order prediction (`predicted_change`); if the predicted start
+has a residual above `chord_threshold` and the plain warm start a smaller one,
+the plain warm start is used instead. The Newton system
 is solved with envelope scaling (`NewtonScaling`, built once per solve from the
 starting frequencies), and iterations stop when both the scaled residual and
-the scaled step fall below `tol` in the max norm. On domains that do not reach
-far into the tails the scaling is close to the identity.
+the scaled step fall below `tol` in the max norm, or when the residual is below
+`tol` and a step below `√tol` no longer reduces it (its roundoff floor). On
+domains that do not reach far into the tails the scaling is close to the identity.
+A floor above `tol` stops the solve unconverged as soon as a Newton step below
+`tol` fails to reduce the residual (`_floor_action`); with `floor_tol > tol`
+(opt-in) a Newton step at a floor below `floor_tol` counts as converged. The floor is set by the outer-boundary rows, whose roundoff is
+amplified by the envelope row weights: about 1e-14 to 1e-10 on the 690-node
+α = 0.3 meshes, 5e-10 on the 1355-node α = 0.187 mesh.
 
 With `reuse_factorization` and a warm start, the iteration begins as a chord
 method: steps use the guess's factorised Jacobian (and later the most recent
@@ -913,25 +923,41 @@ and the Jacobian is only re-assembled and refactorised when that fails; chord
 steps are attempted only while the residual is below `chord_threshold`. Along
 a time evolution, where successive amplitudes are close, this replaces most
 of the factorisations by residual evaluations. The returned solution always
-carries a factorisation taken at (or within `√tol` of) the converged point,
-as the amplitude sensitivities require.
+carries a factorisation taken at (or within `tol/10` of) the converged point,
+as the amplitude sensitivities require; a solve at the guess's own amplitudes
+and problem keeps the guess's factorisation.
 """
-function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=nothing,
-                      tol=1e-10, maxiter=30, verbose=false, reuse_factorization=true, chord_threshold=1e-3)
+function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=nothing, guess_change=nothing,
+                      tol=1e-10, floor_tol=tol, maxiter=30, verbose=false, reuse_factorization=true, chord_threshold=1e-3)
     layout = UnknownLayout(problem)
     scale = maximum(amplitudes)
     warm = guess isa RadialSolution && length(guess.unknowns) == n_unknowns(layout)
-    unknowns = warm ? warm_start_unknowns(guess, scale) : initial_unknowns(problem, layout, amplitudes, scale)
+    predicted = warm && guess_change !== nothing && any(!iszero, guess_change)
+    unknowns = warm ? warm_start_unknowns(guess, scale; change=guess_change) : initial_unknowns(problem, layout, amplitudes, scale)
     scaling = NewtonScaling(problem, layout, _complexify(unknowns[parameter_range(layout)][frequency_range(layout)]))
     assembly = JacobianWorkspace(problem, layout)   # Jacobian pattern and scratch storage, reused across iterations
     scaled_norm(residual_vector) = norm(scaling.row .* residual_vector, Inf)
     scaled_step_norm(step_vector) = norm(step_vector ./ scaling.column, Inf)
     current = residual(problem, layout, unknowns, amplitudes, scale)
     current_norm = scaled_norm(current)
+    if predicted && current_norm ≥ chord_threshold
+        # The prediction is not clearly close: start from the plain warm start if that is closer.
+        plain = warm_start_unknowns(guess, scale)
+        plain_residual = residual(problem, layout, plain, amplitudes, scale)
+        if scaled_norm(plain_residual) < current_norm
+            verbose && println("  prediction |F| = $current_norm worse than the plain warm start; using the latter")
+            unknowns, current, current_norm = plain, plain_residual, scaled_norm(plain_residual)
+        end
+    end
 
     # Chord steps are only worthwhile near a solution; far from it every rejected step costs a residual.
     factorization = warm && reuse_factorization && current_norm < chord_threshold ? guess.jacobian_factorization : nothing
-    factorization_distance = Inf   # max-norm distance from the current point to where the factorisation was taken
+    # Max-norm distance from the current point to where the factorisation was taken. The guess's factorisation
+    # belongs to the current system only if problem and amplitudes are the guess's own.
+    same_system = warm && !predicted && amplitudes == guess.amplitudes && _same_discretisation(problem, guess.problem)
+    factorization_distance = same_system ? 0.0 : Inf
+    # Reference scale of the unknowns when the factorisation was taken (see `_rescale_frequency_step!`).
+    factorization_scale = warm ? float(guess.scale) : float(scale)
     converged = false
     iterations = 0
     stalled = 0
@@ -942,18 +968,36 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
         if !chord
             factorization = ScaledFactorization(jacobian(problem, layout, unknowns, amplitudes, scale; workspace=assembly), scaling)
             factorization_distance = 0.0
+            factorization_scale = float(scale)
         end
-        step = -(factorization \ current)
+        step = _rescale_frequency_step!(-(factorization \ current), layout, scale / factorization_scale)
         # Backtracking line search on the residual norm (Armijo condition); a
         # chord step must at least halve the residual or it is abandoned.
+        # A small full step that does not reduce the residual may mean the residual is at its roundoff floor
+        # (`_floor_action`); backtracking would then only shrink the step (up to 14 residual evaluations).
         damping = 1.0
         trial, trial_residual, trial_norm = unknowns, current, current_norm
+        floor_action = nothing
         while damping ≥ 1e-4
             trial = unknowns .+ damping .* step
             trial_residual = residual(problem, layout, trial, amplitudes, scale)
             trial_norm = scaled_norm(trial_residual)
             trial_norm ≤ (1 - 1e-4damping) * current_norm && break
+            damping == 1 && (floor_action = _floor_action(chord, current_norm, scaled_step_norm(step), tol, floor_tol))
+            floor_action === nothing || break
             damping /= 2
+        end
+        if floor_action == :refactorise
+            verbose && println("  chord step $iteration does not reduce |F| = $current_norm; refactorising")
+            factorization = nothing
+            continue
+        elseif floor_action == :converged
+            verbose && println("  $(chord ? "chord" : "newton") $iteration: |F| = $current_norm is at its roundoff floor; converged")
+            converged = true
+            break
+        elseif floor_action == :stuck
+            verbose && println("  newton $iteration: |F| = $current_norm is at its roundoff floor, above tol; stopping")
+            break
         end
         if chord && trial_norm > max(current_norm / 2, tol)
             verbose && println("  chord step $iteration rejected (|F| $current_norm → $trial_norm); refactorising")
@@ -990,9 +1034,10 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
         previous_step_norm = step_norm
     end
     converged || @warn "solve_radial did not converge: |F| = $current_norm after $iterations iterations"
-    # Sensitivities need the Jacobian at the converged point: refactorise unless the
-    # current factorisation was taken within √tol of it (Jacobian error O(distance)).
-    if factorization === nothing || factorization_distance > sqrt(tol)
+    # Sensitivities need the Jacobian at the converged point: the relative rate errors are 0.1 to 6 × the distance
+    # (validation/newton_jacobian_accuracy.jl), so refactorise unless the factorisation was taken within tol/10,
+    # where they are at the noise floor of the converged solution itself.
+    if factorization === nothing || factorization_distance > tol / 10
         factorization = ScaledFactorization(jacobian(problem, layout, unknowns, amplitudes, scale; workspace=assembly), scaling)
     end
     parameters = RadialParameters(layout, unknowns[parameter_range(layout)], amplitudes, scale)
@@ -1000,11 +1045,66 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
                    iterations, current_norm, converged)
 end
 
-"""Rescale a previous solution's unknowns to a new reference `scale`; frequencies are untouched."""
-function warm_start_unknowns(previous::RadialSolution, scale)
-    unknowns = previous.unknowns .* (previous.scale / scale)
+"""
+    _rescale_frequency_step!(step, layout, scale_ratio)
+
+Correct a step computed with a Jacobian factorised when the unknowns had another reference scale. Profile-like
+unknowns and residuals both scale like `1/scale` while the frequencies do not, so the Jacobian in units of
+`scale` equals the one in units of `scale₀` with its frequency columns multiplied by `scale₀/scale`; the
+frequency entries of the step are therefore multiplied by `scale_ratio = scale/scale₀`. Uncorrected, the
+frequency columns are off by `|scale/scale₀ − 1|`, 20–30% for a nonlinear-regime spindown step, where the chord
+iteration then reduced the residual by 0.38 per step instead of 0.11–0.18.
+"""
+function _rescale_frequency_step!(step::AbstractVector, layout::UnknownLayout, scale_ratio)
+    scale_ratio == 1 || (step[parameter_range(layout)[frequency_range(layout)]] .*= scale_ratio)
+    return step
+end
+
+"""
+    _floor_action(chord, residual_norm, step_norm, tol, floor_tol)
+
+What to do when a full step of scaled size `step_norm` does not reduce the residual, or `nothing` to backtrack
+as usual. With the residual below `tol` and the step below `√tol` the residual is at its roundoff floor:
+`:converged` (for a chord step only if the step is also below `tol`; a larger one may come from an out-of-date
+Jacobian, so `:refactorise` and let a Newton step decide). A Newton step at a residual below the opt-in
+`floor_tol` likewise converges. A Newton step below `tol` that does not reduce a residual above `tol` means a
+floor above `tol`: `:stuck`, since repeating the step from the same point gives the same result.
+"""
+function _floor_action(chord::Bool, residual_norm, step_norm, tol, floor_tol)
+    step_norm < sqrt(tol) || return nothing
+    if chord
+        residual_norm < tol && step_norm < tol && return :converged
+        return :refactorise
+    end
+    (residual_norm < tol || residual_norm < floor_tol) && return :converged
+    step_norm < tol && return :stuck
+    return nothing
+end
+
+"""
+Whether two problems give the same discrete system (same background, mass coupling, potential, modes, mesh,
+quadrature and boundary treatment). Shared components are compared by identity, so problems built separately
+from equal inputs may compare unequal; `solve_radial` then only refactorises once more than necessary.
+"""
+_same_discretisation(problem::RadialProblem, other::RadialProblem) =
+    problem === other ||
+    (problem.background == other.background && problem.mass_coupling == other.mass_coupling &&
+     problem.potential == other.potential && problem.mode_set === other.mode_set &&
+     problem.quadrature === other.quadrature && problem.mixing === other.mixing && problem.mesh.rstar == other.mesh.rstar &&
+     problem.horizon_order == other.horizon_order && problem.outer_order == other.outer_order &&
+     problem.outer_boundary == other.outer_boundary)
+
+"""
+    warm_start_unknowns(previous, scale; change=nothing)
+
+A previous solution's unknowns, plus `change` if given (in units of `previous.scale`), rescaled to a new
+reference `scale`; frequencies are not rescaled.
+"""
+function warm_start_unknowns(previous::RadialSolution, scale; change=nothing)
+    moved = change === nothing ? previous.unknowns : previous.unknowns .+ change
+    unknowns = moved .* (previous.scale / scale)
     layout = previous.layout
     frequency_indices = parameter_range(layout)[frequency_range(layout)]
-    unknowns[frequency_indices] = previous.unknowns[frequency_indices]
+    unknowns[frequency_indices] = moved[frequency_indices]
     return unknowns
 end

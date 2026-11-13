@@ -44,7 +44,7 @@ export phase_actions, action_flux, action_losses, action_jacobian, amplitude_res
 export with_background, amplitude_rates, evolve_fixed_background, evolve_with_spindown
 export BackgroundState, BackgroundDerivatives, balance_terms, background_charge_derivatives, metric_work, boyer_lindquist_metric_work,
        EvolutionCache, EvolutionResult, EvolutionDiagnostics,
-       AmplitudeTrajectory, amplitude_trajectory
+       AmplitudeTrajectory, amplitude_trajectory, SolutionTangents, solution_tangents, predicted_change
 export amplitudes_for_energy, fundamental_energies, with_potential
 
 end

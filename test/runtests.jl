@@ -416,6 +416,59 @@ end
 end
 
 
+@testset "Warm starts: same point and tangent predictor" begin
+    background = KerrBackground(0.9)
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
+    mesh = RadialMesh(background; rstar_min=-60.0, rstar_max=250.0, step=0.8)
+    problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh)
+    amplitudes = [1e-6, 1e-7]
+    solution = solve_radial(problem, amplitudes)
+    @test solution.converged
+
+    # Same system: equal inputs give equal discretisations, a different spin does not.
+    @test AC._same_discretisation(problem, with_background(problem, KerrBackground(0.9), 0.3))
+    @test !AC._same_discretisation(problem, with_background(problem, KerrBackground(0.9 + 1e-9), 0.3))
+
+    # A solve at the guess's own point takes no step and keeps the guess's factorisation.
+    again = solve_radial(problem, amplitudes; guess=solution)
+    @test again.converged
+    @test again.iterations == 1
+    @test again.unknowns == solution.unknowns
+    @test again.jacobian_factorization === solution.jacobian_factorization
+
+    # Warm start with a change: profile-like unknowns rescaled, frequencies only moved.
+    layout = solution.layout
+    change = 1e-3 .* sin.(1:length(solution.unknowns))
+    moved = AC.warm_start_unknowns(solution, 2solution.scale; change)
+    frequency_indices = AC.parameter_range(layout)[AC.frequency_range(layout)]
+    @test moved[frequency_indices] == (solution.unknowns .+ change)[frequency_indices]
+    @test moved[1:10] ≈ (solution.unknowns .+ change)[1:10] ./ 2
+
+    # The tangent prediction is second order in the change of amplitudes and background.
+    cache = EvolutionCache(problem)
+    state = BackgroundState(1.0, 0.9)
+    tangents = solution_tangents(cache, solution, state)
+    function prediction_errors(relative_change)
+        target_amplitudes = amplitudes .* (1 .+ relative_change .* [1.0, -2.0])
+        target = BackgroundState(1 - 0.3relative_change, 0.9 * (1 - relative_change))
+        target_problem = AC.current_problem(cache, target)
+        reference = solve_radial(target_problem, target_amplitudes; guess=solution)
+        predicted = AC.warm_start_unknowns(solution, reference.scale;
+                                           change=predicted_change(tangents, target_amplitudes, target))
+        plain = AC.warm_start_unknowns(solution, reference.scale)
+        warm = solve_radial(target_problem, target_amplitudes; guess=solution,
+                            guess_change=predicted_change(tangents, target_amplitudes, target))
+        return norm(predicted .- reference.unknowns, Inf), norm(plain .- reference.unknowns, Inf), warm, reference
+    end
+    predicted_error, plain_error, warm, reference = prediction_errors(1e-4)
+    halved_error, = prediction_errors(5e-5)
+    @test predicted_error < 1e-2plain_error
+    @test 3 < predicted_error / halved_error < 5
+    @test warm.converged
+    @test norm(warm.unknowns .- reference.unknowns, Inf) < 1e-9
+    @test growth_rates(warm) ≈ growth_rates(reference) rtol=1e-6
+end
+
 @testset "Wave actions: identities and balances" begin
     background = KerrBackground(0.9)
     mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])

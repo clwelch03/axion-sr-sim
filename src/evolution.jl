@@ -120,6 +120,24 @@ function amplitude_trajectory(result::EvolutionResult)
     AmplitudeTrajectory(collect(result.ode_solution.t), amplitudes, mass, angular_momentum)
 end
 
+"""
+    SolutionTangents
+
+First-order response ("tangents") of a converged `solution`'s unknown vector, in units of its `scale` with the
+frequencies unscaled: to each prescribed amplitude (columns of `wrt_amplitudes`, from `amplitude_response`), and at
+fixed amplitudes to the black-hole mass `b` and angular momentum `j` (`background_tangents`), at the
+background `(black_hole_mass, black_hole_angular_momentum)` of the solution. Built by `solution_tangents`; used by
+`predicted_change` to start a nearby solve within second order of its solution.
+"""
+struct SolutionTangents{T<:Real, S<:RadialSolution}
+    solution::S
+    black_hole_mass::T
+    black_hole_angular_momentum::T
+    wrt_amplitudes::Matrix{T}
+    wrt_mass::Vector{T}
+    wrt_angular_momentum::Vector{T}
+end
+
 """Mutable scratch shared by the right-hand-side evaluations of one evolution."""
 mutable struct EvolutionCache{P<:RadialProblem, T<:Real}
     template::P
@@ -135,11 +153,14 @@ mutable struct EvolutionCache{P<:RadialProblem, T<:Real}
     balance::Symbol       # :energy or :action
     accepted_solution::Union{Nothing, RadialSolution}   # radial solution at the last accepted step (spindown warm start)
     solve_failed::Bool    # a radial solve in the current step attempt did not converge (spindown rejects the step)
+    tangent_predictor::Bool   # start solves from a first-order prediction (`_accepted_prediction`, `_solve_cached!`)
+    accepted_tangents::Union{Nothing, SolutionTangents}   # tangents of `accepted_solution` (spindown with tangent_predictor)
 end
 
 """
     EvolutionCache(problem; decay_constant_ratio=0.0, include_metric_work=false, record_metric_work=false,
-                   newton_tol=1e-10, verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing)
+                   newton_tol=1e-10, verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing,
+                   tangent_predictor=true)
 
 Fresh cache for an evolution of `problem` (also handy for calling
 `balance_terms` directly). The energy, the angular momentum and the metric work
@@ -147,11 +168,12 @@ are computed only when the energy balance, `include_metric_work` or
 `record_metric_work` asks for them (`_computes_charges`).
 """
 function EvolutionCache(problem::RadialProblem; decay_constant_ratio=0.0, include_metric_work=false, record_metric_work=false,
-                        newton_tol=1e-10, verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing)
+                        newton_tol=1e-10, verbose=false, log_amplitudes=true, balance=:action, last_solution=nothing,
+                        tangent_predictor=true)
     _check_balance(problem, balance)
     EvolutionCache(problem, problem.mass_coupling, float(decay_constant_ratio)^2, include_metric_work, record_metric_work, last_solution,
                    EvolutionDiagnostics{Float64}[], float(newton_tol), verbose, log_amplitudes, balance,
-                   last_solution, false)
+                   last_solution, false, tangent_predictor, nothing)
 end
 
 """Whether the balance terms include the energy, angular momentum and metric work: the action balance does not need them."""
@@ -198,9 +220,16 @@ function _with_initial_step(kwargs, step)
     return merge(NamedTuple(kwargs), (dt=step,))
 end
 
-"""Radial solve warm-started from the cache's previous solution."""
+"""
+Radial solve warm-started from the cache's previous solution; with the tangent predictor, and when the previous
+solution belongs to the same discrete problem, moved to first order in the amplitude change (`amplitude_response`,
+two back-substitutions).
+"""
 function _solve_cached!(cache::EvolutionCache, problem::RadialProblem, amplitudes)
-    solution = solve_radial(problem, amplitudes; guess=cache.last_solution, tol=cache.newton_tol)
+    previous = cache.last_solution
+    predict = cache.tangent_predictor && previous isa RadialSolution && _same_discretisation(problem, previous.problem)
+    guess_change = predict ? amplitude_response(previous) * (amplitudes .- previous.amplitudes) : nothing
+    solution = solve_radial(problem, amplitudes; guess=previous, guess_change, tol=cache.newton_tol)
     cache.last_solution = solution
     return solution
 end
@@ -234,7 +263,8 @@ end
 
 """
     evolve_fixed_background(problem, amplitudes, time_span; balance=:action, log_amplitudes=true,
-                            initial_step_fraction=0.05, newton_tol=1e-10, verbose=false, reltol, abstol, kwargs...)
+                            initial_step_fraction=0.05, newton_tol=1e-10, verbose=false, tangent_predictor=true,
+                            reltol, abstol, kwargs...)
 
 Integrate the amplitudes with Tsit5 on a frozen Kerr background, with the
 action (default, any number of modes) or energy (two modes) balance.
@@ -244,13 +274,16 @@ by about `1e-7 (1 + |ln A|)`; otherwise the state is `A` with the old defaults
 `reltol = 1e-6`, `abstol = 1e-12`. The first step is `initial_step_fraction`
 times the shortest initial e-folding time unless `dt` is passed
 (`initial_step_fraction=nothing` leaves it to Tsit5's heuristic).
-`verbose` prints one line per right-hand-side evaluation. Other keyword
-arguments are passed to `solve` (e.g. `saveat`, `dtmax`).
+`verbose` prints one line per right-hand-side evaluation. Each radial solve is
+warm-started from the previous one, moved to first order in the amplitude change
+unless `tangent_predictor=false`. Other keyword arguments are passed to `solve`
+(e.g. `saveat`, `dtmax`).
 """
 function evolve_fixed_background(problem::RadialProblem, amplitudes::AbstractVector, time_span; balance::Symbol=:action,
                                  log_amplitudes=true, initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
+                                 tangent_predictor=true,
                                  reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
-    cache = EvolutionCache(problem; newton_tol, verbose, log_amplitudes, balance)
+    cache = EvolutionCache(problem; newton_tol, verbose, log_amplitudes, balance, tangent_predictor)
     initial_amplitudes = collect(float.(amplitudes))
     initial_rates = amplitude_rates(_solve_cached!(cache, problem, initial_amplitudes); balance)
     solver_options = _with_initial_step(kwargs, _initial_step(initial_amplitudes, initial_rates, initial_step_fraction))
@@ -493,6 +526,27 @@ function _observable_partials(cache::EvolutionCache, solution::RadialSolution, s
 end
 
 """
+`SolutionTangents` of a converged solution on the background `state`: `amplitude_response` and
+`background_tangents` (one dual residual pass).
+"""
+function solution_tangents(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState)
+    background_directions = background_tangents(cache, solution, state)
+    return SolutionTangents(solution, state.mass, state.angular_momentum, amplitude_response(solution),
+                            background_directions[:, 1], background_directions[:, 2])
+end
+
+"""
+    predicted_change(tangents, amplitudes, state)
+
+First-order change of `tangents.solution`'s unknowns (in its units) for moving to `amplitudes` and background
+`state`; pass it as `guess_change` to `solve_radial` with `guess = tangents.solution`.
+"""
+predicted_change(tangents::SolutionTangents, amplitudes::AbstractVector, state::BackgroundState) =
+    tangents.wrt_amplitudes * (amplitudes .- tangents.solution.amplitudes) .+
+    tangents.wrt_mass .* (state.mass - tangents.black_hole_mass) .+
+    tangents.wrt_angular_momentum .* (state.angular_momentum - tangents.black_hole_angular_momentum)
+
+"""
     background_charge_derivatives(cache, solution, state; relative_step=nothing, include_charges=true)
 
 `BackgroundDerivatives` at fixed amplitudes and fixed tortoise mesh (in units
@@ -698,8 +752,8 @@ amplitude_rates(terms::BalanceTerms, cache::EvolutionCache) =
 
 """
 Right-hand side of the spindown evolution. Every radial solve is warm-started
-from the solution at the last accepted step, never from a stage of a rejected
-step: after a rejection the retry's stages can be far from the rejected trial
+from the solution at the last accepted step (moved by `predicted_change` when the
+cache has its tangents), never from a stage of a rejected step: after a rejection the retry's stages can be far from the rejected trial
 stages in both amplitudes and background, and that combination broke the warm
 start (`validation/spindown_warmstart_check.jl`). If a solve still fails, the
 rates are set to zero, the remaining stages of the step are skipped, and
@@ -713,7 +767,8 @@ function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
     end
     amplitudes = _state_amplitudes(state_vector, mode_count, cache.log_amplitudes)
     state = BackgroundState(state_vector[mode_count + 1], state_vector[mode_count + 2])
-    solution = solve_radial(current_problem(cache, state), amplitudes; guess=cache.accepted_solution, tol=cache.newton_tol)
+    solution = solve_radial(current_problem(cache, state), amplitudes; guess=cache.accepted_solution,
+                            guess_change=_accepted_prediction(cache, amplitudes, state), tol=cache.newton_tol)
     if !solution.converged
         cache.solve_failed = true
         rates .= 0
@@ -734,6 +789,23 @@ function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
 end
 
 """
+Tangent prediction off the accepted solution (`predicted_change`), or `nothing` (plain warm start) when the
+predictor is off or the cache holds no tangents of the current accepted solution.
+"""
+function _accepted_prediction(cache::EvolutionCache, amplitudes, state::BackgroundState)
+    tangents = cache.accepted_tangents
+    (cache.tangent_predictor && tangents !== nothing && tangents.solution === cache.accepted_solution) || return nothing
+    return predicted_change(tangents, amplitudes, state)
+end
+
+"""Make `solution` on background `state` the spindown warm start, with its tangents if the predictor is on."""
+function _accept_solution!(cache::EvolutionCache, solution::RadialSolution, state::BackgroundState)
+    cache.accepted_solution = solution
+    cache.accepted_tangents = cache.tangent_predictor ? solution_tangents(cache, solution, state) : nothing
+    return nothing
+end
+
+"""
 `isoutofdomain` for the spindown integrator: reject the step if any radial
 solve in it failed (the integrator then shrinks the step by `qmin`), and clear
 the flag for the next attempt. Called once per step attempt, after the last stage.
@@ -745,18 +817,19 @@ function _reject_failed_step(state_vector, cache::EvolutionCache, time)
 end
 
 """
-Callback after every accepted step: keep the step's radial solution as the
-warm start for the next step. Tsit5 evaluates the right-hand side at the
+Callback after every accepted step: keep the step's radial solution (and its
+tangents) as the warm start for the next step. Tsit5 evaluates the right-hand side at the
 accepted state as its last stage (first-same-as-last), so `cache.last_solution`
 is the solution there; the check makes a different integrator fail loudly.
 """
 function _record_accepted_solution!(integrator)
     cache = integrator.p
-    amplitudes = _state_amplitudes(integrator.u, n_modes(cache.template), cache.log_amplitudes)
+    mode_count = n_modes(cache.template)
+    amplitudes = _state_amplitudes(integrator.u, mode_count, cache.log_amplitudes)
     isapprox(cache.last_solution.amplitudes, amplitudes; rtol=1e-12) ||
         error("last radial solution is not at the accepted state (amplitudes $(cache.last_solution.amplitudes) " *
               "vs $amplitudes); the accepted-step warm start assumes a first-same-as-last integrator such as Tsit5")
-    cache.accepted_solution = cache.last_solution
+    _accept_solution!(cache, cache.last_solution, BackgroundState(integrator.u[mode_count + 1], integrator.u[mode_count + 2]))
     u_modified!(integrator, false)
     return nothing
 end
@@ -765,7 +838,7 @@ end
     evolve_with_spindown(problem, amplitudes, time_span, decay_constant_ratio; balance=:action,
                          include_metric_work=false, record_metric_work=false, log_amplitudes=true, initial_step_fraction=0.05,
                          newton_tol=1e-10, verbose=false, initial_background, initial_guess=nothing,
-                         reltol, abstol, kwargs...)
+                         tangent_predictor=true, reltol, abstol, kwargs...)
 
 Integrate `[A₁ … A_K, b, j]` (or `[ln A₁ … ln A_K, b, j]`, the default) with
 Tsit5, starting from `initial_background`, by default `b = 1` and `j = a` of
@@ -785,8 +858,12 @@ recorded in the diagnostics) only for the energy balance, with `include_metric_w
 `record_metric_work=true`; under the default action balance the diagnostics hold `NaN` for the work
 and the amplitude rates are unchanged (`_computes_charges`).
 
-Each radial solve is warm-started from the solution at the last accepted step,
-and a step in which a solve fails is rejected and retried with a smaller step
+Each radial solve is warm-started from the solution at the last accepted step;
+with `tangent_predictor` (default) it starts from that solution moved to first
+order in the changes of amplitudes, `b` and `j` (`SolutionTangents`,
+`predicted_change`), which costs one `solution_tangents` per accepted step and
+replaces the Newton iterations a plain warm start needs for the change of
+background. A step in which a solve fails is rejected and retried with a smaller step
 (`_spindown_rhs!`). If the step size then reaches the integrator's minimum, the
 integration stops with a non-success return code instead of using an
 unconverged solution. Do not pass `callback` or `isoutofdomain`; they are used.
@@ -802,14 +879,14 @@ function evolve_with_spindown(problem::RadialProblem, amplitudes::AbstractVector
                               balance::Symbol=:action, include_metric_work=false, record_metric_work=false, log_amplitudes=true,
                               initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
                               initial_background::BackgroundState=BackgroundState(1.0, problem.background.a),
-                              initial_guess=nothing,
+                              initial_guess=nothing, tangent_predictor=true,
                               reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
-    cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, record_metric_work, newton_tol, verbose, log_amplitudes, balance,
-                           last_solution=initial_guess)
+    cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, record_metric_work, newton_tol, verbose, log_amplitudes,
+                           balance, last_solution=initial_guess, tangent_predictor)
     initial_amplitudes = collect(float.(amplitudes))
     initial_solution = _solve_cached!(cache, current_problem(cache, initial_background), initial_amplitudes)
     initial_solution.converged || error("initial radial solve did not converge")
-    cache.accepted_solution = initial_solution
+    _accept_solution!(cache, initial_solution, initial_background)
     initial_rates = amplitude_rates(balance_terms(cache, initial_solution, initial_background), cache)
     solver_options = _with_initial_step(kwargs, _initial_step(initial_amplitudes, initial_rates, initial_step_fraction))
     initial_state = vcat(log_amplitudes ? log.(initial_amplitudes) : initial_amplitudes,

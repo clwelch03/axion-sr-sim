@@ -1,0 +1,104 @@
+# Slurm job 27816073, lr7, source = commit 753d59a (copied to a scratch directory), 4 CPUs, 1 Julia thread
+
+=== linear: t = 0.0, A = [9.85578501492328e-7, 3.057454189623335e-9], b = 1.0, j = 0.9
+tangent_predictor = true: 8 accepted, 2 rejected steps, t = 4.253573e+08
+linear, tangent_predictor = true   solves  60 | per solve: iterations  3.73  R  5.13  J 1.58  F 1.58  newton 0.62  chord  3.12  back  0.00  finJ 0.97 | failed 0
+     12 × RRJFSRSRSRJF
+     12 × RRJFSRSRSRSRJF
+      8 × RSRSRJF
+      6 × RSRSRJFSRSRJF
+      4 × RSRSRSRSRSRSRJF
+tangent_predictor = false: 9 accepted, 1 rejected steps, t = 4.471854e+08
+linear, tangent_predictor = false  solves  60 | per solve: iterations  7.07  R  8.98  J 3.42  F 3.42  newton 2.42  chord  4.65  back  0.92  finJ 1.00 | failed 0
+      4 × RJFSRJFSRJFSRSRSRSRJF
+      4 × RJFSRSRJFSRSRSRSRSRJF
+      4 × RJFSRJFSRJFSRJFSRSRSRSRJF
+      4 × RJFSRJFSRJFSRJFSRSRSRSRSRJF
+      4 × RJFSRSRJFSRSRJF
+
+=== plateau: t = 1.5e9, A = [0.00280773553, 3.3961332e-9], b = 0.9814753887857007, j = 0.8374944341429903
+tangent_predictor = true: 9 accepted, 1 rejected steps, t = 2.522039e+09
+plateau, tangent_predictor = true  solves  60 | per solve: iterations  1.43  R  2.43  J 1.00  F 1.00  newton 0.00  chord  1.43  back  0.00  finJ 1.00 | failed 0
+     34 × RSRJF
+     26 × RSRSRJF
+tangent_predictor = false: 9 accepted, 1 rejected steps, t = 2.522039e+09
+plateau, tangent_predictor = false solves  60 | per solve: iterations  3.10  R  4.10  J 1.32  F 1.32  newton 0.32  chord  2.78  back  0.00  finJ 1.00 | failed 0
+     28 × RSRSRSRJF
+     19 × RJFSRSRSRSRJF
+     13 × RSRSRJF
+
+=== transition: t = 3.0968105831506714e10, A = [0.0024024134667967956, 2.4071466062915234e-6], b = 0.9854426851242335, j = 0.8458838283206854
+tangent_predictor = true: 9 accepted, 1 rejected steps, t = 3.228007e+10
+transition, tangent_predictor = true solves  60 | per solve: iterations  3.65  R  4.72  J 1.07  F 1.07  newton 0.07  chord  3.58  back  0.00  finJ 1.00 | failed 0
+     39 × RSRSRSRSRJF
+     17 × RSRSRSRJF
+      4 × RRJFSRSRSRJF
+tangent_predictor = false: 9 accepted, 1 rejected steps, t = 3.228007e+10
+transition, tangent_predictor = false solves  60 | per solve: iterations  8.87  R  9.98  J 3.27  F 3.27  newton 2.27  chord  6.60  back  0.12  finJ 1.00 | failed 0
+      8 × RJFSRJFSRSRSRSRSRSRSRSRSRSRSRSRJF
+      8 × RJFSRJFSRSRSRSRJF
+      6 × RJFSRJFSRSRSRSRSRJF
+      6 × RJFSRJFSRSRSRSRSRSRSRSRSRSRSRJF
+      5 × RJFSRJFSRSRSRSRSRSRSRSRSRSRJF
+
+=== nonlinear: t = 1.0e11, A = [0.00014719255751539253, 4.100281105490423e-6], b = 0.9954602054965745, j = 0.8671482601144008
+tangent_predictor = true: 9 accepted, 1 rejected steps, t = 1.121132e+11
+nonlinear, tangent_predictor = true solves  57 | per solve: iterations  4.26  R  5.56  J 1.32  F 1.32  newton 0.33  chord  3.93  back  0.00  finJ 0.98 | failed 1
+     12 × RRJFSRSRSRJF
+     12 × RSRSRSRJF
+      6 × RSRSRSRSRSRJF
+      5 × RSRSRSRSRJF
+      4 × RRJFSRSRJF
+tangent_predictor = false: 9 accepted, 1 rejected steps, t = 1.121125e+11
+nonlinear, tangent_predictor = false solves  55 | per solve: iterations  7.80  R  8.80  J 2.51  F 2.51  newton 1.53  chord  6.27  back  0.00  finJ 0.98 | failed 1
+      8 × RJFSRJFSRSRSRSRSRSRJF
+      8 × RJFSRSRSRSRSRSRSRSRSRSRJF
+      8 × RJFSRJFSRSRSRSRSRSRSRJF
+      5 × RJFSRJFSRSRSRSRSRJF
+      5 × RJFSRJFSRSRSRSRJF
+┌ Warning: Verbosity toggle: max_iters 
+│  Interrupted. Larger maxiters is needed. If you are using an integrator for non-stiff ODEs or an automatic switching algorithm (the default), you may want to consider using a method for stiff equations. See the solver pages for more details (e.g. https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/#Stiff-Problems).
+└ @ DiffEqBase ~/.julia/packages/DiffEqBase/WgyOh/src/check_error.jl:44
+┌ Warning: Verbosity toggle: max_iters 
+│  Interrupted. Larger maxiters is needed. If you are using an integrator for non-stiff ODEs or an automatic switching algorithm (the default), you may want to consider using a method for stiff equations. See the solver pages for more details (e.g. https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/#Stiff-Problems).
+└ @ DiffEqBase ~/.julia/packages/DiffEqBase/WgyOh/src/check_error.jl:44
+┌ Warning: Verbosity toggle: max_iters 
+│  Interrupted. Larger maxiters is needed. If you are using an integrator for non-stiff ODEs or an automatic switching algorithm (the default), you may want to consider using a method for stiff equations. See the solver pages for more details (e.g. https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/#Stiff-Problems).
+└ @ DiffEqBase ~/.julia/packages/DiffEqBase/WgyOh/src/check_error.jl:44
+┌ Warning: Verbosity toggle: max_iters 
+│  Interrupted. Larger maxiters is needed. If you are using an integrator for non-stiff ODEs or an automatic switching algorithm (the default), you may want to consider using a method for stiff equations. See the solver pages for more details (e.g. https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/#Stiff-Problems).
+└ @ DiffEqBase ~/.julia/packages/DiffEqBase/WgyOh/src/check_error.jl:44
+┌ Warning: Verbosity toggle: max_iters 
+│  Interrupted. Larger maxiters is needed. If you are using an integrator for non-stiff ODEs or an automatic switching algorithm (the default), you may want to consider using a method for stiff equations. See the solver pages for more details (e.g. https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/#Stiff-Problems).
+└ @ DiffEqBase ~/.julia/packages/DiffEqBase/WgyOh/src/check_error.jl:44
+┌ Warning: Verbosity toggle: max_iters 
+│  Interrupted. Larger maxiters is needed. If you are using an integrator for non-stiff ODEs or an automatic switching algorithm (the default), you may want to consider using a method for stiff equations. See the solver pages for more details (e.g. https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/#Stiff-Problems).
+└ @ DiffEqBase ~/.julia/packages/DiffEqBase/WgyOh/src/check_error.jl:44
+┌ Warning: solve_radial did not converge: |F| = 1.1553317550663226e-10 after 5 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim-speedup/newton/work/pkg_v7/src/bvp.jl:667
+┌ Warning: Verbosity toggle: max_iters 
+│  Interrupted. Larger maxiters is needed. If you are using an integrator for non-stiff ODEs or an automatic switching algorithm (the default), you may want to consider using a method for stiff equations. See the solver pages for more details (e.g. https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/#Stiff-Problems).
+│ 
+│ Diagnostics:
+│ 
+│ Error Analysis:
+│   step error estimate EEst = 2481 (a step is accepted when EEst <= 1)
+│   largest contributors to EEst = internalnorm(atmp), where atmp is the tolerance-weighted local error per state component:
+│     atmp[1] = -4962, u[1] = -13.58, uprev[1] = -12.8
+│     atmp[2] = 11.66, u[2] = -12.39, uprev[2] = -12.39
+│     atmp[4] = -4.512, u[4] = 0.8664, uprev[4] = 0.8665
+└ @ DiffEqBase ~/.julia/packages/DiffEqBase/WgyOh/src/check_error.jl:44
+┌ Warning: solve_radial did not converge: |F| = 1.0828905961931393e-10 after 6 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim-speedup/newton/work/pkg_v7/src/bvp.jl:667
+┌ Warning: Verbosity toggle: max_iters 
+│  Interrupted. Larger maxiters is needed. If you are using an integrator for non-stiff ODEs or an automatic switching algorithm (the default), you may want to consider using a method for stiff equations. See the solver pages for more details (e.g. https://docs.sciml.ai/DiffEqDocs/stable/solvers/ode_solve/#Stiff-Problems).
+│ 
+│ Diagnostics:
+│ 
+│ Error Analysis:
+│   step error estimate EEst = 814.9 (a step is accepted when EEst <= 1)
+│   largest contributors to EEst = internalnorm(atmp), where atmp is the tolerance-weighted local error per state component:
+│     atmp[1] = 1630, u[1] = -12.93, uprev[1] = -12.8
+│     atmp[2] = -3.928, u[2] = -12.39, uprev[2] = -12.39
+│     atmp[4] = 1.515, u[4] = 0.8665, uprev[4] = 0.8665
+└ @ DiffEqBase ~/.julia/packages/DiffEqBase/WgyOh/src/check_error.jl:44

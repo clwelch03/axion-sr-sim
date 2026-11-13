@@ -1,0 +1,49 @@
+# Slurm job 27816074, lr7, source = commit 753d59a (copied to a scratch directory), 4 CPUs, 1 Julia thread
+
+=== plateau: exact rates [dlnA1, dlnA2, db, dj]/dτ = [1.1533699927084887e-15, 2.3578292821911753e-10, -5.2874197856508756e-17, -1.8311681427451762e-16]
+     eps   dist(max) dist(scaled) |   err dlnA1   err dlnA2      err db      err dj
+   1e-10   5.037e-10   1.193e-09 |   6.938e-24   1.577e-20   0.000e+00   0.000e+00
+   1e-09   4.946e-09   1.183e-08 |   6.928e-23   1.544e-19   0.000e+00   0.000e+00
+   1e-08   4.937e-08   1.181e-07 |   6.927e-22   1.542e-18   0.000e+00   0.000e+00
+   1e-07   4.936e-07   1.181e-06 |   6.927e-21   1.542e-17   0.000e+00   0.000e+00
+   1e-06   4.936e-06   1.181e-05 |   6.927e-20   1.542e-16   0.000e+00   0.000e+00
+   noise   1.044e-11   1.162e-11 |  -1.520e-23  -2.296e-21   6.735e-25   2.272e-24   (noise: re-converged at tol 1e-10)
+   1e-05   4.936e-05   1.181e-04 |   6.927e-19   1.542e-15   0.000e+00   0.000e+00
+   1e-04   4.936e-04   1.181e-03 |   6.927e-18   1.542e-14   0.000e+00   0.000e+00
+   1e-03   4.936e-03   1.183e-02 |   6.931e-17   1.542e-13   0.000e+00   0.000e+00
+
+=== transition: exact rates [dlnA1, dlnA2, db, dj]/dτ = [-4.3919139790068427e-11, 1.1635759682939087e-10, 9.247389969160778e-13, 1.96308476841636e-12]
+     eps   dist(max) dist(scaled) |   err dlnA1   err dlnA2      err db      err dj
+   1e-10   4.890e-10   1.180e-09 |  -1.250e-19  -1.441e-19   0.000e+00   0.000e+00
+   1e-09   4.891e-09   1.179e-08 |  -1.248e-18  -1.658e-18   0.000e+00   0.000e+00
+   1e-08   4.891e-08   1.179e-07 |  -1.248e-17  -1.648e-17   0.000e+00   0.000e+00
+   1e-07   4.891e-07   1.179e-06 |  -1.249e-16  -1.646e-16   0.000e+00   0.000e+00
+   1e-06   4.891e-06   1.179e-05 |  -1.249e-15  -1.646e-15   0.000e+00   0.000e+00
+   noise   8.882e-16   1.054e-15 |  -5.353e-23  -3.577e-21  -6.058e-28  -1.616e-27   (noise: re-converged at tol 1e-10)
+   1e-05   4.891e-05   1.179e-04 |  -1.249e-14  -1.646e-14   0.000e+00   0.000e+00
+   1e-04   4.891e-04   1.179e-03 |  -1.249e-13  -1.646e-13   0.000e+00   0.000e+00
+   1e-03   4.891e-03   1.181e-02 |  -1.249e-12  -1.646e-12   0.000e+00   0.000e+00
+
+=== nonlinear: exact rates [dlnA1, dlnA2, db, dj]/dτ = [-1.565351969375259e-10, 1.2337837622363125e-12, 4.790901821121718e-15, -1.5677735979828334e-14]
+     eps   dist(max) dist(scaled) |   err dlnA1   err dlnA2      err db      err dj
+   1e-10   1.188e-09   2.098e-09 |  -2.106e-20  -8.395e-22   0.000e+00   0.000e+00
+   1e-09   1.189e-08   2.101e-08 |  -2.113e-19  -8.207e-21   0.000e+00   0.000e+00
+   1e-08   1.189e-07   2.101e-07 |  -2.116e-18  -8.165e-20   0.000e+00   0.000e+00
+   1e-07   1.189e-06   2.101e-06 |  -2.116e-17  -8.162e-19   0.000e+00   0.000e+00
+   1e-06   1.189e-05   2.101e-05 |  -2.116e-16  -8.161e-18   0.000e+00   0.000e+00
+   noise   4.896e-12   5.055e-12 |   2.425e-22  -1.813e-23  -1.118e-26  -6.779e-26   (noise: re-converged at tol 1e-10)
+   1e-05   1.189e-04   2.101e-04 |  -2.116e-15  -8.161e-17   0.000e+00   0.000e+00
+   1e-04   1.189e-03   2.101e-03 |  -2.116e-14  -8.162e-16   0.000e+00   0.000e+00
+   1e-03   1.189e-02   2.103e-02 |  -2.117e-13  -8.164e-15   0.000e+00   0.000e+00
+┌ Warning: solve_radial did not converge: |F| = 2.4623264967728668e-12 after 5 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim-speedup/newton/work/pkg_v7/src/bvp.jl:667
+┌ Warning: solve_radial did not converge: |F| = 2.0203368247752715e-12 after 5 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim-speedup/newton/work/pkg_v7/src/bvp.jl:667
+┌ Warning: solve_radial did not converge: |F| = 1.3403522174517432e-12 after 4 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim-speedup/newton/work/pkg_v7/src/bvp.jl:667
+┌ Warning: solve_radial did not converge: |F| = 2.8768386831986545e-12 after 4 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim-speedup/newton/work/pkg_v7/src/bvp.jl:667
+┌ Warning: solve_radial did not converge: |F| = 2.0842927507502397e-12 after 4 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim-speedup/newton/work/pkg_v7/src/bvp.jl:667
+┌ Warning: solve_radial did not converge: |F| = 1.5408484394793137e-12 after 8 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim-speedup/newton/work/pkg_v7/src/bvp.jl:667

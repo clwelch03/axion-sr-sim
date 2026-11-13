@@ -491,6 +491,7 @@ unchanged; only the conditioning and the convergence test change.
 struct NewtonScaling
     row::Vector{Float64}
     column::Vector{Float64}
+    layout::UnknownLayout
 end
 
 function NewtonScaling(problem::RadialProblem, layout::UnknownLayout, mode_frequencies::AbstractVector)
@@ -506,8 +507,11 @@ function NewtonScaling(problem::RadialProblem, layout::UnknownLayout, mode_frequ
         end
         row[outer_rows(layout)[reals]] .= 1 / envelopes[end, channel]
     end
-    return NewtonScaling(row, column)
+    return NewtonScaling(row, column, layout)
 end
+
+"""Factorization method used by `ScaledFactorization` when none is given (`:block` or `:sparse_lu`)."""
+const DEFAULT_FACTORIZATION_METHOD = Ref(:block)
 
 """
     ScaledFactorization
@@ -516,14 +520,28 @@ LU factorization of the scaled Jacobian `D_r J D_c` with its weights;
 `factorization \\ b` returns `J⁻¹ b` in unscaled variables, so the implicit-
 function solves (`amplitude_response`, `background_charge_derivatives`) use the
 well-conditioned system without knowing about the scaling.
+
+`ScaledFactorization(jacobian, scaling; method)` factorises with the block
+elimination of `BlockFactorization` (`method=:block`, which needs the Jacobian structure of
+`scaling.layout`) or with the general sparse LU (`method=:sparse_lu`, UMFPACK, kept as the reference).
+The default `method` is `DEFAULT_FACTORIZATION_METHOD[]`, which validation scripts set to compare the two.
 """
 struct ScaledFactorization{F}
     factorization::F
     scaling::NewtonScaling
 end
 
-ScaledFactorization(jacobian::AbstractMatrix, scaling::NewtonScaling) =
-    ScaledFactorization(lu(Diagonal(scaling.row) * jacobian * Diagonal(scaling.column)), scaling)
+function ScaledFactorization(jacobian::AbstractMatrix, scaling::NewtonScaling;
+                            method::Symbol=DEFAULT_FACTORIZATION_METHOD[])
+    if method == :block
+        factors = BlockFactorization(sparse(jacobian), scaling.layout, scaling.row, scaling.column)
+    elseif method == :sparse_lu
+        factors = lu(Diagonal(scaling.row) * jacobian * Diagonal(scaling.column))
+    else
+        throw(ArgumentError("unknown factorization method $method; use :block or :sparse_lu"))
+    end
+    return ScaledFactorization(factors, scaling)
+end
 
 Base.:\(scaled::ScaledFactorization, right_hand_side::AbstractVecOrMat) =
     scaled.scaling.column .* (scaled.factorization \ (scaled.scaling.row .* right_hand_side))

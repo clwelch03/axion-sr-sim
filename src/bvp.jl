@@ -148,30 +148,35 @@ function NodeWorkspace{T}(problem::RadialProblem) where {T}
                                   zeros(T, n_state, n_frequency_reals))
 end
 
+"""Number of tasks `_foreach_in_chunks` uses for `count` indices (at most `chunks_per_thread` per Julia thread)."""
+_chunk_count(count::Int; chunks_per_thread=4) = Threads.nthreads() == 1 ? 1 : max(1, min(chunks_per_thread * Threads.nthreads(), count))
+
 """
-    _foreach_in_chunks(body, indices, make_workspace; chunks_per_thread=4)
+    _foreach_in_chunks(body, indices, make_workspace; chunks_per_thread=4, workspaces=nothing)
 
 Call `body(workspace, index)` for every index. The indices are split into
 contiguous chunks (`chunks_per_thread` per Julia thread, so that threads busy
 with other tasks do not hold up the rest), run as parallel tasks; each task
-gets its own workspace from `make_workspace()`. `body` must write only to
-storage owned by its index, so the result does not depend on the number of
-threads.
+gets its own workspace, `workspaces[chunk]` when a vector of at least
+`_chunk_count(length(indices))` workspaces is given (reused across calls by
+the caller; every kernel overwrites what it reads), else from `make_workspace()`.
+`body` must write only to storage owned by its index, so the result does not
+depend on the number of threads.
 """
-function _foreach_in_chunks(body, indices, make_workspace; chunks_per_thread=4)
-    n_tasks = Threads.nthreads() == 1 ? 1 : min(chunks_per_thread * Threads.nthreads(), length(indices))
+function _foreach_in_chunks(body, indices, make_workspace; chunks_per_thread=4, workspaces=nothing)
+    n_tasks = _chunk_count(length(indices); chunks_per_thread)
+    workspace_of(chunk_index) = workspaces === nothing ? make_workspace() : workspaces[chunk_index]
     if n_tasks ≤ 1
-        _run_chunk(body, indices, make_workspace)
+        _run_chunk(body, indices, workspace_of(1))
     else
         chunks = Iterators.partition(indices, cld(length(indices), n_tasks))
-        foreach(wait, [Threads.@spawn(_run_chunk(body, chunk, make_workspace)) for chunk in chunks])
+        foreach(wait, [Threads.@spawn(_run_chunk(body, chunk, workspace_of(chunk_index))) for (chunk_index, chunk) in enumerate(chunks)])
     end
     return nothing
 end
 
-"""Run `body(workspace, index)` over one chunk of indices with a fresh workspace (a function of its own, so that tasks share no local variables)."""
-function _run_chunk(body, chunk, make_workspace)
-    workspace = make_workspace()
+"""Run `body(workspace, index)` over one chunk of indices (a function of its own, so that tasks share no local variables)."""
+function _run_chunk(body, chunk, workspace)
     for index in chunk
         body(workspace, index)
     end
@@ -337,7 +342,7 @@ function boundary_residual(problem::RadialProblem, layout::UnknownLayout, side::
 end
 
 """
-    residual!(result, problem, layout, unknowns, amplitudes, scale)
+    residual!(result, problem, layout, unknowns, amplitudes, scale; node_workspaces=nothing)
 
 Full residual vector of the discretised boundary-value problem, written into
 `result`. Node right-hand sides and interval relations are evaluated in
@@ -345,9 +350,11 @@ parallel over the Julia threads (`_foreach_in_chunks`), concurrently with the
 boundary rows; every entry is computed by the same arithmetic whatever the
 thread count. Works for dual-number
 unknowns, amplitudes or problems (background, mass coupling, mesh offsets).
+`node_workspaces` (`_node_workspaces`, element type matching `result`) are
+reused instead of allocating one `NodeWorkspace` per task.
 """
 function residual!(result::AbstractVector, problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector,
-                   amplitudes::AbstractVector, scale)
+                   amplitudes::AbstractVector, scale; node_workspaces=nothing)
     T = eltype(result)
     parameter_block = unknowns[parameter_range(layout)]
     frequencies = component_frequencies(problem.mode_set, _complexify(parameter_block[frequency_range(layout)]))
@@ -360,11 +367,11 @@ function residual!(result::AbstractVector, problem::RadialProblem, layout::Unkno
     end
     make_workspace() = NodeWorkspace{T}(problem)
     _with_concurrent_task(boundary_task) do
-        _foreach_in_chunks(1:layout.n_nodes, make_workspace) do workspace, node
+        _foreach_in_chunks(1:layout.n_nodes, make_workspace; workspaces=node_workspaces) do workspace, node
             rhs_block!(view(node_rhs, :, node), workspace, problem, problem.mesh.offsets[node],
                        view(unknowns, node_range(layout, node)), frequencies, scale)
         end
-        _foreach_in_chunks(1:layout.n_nodes-1, make_workspace) do workspace, interval
+        _foreach_in_chunks(1:layout.n_nodes-1, make_workspace; workspaces=node_workspaces) do workspace, interval
             interval_residual!(view(result, interval_rows(layout, interval)), workspace, problem, interval,
                                view(unknowns, node_range(layout, interval)), view(unknowns, node_range(layout, interval + 1)),
                                view(node_rhs, :, interval), view(node_rhs, :, interval + 1), frequencies, scale)
@@ -374,15 +381,24 @@ function residual!(result::AbstractVector, problem::RadialProblem, layout::Unkno
 end
 
 """
-    residual(problem, layout, unknowns, amplitudes, scale)
+    residual(problem, layout, unknowns, amplitudes, scale; node_workspaces=nothing)
 
 Full residual vector of the discretised boundary-value problem (see `residual!`).
 """
 function residual(problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector,
-                  amplitudes::AbstractVector, scale)
+                  amplitudes::AbstractVector, scale; node_workspaces=nothing)
     result = zeros(promote_type(eltype(unknowns), eltype(amplitudes), typeof(problem.mass_coupling)), n_unknowns(layout))
-    return residual!(result, problem, layout, unknowns, amplitudes, scale)
+    return residual!(result, problem, layout, unknowns, amplitudes, scale; node_workspaces)
 end
+
+"""
+    _node_workspaces(problem, layout, T=Float64)
+
+One `NodeWorkspace{T}` per task of `_foreach_in_chunks` over the mesh nodes, for reuse by successive `residual!`
+and `jacobian_blocks!` calls of one solve (one call at a time).
+"""
+_node_workspaces(problem::RadialProblem, layout::UnknownLayout, ::Type{T}=Float64) where {T} =
+    [NodeWorkspace{T}(problem) for _ in 1:_chunk_count(layout.n_nodes)]
 
 # --- Jacobian -----------------------------------------------------------------
 
@@ -714,16 +730,16 @@ function JacobianPattern(layout::UnknownLayout)
 end
 
 """
-    jacobian_blocks!(workspace, problem, layout, unknowns, amplitudes, scale)
+    jacobian_blocks!(workspace, problem, layout, unknowns, amplitudes, scale; node_workspaces=nothing)
 
 Fill `workspace.blocks` (`JacobianBlocks`) with the Jacobian of `residual` at
 `unknowns` and return them. Node derivatives and interval blocks are computed
 in parallel over the Julia threads, concurrently with the boundary blocks (one
 task per component); each block entry is computed by the same arithmetic
-whatever the thread count.
+whatever the thread count. `node_workspaces` as in `residual!`.
 """
 function jacobian_blocks!(workspace::JacobianWorkspace, problem::RadialProblem, layout::UnknownLayout,
-                          unknowns::AbstractVector, amplitudes::AbstractVector, scale)
+                          unknowns::AbstractVector, amplitudes::AbstractVector, scale; node_workspaces=nothing)
     mesh, blocks = problem.mesh, workspace.blocks
     parameter_block = unknowns[parameter_range(layout)]
     frequencies = component_frequencies(problem.mode_set, _complexify(parameter_block[frequency_range(layout)]))
@@ -738,13 +754,13 @@ function jacobian_blocks!(workspace::JacobianWorkspace, problem::RadialProblem, 
     end
     make_workspace() = NodeWorkspace{Float64}(problem)
     _with_concurrent_task(boundary_task) do
-        _foreach_in_chunks(1:layout.n_nodes, make_workspace) do node_workspace, node
+        _foreach_in_chunks(1:layout.n_nodes, make_workspace; workspaces=node_workspaces) do node_workspace, node
             block = view(unknowns, node_range(layout, node))
             rhs_block!(view(node_rhs, :, node), node_workspace, problem, mesh.offsets[node], block, frequencies, scale)
             rhs_derivatives!(view(node_wrt_state, :, :, node), view(node_wrt_frequencies, :, :, node), node_workspace, problem,
                              mesh.offsets[node], block, frequencies, scale)
         end
-        _foreach_in_chunks(1:layout.n_nodes-1, make_workspace) do node_workspace, interval
+        _foreach_in_chunks(1:layout.n_nodes-1, make_workspace; workspaces=node_workspaces) do node_workspace, interval
             left, right = interval, interval + 1
             interval_jacobian!(view(blocks.wrt_left, :, :, interval), view(blocks.wrt_right, :, :, interval),
                                view(blocks.wrt_frequencies, :, :, interval), node_workspace, problem, interval,
@@ -980,7 +996,9 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
                       tol=1e-10, floor_tol=tol, maxiter=30, verbose=false, reuse_factorization=true, chord_threshold=1e-3)
     layout = UnknownLayout(problem)
     scale = maximum(amplitudes)
-    start = _newton_start(problem, layout, amplitudes, scale, guess, guess_change; reuse_factorization, chord_threshold, verbose)
+    node_workspaces = _node_workspaces(problem, layout)   # reused by every residual and Jacobian of this solve
+    start = _newton_start(problem, layout, amplitudes, scale, guess, guess_change, node_workspaces; reuse_factorization,
+                          chord_threshold, verbose)
     scaling, unknowns, current, current_norm = start.scaling, start.unknowns, start.residual, start.residual_norm
     factorization, factorization_distance, factorization_scale = start.factorization, start.distance, start.factorization_scale
     assembly = nothing   # Jacobian workspace, built when the first Jacobian is needed and reused
@@ -990,11 +1008,12 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
         chord = factorization !== nothing
         if !chord
             assembly === nothing && (assembly = JacobianWorkspace(problem, layout))
-            factorization = _factorised_jacobian(assembly, problem, layout, unknowns, amplitudes, scale, scaling)
+            factorization = _factorised_jacobian(assembly, problem, layout, unknowns, amplitudes, scale, scaling, node_workspaces)
             factorization_distance, factorization_scale = 0.0, float(scale)
         end
         step = _rescale_frequency_step!(-(factorization \ current), layout, scale / factorization_scale)
-        search = _line_search(problem, layout, amplitudes, scale, scaling, unknowns, current, current_norm, step, chord, tol, floor_tol)
+        search = _line_search(problem, layout, amplitudes, scale, scaling, unknowns, current, current_norm, step, chord, tol, floor_tol,
+                              node_workspaces)
         if search.floor_action == :refactorise
             verbose && println("  chord step $iteration does not reduce |F| = $current_norm; refactorising")
             factorization = nothing
@@ -1036,7 +1055,7 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
     # where they are at the noise floor of the converged solution itself.
     if factorization === nothing || factorization_distance > tol / 10
         assembly === nothing && (assembly = JacobianWorkspace(problem, layout))
-        factorization = _factorised_jacobian(assembly, problem, layout, unknowns, amplitudes, scale, scaling)
+        factorization = _factorised_jacobian(assembly, problem, layout, unknowns, amplitudes, scale, scaling, node_workspaces)
     end
     parameters = RadialParameters(layout, unknowns[parameter_range(layout)], amplitudes, scale)
     RadialSolution(problem, layout, collect(float.(amplitudes)), float(scale), unknowns, parameters, factorization,
@@ -1044,7 +1063,8 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
 end
 
 """
-    _newton_start(problem, layout, amplitudes, scale, guess, guess_change; reuse_factorization, chord_threshold, verbose)
+    _newton_start(problem, layout, amplitudes, scale, guess, guess_change, node_workspaces; reuse_factorization, chord_threshold,
+                  verbose)
 
 Starting point of `solve_radial`: the `NewtonScaling` (from the starting frequencies), the starting unknowns, their
 residual and its scaled max norm, and the factorisation to start from (the guess's, for a warm start with a residual
@@ -1052,17 +1072,18 @@ below `chord_threshold`, else `nothing`) with its max-norm `distance` from the s
 amplitudes are the guess's own, `Inf` otherwise) and the unknowns' reference scale where it was taken. A predicted
 start (`guess_change`) with a residual above `chord_threshold` is replaced by the plain warm start if that is closer.
 """
-function _newton_start(problem::RadialProblem, layout::UnknownLayout, amplitudes::AbstractVector, scale, guess, guess_change;
+function _newton_start(problem::RadialProblem, layout::UnknownLayout, amplitudes::AbstractVector, scale, guess, guess_change,
+                       node_workspaces;
                        reuse_factorization::Bool, chord_threshold, verbose::Bool)
     warm = guess isa RadialSolution && length(guess.unknowns) == n_unknowns(layout)
     predicted = warm && guess_change !== nothing && any(!iszero, guess_change)
     unknowns = warm ? warm_start_unknowns(guess, scale; change=guess_change) : initial_unknowns(problem, layout, amplitudes, scale)
     scaling = _starting_scaling(problem, layout, unknowns)
-    current = residual(problem, layout, unknowns, amplitudes, scale)
+    current = residual(problem, layout, unknowns, amplitudes, scale; node_workspaces)
     current_norm = _weighted_max_norm(current, scaling.row, *)
     if predicted && current_norm ≥ chord_threshold
         plain = warm_start_unknowns(guess, scale)
-        plain_residual = residual(problem, layout, plain, amplitudes, scale)
+        plain_residual = residual(problem, layout, plain, amplitudes, scale; node_workspaces)
         if _weighted_max_norm(plain_residual, scaling.row, *) < current_norm
             verbose && println("  prediction |F| = $current_norm worse than the plain warm start; using the latter")
             # The scaling follows the start that is used, not the rejected prediction's frequencies.
@@ -1082,7 +1103,8 @@ _starting_scaling(problem::RadialProblem, layout::UnknownLayout, unknowns::Abstr
     NewtonScaling(problem, layout, _complexify(unknowns[parameter_range(layout)][frequency_range(layout)]))
 
 """
-    _line_search(problem, layout, amplitudes, scale, scaling, unknowns, current, current_norm, step, chord, tol, floor_tol)
+    _line_search(problem, layout, amplitudes, scale, scaling, unknowns, current, current_norm, step, chord, tol, floor_tol,
+                 node_workspaces)
 
 Backtracking line search on the scaled residual norm along `step` (Armijo condition with factor `1e-4`, halving the
 damping down to `1e-4`; when that is exhausted the last trial is returned). A full step that does not reduce the
@@ -1091,11 +1113,11 @@ the trial unknowns, residual, scaled norm, the damping of that trial and the flo
 """
 function _line_search(problem::RadialProblem, layout::UnknownLayout, amplitudes::AbstractVector, scale, scaling::NewtonScaling,
                       unknowns::AbstractVector, current::AbstractVector, current_norm, step::AbstractVector, chord::Bool, tol,
-                      floor_tol)
+                      floor_tol, node_workspaces)
     damping, floor_action = 1.0, nothing
     while true
         trial = unknowns .+ damping .* step
-        trial_residual = residual(problem, layout, trial, amplitudes, scale)
+        trial_residual = residual(problem, layout, trial, amplitudes, scale; node_workspaces)
         trial_norm = _weighted_max_norm(trial_residual, scaling.row, *)
         accepted = trial_norm ≤ (1 - 1e-4damping) * current_norm
         if !accepted && damping == 1
@@ -1131,8 +1153,8 @@ end
 
 """Scaled factorisation of the Jacobian at `unknowns`, assembled in `workspace` and factorised from its blocks."""
 _factorised_jacobian(workspace::JacobianWorkspace, problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector,
-                     amplitudes::AbstractVector, scale, scaling::NewtonScaling) =
-    ScaledFactorization(jacobian_blocks!(workspace, problem, layout, unknowns, amplitudes, scale), scaling)
+                     amplitudes::AbstractVector, scale, scaling::NewtonScaling, node_workspaces) =
+    ScaledFactorization(jacobian_blocks!(workspace, problem, layout, unknowns, amplitudes, scale; node_workspaces), scaling)
 
 """
     _rescale_frequency_step!(step, layout, scale_ratio)

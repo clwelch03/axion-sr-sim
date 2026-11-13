@@ -141,6 +141,15 @@ end
     analytic = AC.nonlinear_source_jacobian(quadrature, potential, background, 0.3, s, profiles)
     @test AC._realify(vec(analytic.wrt_real)) ≈ vec(autodiff[:, 1:2:end]) rtol=1e-12
     @test AC._realify(vec(analytic.wrt_imag)) ≈ vec(autodiff[:, 2:2:end]) rtol=1e-12
+    # Dual-number source (value from the plain kernel, partials analytic): along a profile direction it must equal
+    # the source Jacobian applied to that direction, and through the offset a central difference.
+    direction = randn(ComplexF64, length(profiles))
+    along_profiles = ForwardDiff.derivative(e -> nonlinear_source(quadrature, potential, background, 0.3, s, profiles .+ e .* direction), 0.0)
+    @test along_profiles ≈ analytic.wrt_real * real.(direction) .+ analytic.wrt_imag * imag.(direction) rtol=1e-12
+    along_offset = ForwardDiff.derivative(offset -> nonlinear_source(quadrature, potential, background, 0.3, offset, profiles), s)
+    step = 1e-4
+    @test along_offset ≈ (nonlinear_source(quadrature, potential, background, 0.3, s + step, profiles) .-
+                          nonlinear_source(quadrature, potential, background, 0.3, s - step, profiles)) ./ 2step rtol=1e-7
 end
 
 @testset "Asymptotic series satisfy the radial equation" begin

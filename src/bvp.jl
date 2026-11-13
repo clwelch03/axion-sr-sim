@@ -123,8 +123,8 @@ midpoint with respect to the left node, the right node and the frequencies.
 The element type `T` may be a dual number (residual only). One workspace
 serves one task at a time.
 """
-struct NodeWorkspace{T<:Number}
-    rhs::RhsWorkspace{T}
+struct NodeWorkspace{T<:Number, R<:RhsWorkspace{T}}
+    rhs::R
     profiles::Vector{Complex{T}}
     slopes::Vector{Complex{T}}
     profile_rates::Vector{Complex{T}}
@@ -141,9 +141,11 @@ function NodeWorkspace{T}(problem::RadialProblem) where {T}
     n_chan, n_frequency_reals = n_channels(problem), 2n_modes(problem)
     n_state = 4n_chan
     complex_buffer() = zeros(Complex{T}, n_chan)
-    NodeWorkspace{T}(RhsWorkspace{T}(problem), complex_buffer(), complex_buffer(), complex_buffer(), complex_buffer(),
-                     zeros(T, n_state), zeros(T, n_state), zeros(T, n_state, n_state), zeros(T, n_state, n_frequency_reals),
-                     zeros(T, n_state, n_state), zeros(T, n_state, n_frequency_reals))
+    rhs = RhsWorkspace{T}(problem)
+    NodeWorkspace{T, typeof(rhs)}(rhs, complex_buffer(), complex_buffer(), complex_buffer(), complex_buffer(),
+                                  zeros(T, n_state), zeros(T, n_state), zeros(T, n_state, n_state),
+                                  zeros(T, n_state, n_frequency_reals), zeros(T, n_state, n_state),
+                                  zeros(T, n_state, n_frequency_reals))
 end
 
 """

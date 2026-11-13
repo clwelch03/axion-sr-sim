@@ -105,23 +105,65 @@ Scratch arrays for the in-place field kernels at one radial node (element type
 `component_values = [Re F; Im F][component, polar node]`, the field
 `Φ[point, polar node]`, a grid function of the field (`h(Φ)`, `h′(Φ)` or
 `U(Φ)`), its stacked phase projection `[Re; Im] ⟨e^{+i q·ξ} h⟩[component, polar node]`,
-the stacked Fourier coefficients `[Re; Im] ĥ′(k)[slot, polar node]`, and the polar
-weights `w ρ²`. One workspace serves one task at a time.
+the stacked Fourier coefficients `[Re; Im] ĥ′(k)[slot, polar node]`, the polar
+weights `w ρ²`, and, when `T` is a ForwardDiff dual number, a `DualSourceScratch`
+for `nonlinear_source!` (`nothing` otherwise). One workspace serves one task at a time.
 """
-struct FieldWorkspace{T<:Number}
+struct FieldWorkspace{T<:Number, S}
     component_values::Matrix{T}
     field::Matrix{T}
     grid_values::Matrix{T}
     projected::Matrix{T}
     fourier_coefficients::Matrix{T}
     polar_weights::Vector{T}
+    dual_scratch::S
 end
+
+"""
+    DualSourceScratch
+
+Scratch arrays for `nonlinear_source!` on dual numbers with value type `V` and
+`n_partials` partials: a value-type `FieldWorkspace` and the value profiles and
+source; the partial profiles of one direction; the stacked component profiles,
+field perturbations and their projections of all directions side by side
+(`n_polar` columns per direction); `h′(Φ)` on the grid; and the partials of the
+source (`[channel, direction]`, real and imaginary parts).
+"""
+struct DualSourceScratch{V<:Real, W<:FieldWorkspace{V}}
+    plain::W
+    plain_profiles::Vector{Complex{V}}
+    plain_source::Vector{Complex{V}}
+    partial_profiles::Vector{Complex{V}}
+    partial_components::Matrix{V}
+    partial_field::Matrix{V}
+    partial_projected::Matrix{V}
+    slope::Matrix{V}
+    source_partials_real::Matrix{V}
+    source_partials_imag::Matrix{V}
+end
+
+function DualSourceScratch{V}(quadrature::FieldQuadrature, n_partials::Int) where {V}
+    n_polar, n_stacked = length(quadrature.angular.x), 2n_components(quadrature.mode_set)
+    n_grid, n_chan = n_points(quadrature.phase), n_channels(quadrature.mode_set)
+    complex_buffer() = zeros(Complex{V}, n_chan)
+    plain = FieldWorkspace{V}(quadrature)
+    DualSourceScratch{V, typeof(plain)}(plain, complex_buffer(), complex_buffer(), complex_buffer(),
+                                        zeros(V, n_stacked, n_polar * n_partials), zeros(V, n_grid, n_polar * n_partials),
+                                        zeros(V, n_stacked, n_polar * n_partials), zeros(V, n_grid, n_polar),
+                                        zeros(V, n_chan, n_partials), zeros(V, n_chan, n_partials))
+end
+
+_dual_scratch(::Type, quadrature::FieldQuadrature) = nothing
+_dual_scratch(::Type{ForwardDiff.Dual{Tag, V, N}}, quadrature::FieldQuadrature) where {Tag, V, N} =
+    DualSourceScratch{V}(quadrature, N)
 
 function FieldWorkspace{T}(quadrature::FieldQuadrature) where {T}
     n_polar, n_stacked = length(quadrature.angular.x), 2n_components(quadrature.mode_set)
     n_grid = n_points(quadrature.phase)
-    FieldWorkspace{T}(zeros(T, n_stacked, n_polar), zeros(T, n_grid, n_polar), zeros(T, n_grid, n_polar),
-                      zeros(T, n_stacked, n_polar), zeros(T, 2n_slots(quadrature.phase), n_polar), zeros(T, n_polar))
+    dual_scratch = _dual_scratch(T, quadrature)
+    FieldWorkspace{T, typeof(dual_scratch)}(zeros(T, n_stacked, n_polar), zeros(T, n_grid, n_polar), zeros(T, n_grid, n_polar),
+                                            zeros(T, n_stacked, n_polar), zeros(T, 2n_slots(quadrature.phase), n_polar),
+                                            zeros(T, n_polar), dual_scratch)
 end
 
 """
@@ -221,6 +263,10 @@ In-place `nonlinear_source`: writes `N_{l,q}` of every channel into `source`
 """
 function nonlinear_source!(source::AbstractVector, workspace::FieldWorkspace, quadrature::FieldQuadrature,
                            potential::AxionPotential, background::KerrBackground, mass_coupling, s, profiles::AbstractVector)
+    if workspace.dual_scratch !== nothing && _single_dual_type(eltype(workspace.field), real(eltype(profiles)),
+                                                               typeof(mass_coupling), typeof(s), typeof(background.a))
+        return _dual_nonlinear_source!(source, workspace, quadrature, potential, background, mass_coupling, s, profiles)
+    end
     mode_set, harmonics = quadrature.mode_set, quadrature.angular.harmonics
     n_comp = n_components(mode_set)
     field = reconstruct_field!(workspace, quadrature, profiles)
@@ -242,6 +288,97 @@ end
 
 nonlinear_source!(source::AbstractVector, ::FieldWorkspace, ::FieldQuadrature, ::FreePotential, ::KerrBackground,
                   mass_coupling, s, profiles::AbstractVector) = fill!(source, zero(eltype(source)))
+
+"""Whether every one of `types` is either the dual type `D` or not a dual number (no nested or mixed tags)."""
+_single_dual_type(D::Type, types::Type...) = all(type -> type == D || !(type <: ForwardDiff.Dual), types)
+
+_value(x::ForwardDiff.Dual) = ForwardDiff.value(x)
+_value(x::Real) = x
+_value(z::Complex) = complex(_value(real(z)), _value(imag(z)))
+_partial(x::ForwardDiff.Dual, direction::Int) = ForwardDiff.partials(x)[direction]
+_partial(x::Real, direction::Int) = zero(x)
+_partial(z::Complex, direction::Int) = complex(_partial(real(z), direction), _partial(imag(z), direction))
+
+"""
+    _dual_nonlinear_source!(source, workspace, quadrature, potential, background, α, s, profiles)
+
+`nonlinear_source!` for ForwardDiff dual numbers of one type `D` (any of the
+profiles, background, `α` and `s` may be plain numbers instead). With
+`N_c = α² Σ_x w ρ² Ỹ_c P_c(x)` and `P = ⟨e^{+iq·ξ} h(Φ)⟩`, the value comes from
+the plain kernel at the values, and each partial is
+
+    ∂N_c = ∂(α² w ρ²) terms at fixed P  +  α² Σ_x w ρ² Ỹ_c ⟨e^{+iq·ξ} h′(Φ) ∂Φ⟩,
+
+where `∂Φ` is the field of the partial profiles. All partial directions go
+through two real matrix products (synthesis and analysis) side by side.
+Directions are skipped when no profile carries partials.
+"""
+function _dual_nonlinear_source!(source::AbstractVector{Complex{D}}, workspace::FieldWorkspace, quadrature::FieldQuadrature,
+                                 potential::AxionPotential, background::KerrBackground, mass_coupling, s,
+                                 profiles::AbstractVector) where {D<:ForwardDiff.Dual}
+    mode_set, grid, phase = quadrature.mode_set, quadrature.angular, quadrature.phase
+    n_comp, n_polar, n_partials = n_components(mode_set), length(grid.x), ForwardDiff.npartials(D)
+    scratch = workspace.dual_scratch
+    plain = scratch.plain
+    scratch.plain_profiles .= _value.(profiles)
+    plain_coupling, plain_offset = _value(mass_coupling), _value(s)
+    nonlinear_source!(scratch.plain_source, plain, quadrature, potential, KerrBackground(_value(background.a)),
+                      plain_coupling, plain_offset, scratch.plain_profiles)
+    projected, plain_weights = plain.projected, plain.polar_weights    # P at the values, w ρ² at the values
+
+    # Partials from α² and w ρ² at fixed P (zero unless the background, α or s are dual).
+    partials_real, partials_imag = scratch.source_partials_real, scratch.source_partials_imag
+    dual_weights = _polar_weights!(workspace, quadrature, background, s)
+    for channel in eachindex(source)
+        component_index = mode_set.channel_component[channel]
+        weighted_sum = zero(Complex{D})
+        for node in 1:n_polar
+            weighted_sum += dual_weights[node] * grid.harmonics[node, channel] *
+                            complex(projected[component_index, node], projected[n_comp + component_index, node])
+        end
+        explicit = weighted_sum * mass_coupling^2
+        for direction in 1:n_partials
+            partials_real[channel, direction] = _partial(real(explicit), direction)
+            partials_imag[channel, direction] = _partial(imag(explicit), direction)
+        end
+    end
+
+    # Partials through the profiles: ∂P = analysis * (h′(Φ) .* (synthesis * ∂G)) for all directions at once.
+    if any(profile -> any(direction -> !iszero(_partial(profile, direction)), 1:n_partials), profiles)
+        for direction in 1:n_partials
+            scratch.partial_profiles .= _partial.(profiles, direction)
+            columns = (direction - 1) * n_polar .+ (1:n_polar)
+            component_profiles!(view(scratch.partial_components, :, columns), quadrature, scratch.partial_profiles)
+        end
+        scratch.slope .= nonlinearity_derivative.(Ref(potential), plain.field)
+        mul!(scratch.partial_field, phase.synthesis, scratch.partial_components)
+        for direction in 1:n_partials
+            columns = (direction - 1) * n_polar .+ (1:n_polar)
+            view(scratch.partial_field, :, columns) .*= scratch.slope
+        end
+        mul!(scratch.partial_projected, phase.analysis, scratch.partial_field)
+        plain_coupling_squared = plain_coupling^2
+        for direction in 1:n_partials, channel in eachindex(source)
+            component_index = mode_set.channel_component[channel]
+            real_part = imag_part = zero(eltype(partials_real))
+            for node in 1:n_polar
+                column = (direction - 1) * n_polar + node
+                weighted_harmonic = plain_weights[node] * grid.harmonics[node, channel]
+                real_part += weighted_harmonic * scratch.partial_projected[component_index, column]
+                imag_part += weighted_harmonic * scratch.partial_projected[n_comp + component_index, column]
+            end
+            partials_real[channel, direction] += real_part * plain_coupling_squared
+            partials_imag[channel, direction] += imag_part * plain_coupling_squared
+        end
+    end
+
+    for channel in eachindex(source)
+        value = scratch.plain_source[channel]
+        source[channel] = complex(D(real(value), ForwardDiff.Partials(ntuple(k -> partials_real[channel, k], Val(n_partials)))),
+                                  D(imag(value), ForwardDiff.Partials(ntuple(k -> partials_imag[channel, k], Val(n_partials)))))
+    end
+    return source
+end
 
 """
     nonlinear_source(quadrature, potential, background, α, s, profiles)

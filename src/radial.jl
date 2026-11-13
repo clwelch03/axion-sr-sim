@@ -263,8 +263,8 @@ Scratch arrays for `radial_rhs!` and `rhs_derivatives!` at one radial point:
 a `FieldWorkspace`, the physical profiles `scale · R`, the nonlinear source and
 its Jacobian (element type `T`, possibly a dual number).
 """
-struct RhsWorkspace{T<:Number}
-    field::FieldWorkspace{T}
+struct RhsWorkspace{T<:Number, F<:FieldWorkspace{T}}
+    field::F
     physical_profiles::Vector{Complex{T}}
     source::Vector{Complex{T}}
     source_jacobian::NonlinearSourceJacobian{T}
@@ -272,8 +272,8 @@ end
 
 function RhsWorkspace{T}(problem::RadialProblem) where {T}
     n_chan = n_channels(problem)
-    RhsWorkspace{T}(FieldWorkspace{T}(problem.quadrature), zeros(Complex{T}, n_chan), zeros(Complex{T}, n_chan),
-                    NonlinearSourceJacobian{T}(n_chan))
+    field = FieldWorkspace{T}(problem.quadrature)
+    RhsWorkspace{T, typeof(field)}(field, zeros(Complex{T}, n_chan), zeros(Complex{T}, n_chan), NonlinearSourceJacobian{T}(n_chan))
 end
 
 """

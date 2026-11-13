@@ -45,6 +45,7 @@ function main(study, directories...; reference_label=nothing)
     states = unique(row["state"] for row in rows)
     println("| state | setting | nodes | ", join(first.(COLUMNS), " | "), " | amplitude-rate error / fastest rate | t(1 thr) s | t(8 thr) s | cost vs prod (1/8 thr) |")
     println("|", repeat("---|", 7 + length(COLUMNS)))
+    summary = Dict(label => (states=String[], rate=0.0, background=0.0, one=Float64[], eight=Float64[]) for label in labels)
     for state in states
         solved = Dict(row["label"] => row for row in rows if row["state"] == state && row["kind"] == "quantities")
         failed = Set(row["label"] for row in rows if row["state"] == state && row["kind"] == "failed")
@@ -66,9 +67,22 @@ function main(study, directories...; reference_label=nothing)
             rate_keys = ("dlnA211_dt", "dlnA322_dt")
             drift = maximum(abs(value(solved[label], key) - value(solved[reference], key)) for key in rate_keys) /
                     maximum(abs(value(solved[reference], key)) for key in rate_keys)
+            entry = summary[label]
+            summary[label] = (states=push!(entry.states, state), rate=max(entry.rate, drift), background=max(entry.background, changes[6], changes[7]),
+                              one=push!(entry.one, one / timing(PRODUCTION_LABEL, 1)), eight=push!(entry.eight, eight / timing(PRODUCTION_LABEL, 8)))
             println("| $state | $(short_label(label))$marker | $(solved[label]["nodes"]) | ", join(format_change.(changes), " | "),
                     " | ", format_change(drift), @sprintf(" | %.3f | %.3f | %s |", one, eight, ratio))
         end
+    end
+    println("\nSummary over states (largest change over the states listed; cost ratio to production, mean over those states):\n")
+    println("| setting | states | amplitude-rate error / fastest rate | db/dt, dj/dt (relative) | cost 1 thr | cost 8 thr |")
+    println("|---|---|---|---|---|---|")
+    mean_finite(values) = (finite = filter(isfinite, values); isempty(finite) ? NaN : sum(finite) / length(finite))
+    for label in labels
+        entry = summary[label]
+        isempty(entry.states) && continue
+        @printf("| %s | %d | %s | %s | %.2f | %.2f |\n", short_label(label), length(entry.states), format_change(entry.rate),
+                format_change(entry.background), mean_finite(entry.one), mean_finite(entry.eight))
     end
     segments = [row for row in rows if row["kind"] == "segment"]
     isempty(segments) && return
@@ -84,4 +98,4 @@ function main(study, directories...; reference_label=nothing)
     end
 end
 
-main(ARGS...)
+main(ARGS...; reference_label=get(ENV, "AUDIT_REFERENCE", nothing))   # AUDIT_REFERENCE: a full label to compare against

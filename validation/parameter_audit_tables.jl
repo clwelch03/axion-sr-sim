@@ -19,12 +19,19 @@ value(row, key) = parse(Float64, row[key])
 relative(x, reference) = abs(x - reference) / abs(reference)
 format_change(change) = change == 0 ? "0" : @sprintf("%.1e", change)
 
+"""The settings tokens of a label that differ from production (`n_phase` np, `n_polar` npol, step h, stretch sf, containment c, horizon ratio hr, max_order mo, n_angular na)."""
+function short_label(label)
+    label == PRODUCTION_LABEL && return "production"
+    tokens = [token for (token, production) in zip(split(label, "_"), split(PRODUCTION_LABEL, "_")) if token != production]
+    return join(tokens, " ")
+end
+
 function main(directory, study, reference_label=nothing)
     rows = read_rows(joinpath(directory, "$study.csv"))
     labels = unique(row["label"] for row in rows)
     states = unique(row["state"] for row in rows)
-    println("| state | setting | nodes | ", join(first.(COLUMNS), " | "), " | t(1 thr) s | t(8 thr) s | cost vs prod (1/8 thr) |")
-    println("|", repeat("---|", 6 + length(COLUMNS)))
+    println("| state | setting | nodes | ", join(first.(COLUMNS), " | "), " | Δ ln A per 10¹⁰ M | t(1 thr) s | t(8 thr) s | cost vs prod (1/8 thr) |")
+    println("|", repeat("---|", 7 + length(COLUMNS)))
     for state in states
         solved = Dict(row["label"] => row for row in rows if row["state"] == state && row["kind"] == "quantities")
         failed = Set(row["label"] for row in rows if row["state"] == state && row["kind"] == "failed")
@@ -34,16 +41,17 @@ function main(directory, study, reference_label=nothing)
         reference = something(reference_label, last(filter(label -> haskey(solved, label), labels)))
         for label in labels
             if label in failed && !haskey(solved, label)
-                println("| $state | $label | | failed |", repeat(" |", length(COLUMNS) + 2))
+                println("| $state | $(short_label(label)) | | failed |", repeat(" |", length(COLUMNS) + 3))
                 continue
             end
             haskey(solved, label) || continue
             changes = [maximum(relative(value(solved[label], key), value(solved[reference], key)) for key in keys) for (_, keys) in COLUMNS]
             one, eight = timing(label, 1), timing(label, 8)
             ratio = @sprintf("%.2f / %.2f", one / timing(PRODUCTION_LABEL, 1), eight / timing(PRODUCTION_LABEL, 8))
-            marker = label == reference ? " (ref)" : (label == PRODUCTION_LABEL ? " (prod)" : "")
-            println("| $state | $label$marker | $(solved[label]["nodes"]) | ", join(format_change.(changes), " | "),
-                    @sprintf(" | %.3f | %.3f | %s |", one, eight, ratio))
+            marker = label == reference ? " (ref)" : ""
+            drift = 1e10 * maximum(abs(value(solved[label], key) - value(solved[reference], key)) for key in ("dlnA211_dt", "dlnA322_dt"))
+            println("| $state | $(short_label(label))$marker | $(solved[label]["nodes"]) | ", join(format_change.(changes), " | "),
+                    " | ", format_change(drift), @sprintf(" | %.3f | %.3f | %s |", one, eight, ratio))
         end
     end
     segments = [row for row in rows if row["kind"] == "segment"]
@@ -55,7 +63,7 @@ function main(directory, study, reference_label=nothing)
     final(row) = [value(row, key) for key in ("Im_omega_322", "dlnA211_dt", "dlnA322_dt", "db_dt", "dj_dt")]
     for row in segments
         state, base = final(row)[2:5], final(reference_segment)[2:5]
-        @printf("| %s | %s | %.1e | %.1e | %.1e | %.1e | %.2f |\n", row["label"], row["Re_omega_211"], abs(state[1] - base[1]),
+        @printf("| %s | %s | %.1e | %.1e | %.1e | %.1e | %.2f |\n", short_label(row["label"]), row["Re_omega_211"], abs(state[1] - base[1]),
                 abs(state[2] - base[2]), relative(state[3], base[3]), relative(state[4], base[4]), value(row, "seconds"))
     end
 end

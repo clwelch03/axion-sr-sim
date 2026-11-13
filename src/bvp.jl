@@ -594,7 +594,7 @@ start of the parameter block). The horizon rows have `horizon_wrt_node`
 (node 1, the identity) and `horizon_wrt_parameters` (all parameter columns);
 the outer rows `outer_wrt_node` (last node, the identity) and
 `outer_wrt_parameters`. With `T = Int` the same struct holds the position of
-every entry in the `nzval` of the sparse matrix (`JacobianWorkspace`).
+every entry in the `nzval` of the sparse matrix (`JacobianPattern`).
 """
 struct JacobianBlocks{T<:Real}
     wrt_left::Array{T,3}
@@ -609,29 +609,54 @@ end
 _block_arrays(blocks::JacobianBlocks) = (blocks.wrt_left, blocks.wrt_right, blocks.wrt_frequencies, blocks.horizon_wrt_node,
                                          blocks.horizon_wrt_parameters, blocks.outer_wrt_node, blocks.outer_wrt_parameters)
 
+"""Array shapes of the seven `JacobianBlocks` fields, in field order."""
+function _block_shapes(layout::UnknownLayout)
+    n_state, n_frequency_reals, n_param = node_block_size(layout), 2layout.n_modes, n_parameters(layout)
+    n_intervals = layout.n_nodes - 1
+    return ((n_state, n_state, n_intervals), (n_state, n_state, n_intervals), (n_state, n_frequency_reals, n_intervals),
+            (n_state, n_state), (n_state, n_param), (n_state, n_state), (n_state, n_param))
+end
+
 """
     JacobianWorkspace(problem, layout=UnknownLayout(problem))
 
-Preallocated storage for Jacobian assembly: the `JacobianBlocks`, the
-right-hand sides and their derivatives at every node, and the sparse matrix
-whose pattern (fixed by the layout) is built once, with the `nzval` position of
-every block entry. Used by `jacobian!`; not safe to share between concurrent calls.
+Preallocated storage for Jacobian assembly: the `JacobianBlocks` and the
+right-hand sides and their derivatives at every node. Used by
+`jacobian_blocks!`; not safe to share between concurrent calls.
 """
 struct JacobianWorkspace
     layout::UnknownLayout
     blocks::JacobianBlocks{Float64}
-    positions::JacobianBlocks{Int}
     node_rhs::Matrix{Float64}
     node_wrt_state::Array{Float64,3}
     node_wrt_frequencies::Array{Float64,3}
-    matrix::SparseMatrixCSC{Float64,Int}
 end
 
 function JacobianWorkspace(problem::RadialProblem, layout::UnknownLayout=UnknownLayout(problem))
-    n_state, n_frequency_reals, n_param = node_block_size(layout), 2layout.n_modes, n_parameters(layout)
+    n_state, n_frequency_reals, n_nodes = node_block_size(layout), 2layout.n_modes, layout.n_nodes
+    blocks = JacobianBlocks{Float64}((zeros(shape) for shape in _block_shapes(layout))...)
+    JacobianWorkspace(layout, blocks, zeros(n_state, n_nodes), zeros(n_state, n_state, n_nodes),
+                      zeros(n_state, n_frequency_reals, n_nodes))
+end
+
+"""
+    JacobianPattern(layout)
+
+Sparsity pattern of the Jacobian, fixed by the layout: the column pointers and
+row indices of a `SparseMatrixCSC` holding exactly the `JacobianBlocks`
+entries, and the `nzval` position of every block entry (`JacobianBlocks{Int}`).
+Used by `sparse_jacobian`; read-only after construction.
+"""
+struct JacobianPattern
+    size::Int
+    colptr::Vector{Int}
+    rowval::Vector{Int}
+    positions::JacobianBlocks{Int}
+end
+
+function JacobianPattern(layout::UnknownLayout)
     n_intervals, n_nodes = layout.n_nodes - 1, layout.n_nodes
-    shapes = ((n_state, n_state, n_intervals), (n_state, n_state, n_intervals), (n_state, n_frequency_reals, n_intervals),
-              (n_state, n_state), (n_state, n_param), (n_state, n_state), (n_state, n_param))
+    shapes = _block_shapes(layout)
     parameter_columns = parameter_range(layout)
     frequency_columns = parameter_columns[frequency_range(layout)]
     # Row and column of every block entry, in the memory order of the block arrays (column-major, interval last).
@@ -652,16 +677,13 @@ function JacobianWorkspace(problem::RadialProblem, layout::UnknownLayout=Unknown
 
     total, n_entries = n_unknowns(layout), length(rows)
     numbered = sparse(rows, columns, 1:n_entries, total, total)   # nzval[slot] = entry number
-    nnz(numbered) == n_entries || error("JacobianWorkspace: overlapping Jacobian blocks")
+    nnz(numbered) == n_entries || error("JacobianPattern: overlapping Jacobian blocks")
     position = zeros(Int, n_entries)
     position[numbered.nzval] = 1:n_entries
     ends = cumsum(collect(prod.(shapes)))
     starts = ends .- prod.(shapes) .+ 1
     positions = JacobianBlocks{Int}((reshape(position[starts[index]:ends[index]], shapes[index]) for index in eachindex(shapes))...)
-    blocks = JacobianBlocks{Float64}((zeros(shape) for shape in shapes)...)
-    matrix = SparseMatrixCSC(total, total, numbered.colptr, numbered.rowval, zeros(n_entries))
-    JacobianWorkspace(layout, blocks, positions, zeros(n_state, n_nodes), zeros(n_state, n_state, n_nodes),
-                      zeros(n_state, n_frequency_reals, n_nodes), matrix)
+    JacobianPattern(total, numbered.colptr, numbered.rowval, positions)
 end
 
 """
@@ -708,36 +730,33 @@ function jacobian_blocks!(workspace::JacobianWorkspace, problem::RadialProblem, 
 end
 
 """
-    jacobian!(workspace, problem, layout, unknowns, amplitudes, scale)
+    sparse_jacobian(blocks, pattern)
 
-Assemble the Jacobian of `residual` into `workspace.matrix` (values refilled in
-place, pattern unchanged) and return that matrix. The returned matrix is
-overwritten by the next call with the same workspace; `workspace.blocks` holds
-the same entries as `JacobianBlocks`.
+New `SparseMatrixCSC` with the pattern `pattern` (`JacobianPattern`) holding the
+entries of `blocks` (`JacobianBlocks`).
 """
-function jacobian!(workspace::JacobianWorkspace, problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector,
-                   amplitudes::AbstractVector, scale)
-    blocks = jacobian_blocks!(workspace, problem, layout, unknowns, amplitudes, scale)
-    values = workspace.matrix.nzval
-    for (block_values, block_positions) in zip(_block_arrays(blocks), _block_arrays(workspace.positions))
+function sparse_jacobian(blocks::JacobianBlocks, pattern::JacobianPattern)
+    values = zeros(length(pattern.rowval))
+    for (block_values, block_positions) in zip(_block_arrays(blocks), _block_arrays(pattern.positions))
         for index in eachindex(block_values, block_positions)
             values[block_positions[index]] = block_values[index]
         end
     end
-    return workspace.matrix
+    return SparseMatrixCSC(pattern.size, pattern.size, copy(pattern.colptr), copy(pattern.rowval), values)
 end
 
 """
-    jacobian(problem, layout, unknowns, amplitudes, scale; workspace=JacobianWorkspace(problem, layout))
+    jacobian(problem, layout, unknowns, amplitudes, scale; workspace=JacobianWorkspace(problem, layout),
+             pattern=JacobianPattern(layout))
 
 Sparse Jacobian of `residual` with respect to `unknowns`: block-bidiagonal in
 the node blocks, bordered by the dense parameter columns (see `JacobianBlocks`).
-Returns a new matrix; pass a `workspace` to reuse the pattern and scratch
-storage between calls.
+Returns a new matrix; pass a `workspace` and a `pattern` to reuse them between
+calls.
 """
 jacobian(problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector, amplitudes::AbstractVector, scale;
-         workspace::JacobianWorkspace=JacobianWorkspace(problem, layout)) =
-    copy(jacobian!(workspace, problem, layout, unknowns, amplitudes, scale))
+         workspace::JacobianWorkspace=JacobianWorkspace(problem, layout), pattern::JacobianPattern=JacobianPattern(layout)) =
+    sparse_jacobian(jacobian_blocks!(workspace, problem, layout, unknowns, amplitudes, scale), pattern)
 
 # --- solution and Newton iteration -------------------------------------------
 
@@ -882,7 +901,8 @@ end
 function ScaledFactorization(jacobian::AbstractMatrix, scaling::NewtonScaling;
                             method::Symbol=DEFAULT_FACTORIZATION_METHOD[])
     if method == :block
-        factors = BlockFactorization(sparse(jacobian), scaling.layout, scaling.row, scaling.column)
+        sparse_matrix = jacobian isa SparseMatrixCSC ? jacobian : sparse(jacobian)   # `sparse` of a sparse matrix copies it
+        factors = BlockFactorization(sparse_matrix, scaling.layout, scaling.row, scaling.column)
     elseif method == :sparse_lu
         factors = lu(Diagonal(scaling.row) * jacobian * Diagonal(scaling.column))
     else
@@ -935,7 +955,7 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
     predicted = warm && guess_change !== nothing && any(!iszero, guess_change)
     unknowns = warm ? warm_start_unknowns(guess, scale; change=guess_change) : initial_unknowns(problem, layout, amplitudes, scale)
     scaling = NewtonScaling(problem, layout, _complexify(unknowns[parameter_range(layout)][frequency_range(layout)]))
-    assembly = JacobianWorkspace(problem, layout)   # Jacobian pattern and scratch storage, reused across iterations
+    assembly = nothing   # Jacobian workspace and pattern, built when the first Jacobian is needed and reused
     scaled_norm(residual_vector) = norm(scaling.row .* residual_vector, Inf)
     scaled_step_norm(step_vector) = norm(step_vector ./ scaling.column, Inf)
     current = residual(problem, layout, unknowns, amplitudes, scale)
@@ -966,7 +986,8 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
         iterations = iteration
         chord = factorization !== nothing
         if !chord
-            factorization = ScaledFactorization(jacobian(problem, layout, unknowns, amplitudes, scale; workspace=assembly), scaling)
+            assembly === nothing && (assembly = (JacobianWorkspace(problem, layout), JacobianPattern(layout)))
+            factorization = _factorised_jacobian(assembly, problem, layout, unknowns, amplitudes, scale, scaling)
             factorization_distance = 0.0
             factorization_scale = float(scale)
         end
@@ -1038,11 +1059,20 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
     # (validation/newton_jacobian_accuracy.jl), so refactorise unless the factorisation was taken within tol/10,
     # where they are at the noise floor of the converged solution itself.
     if factorization === nothing || factorization_distance > tol / 10
-        factorization = ScaledFactorization(jacobian(problem, layout, unknowns, amplitudes, scale; workspace=assembly), scaling)
+        assembly === nothing && (assembly = (JacobianWorkspace(problem, layout), JacobianPattern(layout)))
+        factorization = _factorised_jacobian(assembly, problem, layout, unknowns, amplitudes, scale, scaling)
     end
     parameters = RadialParameters(layout, unknowns[parameter_range(layout)], amplitudes, scale)
     RadialSolution(problem, layout, collect(float.(amplitudes)), float(scale), unknowns, parameters, factorization,
                    iterations, current_norm, converged)
+end
+
+"""Scaled factorisation of the Jacobian at `unknowns`, assembled with `assembly = (workspace, pattern)`."""
+function _factorised_jacobian(assembly::Tuple{JacobianWorkspace, JacobianPattern}, problem::RadialProblem, layout::UnknownLayout,
+                              unknowns::AbstractVector, amplitudes::AbstractVector, scale, scaling::NewtonScaling)
+    workspace, pattern = assembly
+    blocks = jacobian_blocks!(workspace, problem, layout, unknowns, amplitudes, scale)
+    return ScaledFactorization(sparse_jacobian(blocks, pattern), scaling)
 end
 
 """

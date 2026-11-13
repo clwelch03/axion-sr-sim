@@ -318,11 +318,11 @@ end
     layout = AC.UnknownLayout(problem)
     amplitudes, scale = [0.05, 0.02], 0.05
     unknowns = AC.initial_unknowns(problem, layout, amplitudes, scale) .+ 0.01 .* randn(AC.n_unknowns(layout))
-    workspace = AC.JacobianWorkspace(problem, layout)
-    in_place = copy(AC.jacobian!(workspace, problem, layout, unknowns, amplitudes, scale))
+    workspace, pattern = AC.JacobianWorkspace(problem, layout), AC.JacobianPattern(layout)
+    in_place = AC.jacobian(problem, layout, unknowns, amplitudes, scale; workspace, pattern)
     displaced = unknowns .+ 1e-3 .* randn(length(unknowns))
-    AC.jacobian!(workspace, problem, layout, displaced, amplitudes, scale)
-    @test AC.jacobian!(workspace, problem, layout, unknowns, amplitudes, scale) == in_place   # refill is complete
+    AC.jacobian_blocks!(workspace, problem, layout, displaced, amplitudes, scale)
+    @test AC.jacobian(problem, layout, unknowns, amplitudes, scale; workspace, pattern) == in_place   # refill is complete
     @test AC.jacobian(problem, layout, unknowns, amplitudes, scale) == in_place
     dense, blocks = Matrix(in_place), workspace.blocks
     parameter_columns = AC.parameter_range(layout)

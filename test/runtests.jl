@@ -767,18 +767,6 @@ end
     @test maximum(abs, chord.unknowns .- newton.unknowns) < 1e-8 * maximum(abs, newton.unknowns)
     @test occursin("rejected", read(log_path, String))
 
-    # A step from a factorisation taken at the reference scale `scale₀` with its frequency entries multiplied by
-    # `scale/scale₀` (`_rescale_frequency_step!`) is the step with that Jacobian's frequency columns divided by it.
-    ratio = 1.2
-    right_hand_side = sin.(1:length(solution.unknowns))
-    frequencies = AC.parameter_range(layout)[AC.frequency_range(layout)]
-    column_factors = ones(length(right_hand_side))
-    column_factors[frequencies] .= 1 / ratio
-    jacobian = AC.jacobian(problem, layout, solution.unknowns, amplitudes, solution.scale)
-    reference = AC.ScaledFactorization(jacobian * Diagonal(column_factors), solution.jacobian_factorization.scaling) \ right_hand_side
-    rescaled = AC._rescale_frequency_step!(solution.jacobian_factorization \ right_hand_side, layout, ratio)
-    @test rescaled ≈ reference rtol=1e-8
-
     # A tolerance below the residual floor: the solve stops unconverged, unless floor_tol accepts the floor; the
     # evolution cache passes floor_tol to its solves.
     unreachable = 1e-17

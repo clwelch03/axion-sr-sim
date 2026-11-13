@@ -1000,7 +1000,7 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
     start = _newton_start(problem, layout, amplitudes, scale, guess, guess_change, node_workspaces; reuse_factorization,
                           chord_threshold, verbose)
     scaling, unknowns, current, current_norm = start.scaling, start.unknowns, start.residual, start.residual_norm
-    factorization, factorization_distance, factorization_scale = start.factorization, start.distance, start.factorization_scale
+    factorization, factorization_distance = start.factorization, start.distance
     assembly = nothing   # Jacobian workspace, built when the first Jacobian is needed and reused
     converged, iterations, stalled, previous_step_norm = false, 0, 0, Inf
     for iteration in 1:maxiter
@@ -1009,9 +1009,9 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
         if !chord
             assembly === nothing && (assembly = JacobianWorkspace(problem, layout))
             factorization = _factorised_jacobian(assembly, problem, layout, unknowns, amplitudes, scale, scaling, node_workspaces)
-            factorization_distance, factorization_scale = 0.0, float(scale)
+            factorization_distance = 0.0
         end
-        step = _rescale_frequency_step!(-(factorization \ current), layout, scale / factorization_scale)
+        step = -(factorization \ current)
         search = _line_search(problem, layout, amplitudes, scale, scaling, unknowns, current, current_norm, step, chord, tol, floor_tol,
                               node_workspaces)
         if search.floor_action == :refactorise
@@ -1094,8 +1094,7 @@ function _newton_start(problem::RadialProblem, layout::UnknownLayout, amplitudes
     # Chord steps are only worthwhile near a solution; far from it every rejected step costs a residual.
     factorization = warm && reuse_factorization && current_norm < chord_threshold ? guess.jacobian_factorization : nothing
     same_system = warm && !predicted && amplitudes == guess.amplitudes && _same_discretisation(problem, guess.problem)
-    return (; scaling, unknowns, residual=current, residual_norm=current_norm, factorization, distance=same_system ? 0.0 : Inf,
-            factorization_scale=warm ? float(guess.scale) : float(scale))
+    return (; scaling, unknowns, residual=current, residual_norm=current_norm, factorization, distance=same_system ? 0.0 : Inf)
 end
 
 """`NewtonScaling` from the mode frequencies of a starting unknown vector."""
@@ -1155,21 +1154,6 @@ end
 _factorised_jacobian(workspace::JacobianWorkspace, problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector,
                      amplitudes::AbstractVector, scale, scaling::NewtonScaling, node_workspaces) =
     ScaledFactorization(jacobian_blocks!(workspace, problem, layout, unknowns, amplitudes, scale; node_workspaces), scaling)
-
-"""
-    _rescale_frequency_step!(step, layout, scale_ratio)
-
-Correct a step computed with a Jacobian factorised when the unknowns had another reference scale. Profile-like
-unknowns and residuals both scale like `1/scale` while the frequencies do not, so the Jacobian in units of
-`scale` equals the one in units of `scale₀` with its frequency columns multiplied by `scale₀/scale`; the
-frequency entries of the step are therefore multiplied by `scale_ratio = scale/scale₀`. Uncorrected, the
-frequency columns are off by `|scale/scale₀ − 1|`, 20–30% for a nonlinear-regime spindown step, where the chord
-iteration then reduced the residual by 0.38 per step instead of 0.11–0.18.
-"""
-function _rescale_frequency_step!(step::AbstractVector, layout::UnknownLayout, scale_ratio)
-    scale_ratio == 1 || (step[parameter_range(layout)[frequency_range(layout)]] .*= scale_ratio)
-    return step
-end
 
 """
     _floor_action(chord, residual_norm, step_norm, tol, floor_tol)

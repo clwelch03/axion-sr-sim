@@ -16,6 +16,7 @@ using SparseArrays
 using ForwardDiff
 using FastGaussQuadrature: gausslegendre
 using OrdinaryDiffEqTsit5
+using OrdinaryDiffEqRosenbrock: Rosenbrock23, Rodas5P
 
 include("kerr.jl")
 include("potential.jl")
@@ -44,6 +45,7 @@ export with_background, amplitude_rates, evolve_fixed_background, evolve_with_sp
 export BackgroundState, BackgroundDerivatives, balance_terms, background_charge_derivatives, metric_work, boyer_lindquist_metric_work,
        EvolutionCache, EvolutionResult, EvolutionDiagnostics,
        AmplitudeTrajectory, amplitude_trajectory
+export FiniteDifferenceJacobian, RadialSolveCounts, total_solves, Rosenbrock23, Rodas5P
 export amplitudes_for_energy, fundamental_energies, with_potential
 
 end

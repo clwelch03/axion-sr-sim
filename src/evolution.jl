@@ -74,18 +74,46 @@ struct EvolutionDiagnostics{T<:Real}
 end
 
 """
+    RadialSolveCounts
+
+Radial solves of one evolution by purpose: `stage` (right-hand-side evaluations
+requested by the integrator, the entries of the diagnostics log), `jacobian`
+(perturbed solves of the finite-difference Jacobian), `accepted_state` (the
+initial solve, and the solves at accepted states that a new Jacobian needs when
+the integrator's last stage is not there), and `failed` (solves of any purpose
+that did not converge, included in the other counts). `jacobians_computed` and
+`jacobians_reused` count Jacobian requests by outcome.
+"""
+mutable struct RadialSolveCounts
+    stage::Int
+    jacobian::Int
+    accepted_state::Int
+    failed::Int
+    jacobians_computed::Int
+    jacobians_reused::Int
+end
+
+RadialSolveCounts() = RadialSolveCounts(0, 0, 0, 0, 0, 0)
+
+"""Total number of radial solves recorded in `counts`."""
+total_solves(counts::RadialSolveCounts) = counts.stage + counts.jacobian + counts.accepted_state
+
+"""
     EvolutionResult
 
 Output of a driver: the `OrdinaryDiffEq` solution object (state `[A₁, …, A_K]` or
 `[A₁, …, A_K, b, j]`, with `ln A` in place of `A` when `log_amplitudes` is true),
-the diagnostics log, and the final radial solution. Read the amplitudes with
-`amplitude_trajectory` rather than from `ode_solution.u` directly.
+the diagnostics log (one entry per integrator stage evaluation), the final
+radial solution, and the radial solves by purpose (`RadialSolveCounts`). Read
+the amplitudes with `amplitude_trajectory` rather than from `ode_solution.u`
+directly.
 """
 struct EvolutionResult{S, T<:Real, R<:RadialSolution}
     ode_solution::S
     diagnostics::Vector{EvolutionDiagnostics{T}}
     final_radial_solution::R
     log_amplitudes::Bool
+    solve_counts::RadialSolveCounts
 end
 
 """
@@ -134,6 +162,9 @@ mutable struct EvolutionCache{P<:RadialProblem, T<:Real}
     balance::Symbol       # :energy or :action
     accepted_solution::Union{Nothing, RadialSolution}   # radial solution at the last accepted step (spindown warm start)
     solve_failed::Bool    # a radial solve in the current step attempt did not converge (spindown rejects the step)
+    last_rates::Vector{T}       # integrator-state rates at `last_solution` (spindown)
+    accepted_rates::Vector{T}   # integrator-state rates at `accepted_solution` (spindown)
+    solve_counts::RadialSolveCounts
 end
 
 """
@@ -148,7 +179,7 @@ function EvolutionCache(problem::RadialProblem; decay_constant_ratio=0.0, includ
     _check_balance(problem, balance)
     EvolutionCache(problem, problem.mass_coupling, float(decay_constant_ratio)^2, include_metric_work, last_solution,
                    EvolutionDiagnostics{Float64}[], float(newton_tol), verbose, log_amplitudes, balance,
-                   last_solution, false)
+                   last_solution, false, Float64[], Float64[], RadialSolveCounts())
 end
 
 """Print one progress line per right-hand-side evaluation when the cache is verbose."""
@@ -199,6 +230,214 @@ function _solve_cached!(cache::EvolutionCache, problem::RadialProblem, amplitude
     return solution
 end
 
+"""Print one line that is not a stage evaluation (Jacobian, accepted-state solve) when the cache is verbose."""
+function _report_line(cache::EvolutionCache, text::String)
+    cache.verbose || return nothing
+    println(text)
+    flush(stdout)
+    return nothing
+end
+
+"""
+Whether `solution` was solved at the integrator state `state`: same amplitudes
+and, when the state carries `b` and `j`, the same spin `j/b²` and mass coupling
+`α₀ b`, all to `rtol = 1e-12`.
+"""
+function _solution_at_state(solution, state, cache::EvolutionCache)
+    solution === nothing && return false
+    mode_count = n_modes(cache.template)
+    isapprox(solution.amplitudes, _state_amplitudes(state, mode_count, cache.log_amplitudes); rtol=1e-12) || return false
+    length(state) == mode_count && return true
+    mass, angular_momentum = state[mode_count + 1], state[mode_count + 2]
+    return isapprox(solution.problem.background.a, angular_momentum / mass^2; rtol=1e-12) &&
+           isapprox(solution.problem.mass_coupling, cache.initial_mass_coupling * mass; rtol=1e-12)
+end
+
+# --- finite-difference Jacobian for stiff integrators ----------------------------
+
+"""
+    FiniteDifferenceJacobian(; difference=:forward, amplitude_step=3e-4, mass_step=1e-6,
+                             angular_momentum_step=1e-6, step_reductions=2, max_reuse_steps=0)
+
+Settings of the Jacobian of the right-hand side with respect to the integrator
+state, which the drivers supply to implicit and Rosenbrock integrators
+(`algorithm`) in place of the integrator's own differencing. Column `k` is a
+`:forward` or `:central` difference quotient with an absolute step in state
+entry `k`: `amplitude_step` in `ln A` (a step relative to `A` without
+`log_amplitudes`), `mass_step` in `b`, `angular_momentum_step` in `j`. Every
+perturbed radial solve starts from the solution at the base state, and the
+perturbed solves run as concurrent tasks (`Threads.@spawn`). A perturbed solve
+that fails is retried with its step divided by 4, at most `step_reductions`
+times. `max_reuse_steps` is the reuse policy of `_reuse_stored_jacobian`: the
+default `0` computes a new Jacobian at every accepted state.
+
+The default steps come from step scans at a = 0.9, α = 0.3, f_a/M_Pl = 0.047
+in the linear-growth, |211⟩-plateau and |322⟩-takeover regimes: there forward
+differences agree with central ones to 2e-4 (amplitude columns) and 3e-5 (`b`
+and `j` columns), the noise of the rates contributes less than 1e-3, and the
+perturbed solves stay clear of the outliers seen with `b` steps of 1e-7 (rates
+from sensitivities factorised away from the converged point, see `solve_radial`).
+"""
+struct FiniteDifferenceJacobian
+    difference::Symbol
+    amplitude_step::Float64
+    mass_step::Float64
+    angular_momentum_step::Float64
+    step_reductions::Int
+    max_reuse_steps::Int
+end
+
+function FiniteDifferenceJacobian(; difference::Symbol=:forward, amplitude_step=3e-4, mass_step=1e-6,
+                                  angular_momentum_step=1e-6, step_reductions=2, max_reuse_steps=0)
+    difference in (:forward, :central) || throw(ArgumentError("difference must be :forward or :central; got :$difference"))
+    FiniteDifferenceJacobian(difference, amplitude_step, mass_step, angular_momentum_step, step_reductions, max_reuse_steps)
+end
+
+"""
+Jacobian kept between the integrator's requests: the matrix, the state and
+time at which it was computed (`computed_state` empty before the first), the
+state of the previous request, and its age, the number of distinct states
+requested since it was computed.
+"""
+mutable struct JacobianStore
+    matrix::Matrix{Float64}
+    computed_state::Vector{Float64}
+    computed_time::Float64
+    last_request_state::Vector{Float64}
+    age::Int
+end
+
+JacobianStore(state_length::Int) = JacobianStore(zeros(state_length, state_length), Float64[], NaN, Float64[], 0)
+
+"""
+Whether the stored Jacobian serves a request at `state`; updates the request
+bookkeeping. The integrators request the Jacobian at the start of every step
+attempt, at the last accepted state, so a request at the same state as the
+previous one means the previous attempt was rejected. A request at the state
+where the stored Jacobian was computed always reuses it (it is exact there).
+Otherwise the stored Jacobian is reused while at most `max_reuse_steps` new
+states have been requested since it was computed, except when the request
+repeats the previous one: a step rejected with a stale Jacobian is retried with
+a new one.
+"""
+function _reuse_stored_jacobian(store::JacobianStore, settings::FiniteDifferenceJacobian, state::AbstractVector)
+    repeated = state == store.last_request_state
+    if !repeated
+        store.age += 1
+        store.last_request_state = copy(state)
+    end
+    isempty(store.computed_state) && return false
+    state == store.computed_state && return true
+    return !repeated && store.age <= settings.max_reuse_steps
+end
+
+"""Absolute difference steps of the state entries (`ln A` or `A`, then `b` and `j` when present)."""
+function _difference_steps(settings::FiniteDifferenceJacobian, state::AbstractVector, mode_count::Int, log_amplitudes::Bool)
+    amplitude_steps = log_amplitudes ? fill(settings.amplitude_step, mode_count) :
+                                       settings.amplitude_step .* abs.(state[1:mode_count])
+    length(state) == mode_count && return amplitude_steps
+    return vcat(amplitude_steps, settings.mass_step, settings.angular_momentum_step)
+end
+
+"""
+Evaluation at the base state plus `step` in entry `component`, through
+`evaluate(perturbation)` (a named tuple whose `rates` is `nothing` when the
+radial solve failed). A failed solve is retried with the step divided by 4, at
+most `step_reductions` times. Returns the last evaluation, the step it used and
+the number of solves attempted.
+"""
+function _perturbed_evaluation(evaluate, state_length::Int, component::Int, step, step_reductions::Int)
+    evaluation, trial_step = nothing, step
+    for attempt in 0:step_reductions
+        trial_step = step / 4^attempt
+        perturbation = zeros(state_length)
+        perturbation[component] = trial_step
+        evaluation = evaluate(perturbation)
+        evaluation.rates === nothing || return (; evaluation, step=trial_step, attempts=attempt + 1)
+    end
+    return (; evaluation, step=trial_step, attempts=step_reductions + 1)
+end
+
+"""
+Finite-difference Jacobian of the rates at `state`, with `base_rates` the rates
+there and `evaluate` as in `_perturbed_evaluation`. The perturbed evaluations
+(one per column for forward differences, two for central) run as concurrent
+tasks; `evaluate` must therefore not mutate shared state. A central column
+whose two sides ended with different steps uses the quotient over their
+separation. Returns the matrix, or `nothing` if some column has a failed side,
+and the perturbed results `[side, column]`.
+"""
+function _difference_jacobian(evaluate, state::AbstractVector, base_rates::AbstractVector, steps::AbstractVector,
+                              settings::FiniteDifferenceJacobian)
+    signs = settings.difference == :central ? (1, -1) : (1,)
+    tasks = [Threads.@spawn _perturbed_evaluation(evaluate, length(state), component, sign * steps[component],
+                                                  settings.step_reductions)
+             for sign in signs, component in eachindex(state)]
+    results = fetch.(tasks)
+    any(result -> result.evaluation.rates === nothing, results) && return nothing, results
+    matrix = zeros(length(base_rates), length(state))
+    for component in eachindex(state)
+        plus = results[1, component]
+        lower_rates, lower_step = settings.difference == :central ?
+            (results[2, component].evaluation.rates, results[2, component].step) : (base_rates, 0.0)
+        matrix[:, component] = (plus.evaluation.rates .- lower_rates) ./ (plus.step - lower_step)
+    end
+    return matrix, results
+end
+
+"""
+Fill `jacobian_matrix` for a request at `state` and record the solves. Reuses
+the stored Jacobian when `_reuse_stored_jacobian` allows; otherwise `base()`
+returns the radial solution and rates at `state` and `evaluate(base_solution,
+perturbation)` the evaluation at `state + perturbation`. If a column cannot be
+formed even with reduced steps, the stored Jacobian is used if there is one
+(a W-type method such as `Rosenbrock23` tolerates it; rejecting the step would
+not help, since the retry asks for the Jacobian at the same state); without a
+stored Jacobian the evolution stops with an error.
+"""
+function _fill_jacobian!(jacobian_matrix, state, time, cache::EvolutionCache, settings::FiniteDifferenceJacobian,
+                         store::JacobianStore, base, evaluate)
+    counts = cache.solve_counts
+    if _reuse_stored_jacobian(store, settings, state)
+        counts.jacobians_reused += 1
+        jacobian_matrix .= store.matrix
+        _report_line(cache, "jacobian t = $time: reused (computed at t = $(store.computed_time), age $(store.age))")
+        return nothing
+    end
+    base_solution, base_rates = base()
+    steps = _difference_steps(settings, state, n_modes(cache.template), cache.log_amplitudes)
+    matrix, results = _difference_jacobian(perturbation -> evaluate(base_solution, perturbation), state, base_rates,
+                                           steps, settings)
+    attempts = sum(result.attempts for result in results)
+    counts.jacobian += attempts
+    counts.failed += attempts - count(result -> result.evaluation.rates !== nothing, results)
+    newton_iterations = [result.evaluation.solution.iterations for result in results]
+    if matrix === nothing
+        isempty(store.computed_state) &&
+            error("finite-difference Jacobian at t = $time failed: perturbed radial solves did not converge with " *
+                  "steps $steps reduced $(settings.step_reductions) times, and no earlier Jacobian is stored")
+        jacobian_matrix .= store.matrix
+        _report_line(cache, "jacobian t = $time: perturbed solves failed ($attempts solves); using the Jacobian " *
+                            "computed at t = $(store.computed_time)")
+        return nothing
+    end
+    counts.jacobians_computed += 1
+    store.matrix, store.computed_state, store.computed_time, store.age = matrix, copy(state), time, 0
+    jacobian_matrix .= matrix
+    _report_line(cache, "jacobian t = $time: computed from $attempts solves, newton = $(vec(newton_iterations)), " *
+                        "steps = $([result.step for result in results][1, :])")
+    return nothing
+end
+
+"""Time gradient of the autonomous right-hand side (zero), so that stiff integrators do not difference in `t`."""
+function _zero_time_gradient!(time_gradient, state, cache, time)
+    time_gradient .= 0
+    return nothing
+end
+
+"""ODE function with the Jacobian `jacobian!(matrix, state, cache, time)` and a zero time gradient."""
+_ode_function(rhs!, jacobian!) = ODEFunction(rhs!; jac=jacobian!, tgrad=_zero_time_gradient!)
+
 # --- fixed background -----------------------------------------------------------
 
 """
@@ -214,10 +453,47 @@ function amplitude_rates(solution::RadialSolution; balance::Symbol=:action)
     return -(charge_jacobian(solution) \ collect(boundary_losses(solution)))
 end
 
+"""Integrator-state rates on a fixed background from a radial solution at `amplitudes`."""
+_fixed_background_rates(solution::RadialSolution, amplitudes, cache::EvolutionCache) =
+    _state_rates(amplitude_rates(solution; cache.balance), amplitudes, cache.log_amplitudes)
+
+"""
+Radial solve on the fixed background warm-started from `guess`, and the rates at
+the integrator state `state` (`nothing` if the solve did not converge). Mutates
+nothing.
+"""
+function _fixed_background_evaluation(state, cache::EvolutionCache, guess)
+    amplitudes = _state_amplitudes(state, n_modes(cache.template), cache.log_amplitudes)
+    solution = solve_radial(cache.template, amplitudes; guess, tol=cache.newton_tol)
+    rates = solution.converged ? _fixed_background_rates(solution, amplitudes, cache) : nothing
+    return (; rates, solution)
+end
+
+"""
+Jacobian request on the fixed background. The base is the last stage solution
+when it is at `state` (first-same-as-last integrators), otherwise one more solve.
+"""
+function _fixed_background_jacobian!(jacobian_matrix, state, cache::EvolutionCache, settings::FiniteDifferenceJacobian,
+                                     store::JacobianStore, time)
+    function base()
+        if _solution_at_state(cache.last_solution, state, cache)
+            amplitudes = _state_amplitudes(state, n_modes(cache.template), cache.log_amplitudes)
+            return cache.last_solution, _fixed_background_rates(cache.last_solution, amplitudes, cache)
+        end
+        evaluation = _fixed_background_evaluation(state, cache, cache.last_solution)
+        cache.solve_counts.accepted_state += 1
+        evaluation.rates === nothing && error("radial solve at the Jacobian's base state t = $time did not converge")
+        return evaluation.solution, evaluation.rates
+    end
+    _fill_jacobian!(jacobian_matrix, state, time, cache, settings, store, base,
+                    (base_solution, perturbation) -> _fixed_background_evaluation(state .+ perturbation, cache, base_solution))
+end
+
 function _fixed_background_rhs!(rates, state, cache::EvolutionCache, time)
     amplitudes = _state_amplitudes(state, n_modes(cache.template), cache.log_amplitudes)
     solution = _solve_cached!(cache, cache.template, amplitudes)
-    rates .= _state_rates(amplitude_rates(solution; cache.balance), amplitudes, cache.log_amplitudes)
+    cache.solve_counts.stage += 1
+    rates .= _fixed_background_rates(solution, amplitudes, cache)
     push!(cache.diagnostics, EvolutionDiagnostics(time, copy(amplitudes), mode_frequencies(solution),
                                                   cloud_charges(solution), boundary_losses(solution),
                                                   1.0, cache.template.background.a, 0.0,
@@ -228,10 +504,13 @@ end
 
 """
     evolve_fixed_background(problem, amplitudes, time_span; balance=:action, log_amplitudes=true,
-                            initial_step_fraction=0.05, newton_tol=1e-10, verbose=false, reltol, abstol, kwargs...)
+                            initial_step_fraction=0.05, newton_tol=1e-10, verbose=false, algorithm=Tsit5(),
+                            jacobian_settings=FiniteDifferenceJacobian(), reltol, abstol, kwargs...)
 
-Integrate the amplitudes with Tsit5 on a frozen Kerr background, with the
-action (default, any number of modes) or energy (two modes) balance.
+Integrate the amplitudes with `algorithm` (default Tsit5) on a frozen Kerr
+background, with the action (default, any number of modes) or energy (two
+modes) balance. Implicit and Rosenbrock algorithms get the finite-difference
+Jacobian described by `jacobian_settings` (`FiniteDifferenceJacobian`).
 With `log_amplitudes` (default) the state is `ln A` and the default tolerances
 `reltol = abstol = 1e-7` bound the per-step relative error of the amplitudes
 by about `1e-7 (1 + |ln A|)`; otherwise the state is `A` with the old defaults
@@ -243,15 +522,19 @@ arguments are passed to `solve` (e.g. `saveat`, `dtmax`).
 """
 function evolve_fixed_background(problem::RadialProblem, amplitudes::AbstractVector, time_span; balance::Symbol=:action,
                                  log_amplitudes=true, initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
+                                 algorithm=Tsit5(), jacobian_settings::FiniteDifferenceJacobian=FiniteDifferenceJacobian(),
                                  reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
     cache = EvolutionCache(problem; newton_tol, verbose, log_amplitudes, balance)
     initial_amplitudes = collect(float.(amplitudes))
     initial_rates = amplitude_rates(_solve_cached!(cache, problem, initial_amplitudes); balance)
+    cache.solve_counts.accepted_state += 1
     solver_options = _with_initial_step(kwargs, _initial_step(initial_amplitudes, initial_rates, initial_step_fraction))
     initial_state = log_amplitudes ? log.(initial_amplitudes) : initial_amplitudes
-    ode = ODEProblem(_fixed_background_rhs!, initial_state, time_span, cache)
-    ode_solution = solve(ode, Tsit5(); reltol, abstol, solver_options...)
-    EvolutionResult(ode_solution, cache.diagnostics, cache.last_solution, log_amplitudes)
+    store = JacobianStore(length(initial_state))
+    jacobian! = (matrix, state, cache, time) -> _fixed_background_jacobian!(matrix, state, cache, jacobian_settings, store, time)
+    ode = ODEProblem(_ode_function(_fixed_background_rhs!, jacobian!), initial_state, time_span, cache)
+    ode_solution = solve(ode, algorithm; reltol, abstol, solver_options...)
+    EvolutionResult(ode_solution, cache.diagnostics, cache.last_solution, log_amplitudes, cache.solve_counts)
 end
 
 # --- evolving background --------------------------------------------------------
@@ -574,32 +857,94 @@ rates are set to zero, the remaining stages of the step are skipped, and
 `_reject_failed_step` makes the integrator retry with a smaller step.
 """
 function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
-    mode_count = n_modes(cache.template)
     if cache.solve_failed
         rates .= 0
         return nothing
     end
-    amplitudes = _state_amplitudes(state_vector, mode_count, cache.log_amplitudes)
-    state = BackgroundState(state_vector[mode_count + 1], state_vector[mode_count + 2])
-    solution = solve_radial(current_problem(cache, state), amplitudes; guess=cache.accepted_solution, tol=cache.newton_tol)
-    if !solution.converged
+    evaluation = _spindown_evaluation(state_vector, cache, cache.accepted_solution)
+    cache.solve_counts.stage += 1
+    solution, state, terms = evaluation.solution, evaluation.state, evaluation.terms
+    if evaluation.rates === nothing
+        cache.solve_counts.failed += 1
         cache.solve_failed = true
         rates .= 0
         cache.verbose && (println("t = ", time, "  radial solve failed (|F| = ", solution.residual_norm,
                                   "); the step will be rejected"); flush(stdout))
         return nothing
     end
-    cache.last_solution = solution
-    terms = balance_terms(cache, solution, state)
-    rates[1:mode_count] = _state_rates(amplitude_rates(terms, cache), amplitudes, cache.log_amplitudes)
-    rates[mode_count + 1] = terms.state_rate.mass
-    rates[mode_count + 2] = terms.state_rate.angular_momentum
-    push!(cache.diagnostics, EvolutionDiagnostics(time, copy(amplitudes), mode_frequencies(solution),
+    rates .= evaluation.rates
+    cache.last_solution, cache.last_rates = solution, evaluation.rates
+    push!(cache.diagnostics, EvolutionDiagnostics(time, copy(evaluation.amplitudes), mode_frequencies(solution),
                                                   reference_charges(cloud_charges(solution), state), terms.losses,
                                                   state.mass, dimensionless_spin(state), terms.metric_work,
                                                   reference_actions(phase_actions(solution), state), terms.action_losses))
-    _report_step(cache, time, amplitudes, solution, "  b = $(state.mass)  j = $(state.angular_momentum)  w = $(terms.metric_work)")
+    _report_step(cache, time, evaluation.amplitudes, solution,
+                 "  b = $(state.mass)  j = $(state.angular_momentum)  w = $(terms.metric_work)")
     return nothing
+end
+
+"""Integrator-state rates `[(ln) A' …, b', j']` from the balance terms at `amplitudes`."""
+_spindown_state_rates(terms::BalanceTerms, amplitudes, cache::EvolutionCache) =
+    vcat(_state_rates(amplitude_rates(terms, cache), amplitudes, cache.log_amplitudes),
+         terms.state_rate.mass, terms.state_rate.angular_momentum)
+
+"""
+Radial solve warm-started from `guess` and balance terms at the integrator
+state `state_vector`. Returns the amplitudes, background state, radial
+solution, balance terms and integrator-state rates; `rates` and `terms` are
+`nothing` if the solve did not converge. Mutates nothing, so evaluations can run
+concurrently on one cache.
+"""
+function _spindown_evaluation(state_vector, cache::EvolutionCache, guess)
+    mode_count = n_modes(cache.template)
+    amplitudes = _state_amplitudes(state_vector, mode_count, cache.log_amplitudes)
+    state = BackgroundState(state_vector[mode_count + 1], state_vector[mode_count + 2])
+    solution = solve_radial(current_problem(cache, state), amplitudes; guess, tol=cache.newton_tol)
+    solution.converged || return (; amplitudes, state, solution, terms=nothing, rates=nothing)
+    terms = balance_terms(cache, solution, state)
+    return (; amplitudes, state, solution, terms, rates=_spindown_state_rates(terms, amplitudes, cache))
+end
+
+"""
+Evaluation at `base_state + perturbation` for a Jacobian column, solved from
+`base_solution`, the converged solution at `base_state`. All perturbed solves
+go through this function, so a predictor that uses the known perturbation
+(`Δ ln A`, `Δb`, `Δj`) to improve the warm start belongs here.
+"""
+_perturbed_spindown_evaluation(cache::EvolutionCache, base_solution::RadialSolution, base_state, perturbation) =
+    _spindown_evaluation(base_state .+ perturbation, cache, base_solution)
+
+"""
+Radial solution and rates at the last accepted state `state_vector`. After a
+step of a first-same-as-last integrator the cache already holds them; otherwise
+it holds the last stage of the accepted step, from which one solve at the
+accepted state is done (and kept). If that solve fails the evolution stops with
+an error, since an accepted step cannot be rejected afterwards.
+"""
+function _accepted_evaluation!(cache::EvolutionCache, state_vector, time)
+    _solution_at_state(cache.accepted_solution, state_vector, cache) &&
+        return cache.accepted_solution, cache.accepted_rates
+    evaluation = _spindown_evaluation(state_vector, cache, cache.accepted_solution)
+    cache.solve_counts.accepted_state += 1
+    if evaluation.rates === nothing
+        cache.solve_counts.failed += 1
+        error("radial solve at the accepted state t = $time did not converge")
+    end
+    cache.accepted_solution, cache.accepted_rates = evaluation.solution, evaluation.rates
+    _report_line(cache, "accepted t = $time: radial solve at the accepted state, newton = $(evaluation.solution.iterations)")
+    return cache.accepted_solution, cache.accepted_rates
+end
+
+"""
+Jacobian request of the spindown integrator, which integrators make at the last
+accepted state; its solution and rates (`_accepted_evaluation!`) are the base.
+"""
+function _spindown_jacobian!(jacobian_matrix, state_vector, cache::EvolutionCache, settings::FiniteDifferenceJacobian,
+                             store::JacobianStore, time)
+    base() = _accepted_evaluation!(cache, state_vector, time)
+    _fill_jacobian!(jacobian_matrix, state_vector, time, cache, settings, store, base,
+                    (base_solution, perturbation) ->
+                        _perturbed_spindown_evaluation(cache, base_solution, state_vector, perturbation))
 end
 
 """
@@ -614,18 +959,18 @@ function _reject_failed_step(state_vector, cache::EvolutionCache, time)
 end
 
 """
-Callback after every accepted step: keep the step's radial solution as the
-warm start for the next step. Tsit5 evaluates the right-hand side at the
-accepted state as its last stage (first-same-as-last), so `cache.last_solution`
-is the solution there; the check makes a different integrator fail loudly.
+Callback after every accepted step: keep the step's last stage solution and
+rates as the warm start of the next step's solves. Stages of rejected attempts
+are never used, since after a rejection the retry's stages can be far from the
+rejected ones (`_spindown_rhs!`). A first-same-as-last integrator (Tsit5,
+Rosenbrock23) evaluates the right-hand side at the accepted state as its last
+stage, so this is the solution there; for other integrators (Rodas5P, FBDF) it
+is a nearby stage, and the solve at the accepted state is done only when a
+Jacobian needs it (`_accepted_evaluation!`).
 """
 function _record_accepted_solution!(integrator)
     cache = integrator.p
-    amplitudes = _state_amplitudes(integrator.u, n_modes(cache.template), cache.log_amplitudes)
-    isapprox(cache.last_solution.amplitudes, amplitudes; rtol=1e-12) ||
-        error("last radial solution is not at the accepted state (amplitudes $(cache.last_solution.amplitudes) " *
-              "vs $amplitudes); the accepted-step warm start assumes a first-same-as-last integrator such as Tsit5")
-    cache.accepted_solution = cache.last_solution
+    cache.accepted_solution, cache.accepted_rates = cache.last_solution, cache.last_rates
     u_modified!(integrator, false)
     return nothing
 end
@@ -634,10 +979,11 @@ end
     evolve_with_spindown(problem, amplitudes, time_span, decay_constant_ratio; balance=:action,
                          include_metric_work=false, log_amplitudes=true, initial_step_fraction=0.05,
                          newton_tol=1e-10, verbose=false, initial_background, initial_guess=nothing,
+                         algorithm=Tsit5(), jacobian_settings=FiniteDifferenceJacobian(), callback=nothing,
                          reltol, abstol, kwargs...)
 
 Integrate `[A₁ … A_K, b, j]` (or `[ln A₁ … ln A_K, b, j]`, the default) with
-Tsit5, starting from `initial_background`, by default `b = 1` and `j = a` of
+`algorithm` (default Tsit5), starting from `initial_background`, by default `b = 1` and `j = a` of
 `problem.background`. `problem`
 defines the reference units: its `mass_coupling` is `α₀ = M₀ μ` and its mesh is
 reused in units of the current mass at every step. `decay_constant_ratio =
@@ -655,7 +1001,21 @@ Each radial solve is warm-started from the solution at the last accepted step,
 and a step in which a solve fails is rejected and retried with a smaller step
 (`_spindown_rhs!`). If the step size then reaches the integrator's minimum, the
 integration stops with a non-success return code instead of using an
-unconverged solution. Do not pass `callback` or `isoutofdomain`; they are used.
+unconverged solution. `isoutofdomain` is used internally. A `callback` (for
+example one that writes checkpoints) runs after the accepted-step bookkeeping,
+so `integrator.p.accepted_solution` is the radial solution at `integrator.u`.
+
+On the |211⟩ plateau the hole relaxes onto the superradiance threshold on a
+time scale far shorter than the slow evolution, and Tsit5's step is held at its
+stability limit (`docs/session-2026-11-12.md`). A stiff integrator such as
+`algorithm=Rosenbrock23()` (re-exported from `OrdinaryDiffEqRosenbrock`) then
+takes steps set by accuracy. It receives the finite-difference Jacobian of
+`jacobian_settings` (`FiniteDifferenceJacobian`) and a zero time gradient. The
+diagnostics log holds the stage evaluations only; `result.solve_counts`
+separates them from the Jacobian's perturbed solves and from the solves at
+accepted states that integrators which are not first-same-as-last (Rodas5P)
+need before a new Jacobian, and the verbose log prints the latter two on lines
+starting with `jacobian` and `accepted`.
 
 To restart from a saved state `(t, A, b, j)`, pass the original run's `problem`
 (it fixes the reference units and the mesh), the saved amplitudes, `time_span =
@@ -668,22 +1028,29 @@ function evolve_with_spindown(problem::RadialProblem, amplitudes::AbstractVector
                               balance::Symbol=:action, include_metric_work=false, log_amplitudes=true,
                               initial_step_fraction=0.05, newton_tol=1e-10, verbose=false,
                               initial_background::BackgroundState=BackgroundState(1.0, problem.background.a),
-                              initial_guess=nothing,
+                              initial_guess=nothing, algorithm=Tsit5(),
+                              jacobian_settings::FiniteDifferenceJacobian=FiniteDifferenceJacobian(), callback=nothing,
                               reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
     cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, newton_tol, verbose, log_amplitudes, balance,
                            last_solution=initial_guess)
     initial_amplitudes = collect(float.(amplitudes))
     initial_solution = _solve_cached!(cache, current_problem(cache, initial_background), initial_amplitudes)
+    cache.solve_counts.accepted_state += 1
     initial_solution.converged || error("initial radial solve did not converge")
     cache.accepted_solution = initial_solution
-    initial_rates = amplitude_rates(balance_terms(cache, initial_solution, initial_background), cache)
+    initial_terms = balance_terms(cache, initial_solution, initial_background)
+    initial_rates = amplitude_rates(initial_terms, cache)
+    cache.accepted_rates = cache.last_rates = _spindown_state_rates(initial_terms, initial_amplitudes, cache)
     solver_options = _with_initial_step(kwargs, _initial_step(initial_amplitudes, initial_rates, initial_step_fraction))
     initial_state = vcat(log_amplitudes ? log.(initial_amplitudes) : initial_amplitudes,
                          [initial_background.mass, initial_background.angular_momentum])
-    ode = ODEProblem(_spindown_rhs!, initial_state, time_span, cache)
+    store = JacobianStore(length(initial_state))
+    jacobian! = (matrix, state, cache, time) -> _spindown_jacobian!(matrix, state, cache, jacobian_settings, store, time)
+    ode = ODEProblem(_ode_function(_spindown_rhs!, jacobian!), initial_state, time_span, cache)
     accepted_step_callback = DiscreteCallback((state, time, integrator) -> true, _record_accepted_solution!;
                                               save_positions=(false, false))
-    ode_solution = solve(ode, Tsit5(); reltol, abstol, callback=accepted_step_callback,
-                         isoutofdomain=_reject_failed_step, solver_options...)
-    EvolutionResult(ode_solution, cache.diagnostics, cache.last_solution, log_amplitudes)
+    callbacks = callback === nothing ? accepted_step_callback : CallbackSet(accepted_step_callback, callback)
+    ode_solution = solve(ode, algorithm; reltol, abstol, callback=callbacks, isoutofdomain=_reject_failed_step,
+                         solver_options...)
+    EvolutionResult(ode_solution, cache.diagnostics, cache.last_solution, log_amplitudes, cache.solve_counts)
 end

@@ -1,8 +1,11 @@
 # Markdown tables from the CSV files of validation/parameter_audit.jl.
-#   julia validation/parameter_audit_tables.jl <output-dir> <study> [reference-label]
+#   julia validation/parameter_audit_tables.jl <study> <output-dir> [output-dir ...]
+# Rows of a state found in a later directory replace that state's rows from earlier ones (used to rerun one state).
 # Each quantity is given as its relative change from the reference setting (default: the last setting of the
 # study that solved, which is the finest), |x − x_ref| / |x_ref|; cost columns are the minimum wall time of the
-# perturbed right-hand-side call at 1 and 8 Julia threads, and its ratio to the production setting.
+# perturbed right-hand-side call at 1 and 8 Julia threads, and its ratio to the production setting. The column
+# "amplitude-rate error / fastest rate" is max_i |Δ d ln A_i/dt| / max_j |d ln A_j/dt|, which stays meaningful when one
+# rate is near zero (the |211⟩ rate on the plateau sits at the superradiance threshold).
 using Printf
 
 const PRODUCTION_LABEL = "np16_npol12_h0.4_sf1.03_c0.0001_hr1e-06_mo3_na1"
@@ -28,11 +31,19 @@ function short_label(label)
     return join(tokens, " ")
 end
 
-function main(directory, study, reference_label=nothing)
-    rows = read_rows(joinpath(directory, "$study.csv"))
+function main(study, directories...; reference_label=nothing)
+    rows = Dict{SubString{String}, SubString{String}}[]
+    for directory in directories
+        path = joinpath(directory, "$study.csv")
+        isfile(path) || continue
+        new_rows = read_rows(path)
+        replaced = Set(row["state"] for row in new_rows)
+        filter!(row -> !(row["state"] in replaced), rows)
+        append!(rows, new_rows)
+    end
     labels = unique(row["label"] for row in rows)
     states = unique(row["state"] for row in rows)
-    println("| state | setting | nodes | ", join(first.(COLUMNS), " | "), " | Δ ln A per 10¹⁰ M | t(1 thr) s | t(8 thr) s | cost vs prod (1/8 thr) |")
+    println("| state | setting | nodes | ", join(first.(COLUMNS), " | "), " | amplitude-rate error / fastest rate | t(1 thr) s | t(8 thr) s | cost vs prod (1/8 thr) |")
     println("|", repeat("---|", 7 + length(COLUMNS)))
     for state in states
         solved = Dict(row["label"] => row for row in rows if row["state"] == state && row["kind"] == "quantities")
@@ -51,7 +62,10 @@ function main(directory, study, reference_label=nothing)
             one, eight = timing(label, 1), timing(label, 8)
             ratio = @sprintf("%.2f / %.2f", one / timing(PRODUCTION_LABEL, 1), eight / timing(PRODUCTION_LABEL, 8))
             marker = label == reference ? " (ref)" : ""
-            drift = 1e10 * maximum(abs(value(solved[label], key) - value(solved[reference], key)) for key in ("dlnA211_dt", "dlnA322_dt"))
+            # Error of either amplitude rate measured against the faster of the two (near-zero rates on the plateau)
+            rate_keys = ("dlnA211_dt", "dlnA322_dt")
+            drift = maximum(abs(value(solved[label], key) - value(solved[reference], key)) for key in rate_keys) /
+                    maximum(abs(value(solved[reference], key)) for key in rate_keys)
             println("| $state | $(short_label(label))$marker | $(solved[label]["nodes"]) | ", join(format_change.(changes), " | "),
                     " | ", format_change(drift), @sprintf(" | %.3f | %.3f | %s |", one, eight, ratio))
         end

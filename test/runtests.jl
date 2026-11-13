@@ -118,6 +118,40 @@ end
     @test all(iszero, nonlinear_source(quadrature, FreePotential(), background, 0.3, 5.0, profiles))
 end
 
+@testset "Field kernels match the complex formulas" begin
+    background = KerrBackground(0.9)
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]; n_angular=2)
+    quadrature = FieldQuadrature(mode_set; n_polar=8, n_phase=8)
+    profiles = 0.4 .* randn(ComplexF64, AC.n_channels(mode_set))
+    phase_factors = quadrature.phase.phase_factors
+    component_values = AC.component_profiles(quadrature, profiles)
+    @test component_values ≈ reduce(hcat, quadrature.angular.harmonics[:, channels] * profiles[channels]
+                                    for channels in mode_set.component_channels)
+    field = reconstruct_field(quadrature, profiles)
+    @test field ≈ 2 .* real.(phase_factors * transpose(component_values)) rtol=1e-14
+    @test AC.project_phases(quadrature, sin.(field)) ≈ (phase_factors' * sin.(field)) ./ AC.n_points(quadrature.phase) rtol=1e-14
+    potential = ChiralPotential()
+    @test AC.phase_averaged_potential(quadrature, potential, profiles) ≈
+          vec(sum(AC.potential_energy.(Ref(potential), field); dims=1)) ./ AC.n_points(quadrature.phase) rtol=1e-14
+    # Source Jacobian against forward-mode differentiation of the source in the real and imaginary parts.
+    s = 4.0
+    source_reals(reals) = AC._realify(nonlinear_source(quadrature, potential, background, 0.3, s,
+                                                       complex.(reals[1:2:end], reals[2:2:end])))
+    autodiff = ForwardDiff.jacobian(source_reals, AC._realify(profiles))
+    analytic = AC.nonlinear_source_jacobian(quadrature, potential, background, 0.3, s, profiles)
+    @test AC._realify(vec(analytic.wrt_real)) ≈ vec(autodiff[:, 1:2:end]) rtol=1e-12
+    @test AC._realify(vec(analytic.wrt_imag)) ≈ vec(autodiff[:, 2:2:end]) rtol=1e-12
+    # Dual-number source (value from the plain kernel, partials analytic): along a profile direction it must equal
+    # the source Jacobian applied to that direction, and through the offset a central difference.
+    direction = randn(ComplexF64, length(profiles))
+    along_profiles = ForwardDiff.derivative(e -> nonlinear_source(quadrature, potential, background, 0.3, s, profiles .+ e .* direction), 0.0)
+    @test along_profiles ≈ analytic.wrt_real * real.(direction) .+ analytic.wrt_imag * imag.(direction) rtol=1e-12
+    along_offset = ForwardDiff.derivative(offset -> nonlinear_source(quadrature, potential, background, 0.3, offset, profiles), s)
+    step = 1e-4
+    @test along_offset ≈ (nonlinear_source(quadrature, potential, background, 0.3, s + step, profiles) .-
+                          nonlinear_source(quadrature, potential, background, 0.3, s - step, profiles)) ./ 2step rtol=1e-7
+end
+
 @testset "Asymptotic series satisfy the radial equation" begin
     background = KerrBackground(0.9)
     mass_coupling = 0.3
@@ -274,6 +308,62 @@ end
     structured = AC.jacobian(problem, layout, unknowns, amplitudes, scale)
     naive = ForwardDiff.jacobian(u -> AC.residual(problem, layout, u, amplitudes, scale), unknowns)
     @test maximum(abs, Matrix(structured) .- naive) < 1e-10 * maximum(abs, naive)
+end
+
+@testset "Jacobian blocks, in-place assembly and boundary derivatives" begin
+    background = KerrBackground(0.9)
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]; n_angular=2)
+    mesh = RadialMesh(background; rstar_min=-10.0, rstar_max=30.0, step=10.0)
+    problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh, n_phase=8, n_polar=8)
+    layout = AC.UnknownLayout(problem)
+    amplitudes, scale = [0.05, 0.02], 0.05
+    unknowns = AC.initial_unknowns(problem, layout, amplitudes, scale) .+ 0.01 .* randn(AC.n_unknowns(layout))
+    workspace = AC.JacobianWorkspace(problem, layout)
+    in_place = copy(AC.jacobian!(workspace, problem, layout, unknowns, amplitudes, scale))
+    displaced = unknowns .+ 1e-3 .* randn(length(unknowns))
+    AC.jacobian!(workspace, problem, layout, displaced, amplitudes, scale)
+    @test AC.jacobian!(workspace, problem, layout, unknowns, amplitudes, scale) == in_place   # refill is complete
+    @test AC.jacobian(problem, layout, unknowns, amplitudes, scale) == in_place
+    dense, blocks = Matrix(in_place), workspace.blocks
+    parameter_columns = AC.parameter_range(layout)
+    interval = 2
+    @test dense[AC.interval_rows(layout, interval), AC.node_range(layout, interval)] == blocks.wrt_left[:, :, interval]
+    @test dense[AC.interval_rows(layout, interval), AC.node_range(layout, interval + 1)] == blocks.wrt_right[:, :, interval]
+    @test dense[AC.interval_rows(layout, interval), parameter_columns[AC.frequency_range(layout)]] ==
+          blocks.wrt_frequencies[:, :, interval]
+    @test dense[AC.outer_rows(layout), parameter_columns] == blocks.outer_wrt_parameters
+    @test blocks.horizon_wrt_node == I
+    n_state = AC.node_block_size(layout)
+    @test AC.nnz(in_place) == (layout.n_nodes - 1) * n_state * (2n_state + 2layout.n_modes) +
+                              2n_state * (n_state + AC.n_parameters(layout))
+    # Threaded assembly (run the tests with `julia -t 4` to exercise it) against one sequential pass of the kernels.
+    frequencies = AC.component_frequencies(mode_set, AC._complexify(unknowns[parameter_columns][AC.frequency_range(layout)]))
+    node_workspace = AC.NodeWorkspace{Float64}(problem)
+    node_rhs = [AC.rhs_block!(zeros(n_state), node_workspace, problem, mesh.offsets[node],
+                              unknowns[AC.node_range(layout, node)], frequencies, scale) for node in 1:layout.n_nodes]
+    node_derivatives = [AC.rhs_derivatives!(zeros(n_state, n_state), zeros(n_state, 2layout.n_modes), node_workspace, problem,
+                                            mesh.offsets[node], unknowns[AC.node_range(layout, node)], frequencies, scale)
+                        for node in 1:layout.n_nodes]
+    assembled_residual = AC.residual(problem, layout, unknowns, amplitudes, scale)
+    for interval in 1:layout.n_nodes-1
+        left, right = unknowns[AC.node_range(layout, interval)], unknowns[AC.node_range(layout, interval + 1)]
+        rows = AC.interval_residual!(zeros(n_state), node_workspace, problem, interval, left, right,
+                                     node_rhs[interval], node_rhs[interval + 1], frequencies, scale)
+        @test rows == assembled_residual[AC.interval_rows(layout, interval)]
+        wrt_left, wrt_right, wrt_frequencies = AC.interval_jacobian!(zeros(n_state, n_state), zeros(n_state, n_state),
+            zeros(n_state, 2layout.n_modes), node_workspace, problem, interval, node_derivatives[interval],
+            node_derivatives[interval + 1], left, right, node_rhs[interval], node_rhs[interval + 1], frequencies, scale)
+        @test (wrt_left, wrt_right, wrt_frequencies) == (blocks.wrt_left[:, :, interval], blocks.wrt_right[:, :, interval],
+                                                         blocks.wrt_frequencies[:, :, interval])
+    end
+    # Boundary blocks against differentiation of the whole boundary residual in the parameter block.
+    parameter_block = unknowns[parameter_columns]
+    for (side, node, block) in ((:horizon, 1, blocks.horizon_wrt_parameters), (:outer, layout.n_nodes, blocks.outer_wrt_parameters))
+        node_block = unknowns[AC.node_range(layout, node)]
+        autodiff = ForwardDiff.jacobian(p -> AC.boundary_residual(problem, layout, side, node_block, p, amplitudes, scale),
+                                        parameter_block)
+        @test maximum(abs, block .- autodiff) < 1e-12 * maximum(abs, autodiff)
+    end
 end
 
 @testset "Linear single mode: eigenvalue, fluxes, sensitivities" begin

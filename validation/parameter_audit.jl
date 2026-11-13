@@ -59,8 +59,25 @@ const TAKEOVER = H.StateSpec("takeover", "|322> takeover, t = 2.9408e10 of log 6
                              [2.551522594444469e-03, 1.950591472117652e-06], 9.840819661230717e-01, 8.429987750916837e-01,
                              :continuation, 1e-12, 1e-10, false)
 
-const STATE_NAMES = ["linear", "plateau", "takeover", "nonlinear", "large_mesh"]
-spec_of(name) = name == "takeover" ? TAKEOVER : H.spec_named(name)
+"""
+Two strongly nonlinear states of the f_a/M_Pl = 3e-3 runs (amplitudes about 7 times the plateau's), not in the harness:
+the |211⟩ peak (t = 6.6667e8 of results/spindown_a0.9_alpha0.3_fa3e-3_t1e10_solution.csv) and the peak with |322⟩
+grown (t = 6.75e8 of results/spindown_a0.9_alpha0.3_fa3e-3_solution.csv). Their rates use f_a/M_Pl = 3e-3.
+"""
+const STRONG_STATES = [
+    H.StateSpec("strong_peak", "|211> peak of the f_a/M_Pl = 3e-3 run", 0.3, 0.9, [2.06565792e-2, 1.89863626e-6],
+                0.9972886146555608, 0.8908392725156438, :continuation, 1e-12, 1e-10, false),
+    H.StateSpec("strong_takeover", "both modes grown, f_a/M_Pl = 3e-3 run", 0.3, 0.9, [1.55687785e-2, 3.15544685e-5],
+                0.9975424292397707, 0.8888775116704426, :continuation, 1e-12, 1e-10, false),
+]
+
+const STATE_NAMES = ["linear", "plateau", "takeover", "nonlinear", "large_mesh"]   # default; strong_* only when listed
+function spec_of(name)
+    name == "takeover" && return TAKEOVER
+    index = findfirst(spec -> spec.name == name, STRONG_STATES)
+    return index === nothing ? H.spec_named(name) : STRONG_STATES[index]
+end
+decay_constant_ratio(spec) = startswith(spec.name, "strong") ? 3e-3 : H.DECAY_CONSTANT_RATIO
 
 """Reference problem (initial background) of a state at the given discretisation."""
 function reference_problem(spec, settings::Discretisation)
@@ -108,8 +125,8 @@ end
 state_problem(spec, reference) = H.problem_at(reference, H.background_state(spec))
 
 """Evolution cache with production settings (action balance, no metric work) at the given Newton tolerances."""
-audit_cache(reference; tol, floor_tol) =
-    EvolutionCache(reference; decay_constant_ratio=H.DECAY_CONSTANT_RATIO, newton_tol=tol, newton_floor_tol=floor_tol)
+audit_cache(spec, reference; tol, floor_tol) =
+    EvolutionCache(reference; decay_constant_ratio=decay_constant_ratio(spec), newton_tol=tol, newton_floor_tol=floor_tol)
 
 """
 Integrator-state rates `[d ln A₂₁₁/dt, d ln A₃₂₂/dt, db/dt, dj/dt]` from one `_spindown_rhs!` call at
@@ -136,7 +153,7 @@ production_tolerances(spec) = (tol=1e-10, floor_tol=spec.name == "large_mesh" ? 
 
 """Minimum wall time over `repeats` perturbed right-hand-side calls at production tolerances (after one warm-up)."""
 function time_rhs(spec, reference, solution; repeats=3)
-    cache = audit_cache(reference; production_tolerances(spec)...)
+    cache = audit_cache(spec, reference; production_tolerances(spec)...)
     amplitudes, background = perturbed_point(spec, solution)
     _, warm = rhs_rates(cache, solution, amplitudes, background)
     best = minimum(@elapsed(rhs_rates(cache, solution, amplitudes, background)) for _ in 1:repeats)
@@ -175,7 +192,7 @@ function run_solve(study, directory, names)
             build_seconds = @elapsed (solution, route) = converged_state(spec, settings, problem)
             serialize(state_file(directory, study, settings, name), solution.unknowns)
             frequencies = mode_frequencies(solution)
-            cache = audit_cache(reference; tol=SOLVE_TOLERANCE, floor_tol=floor_tolerance(spec))
+            cache = audit_cache(spec, reference; tol=SOLVE_TOLERANCE, floor_tol=floor_tolerance(spec))
             rates, _ = rhs_rates(cache, solution, solution.amplitudes, H.background_state(spec))
             quantities = vcat(real.(frequencies), imag.(frequencies), rates)
             append_row(csv, [study, label, name, "quantities", Threads.nthreads(), length(reference.mesh.rstar),
@@ -250,7 +267,7 @@ function run_tolerance(directory, names)
         amplitudes, background = perturbed_point(spec, solution)
         for tol in (1e-7, 1e-8, 1e-9, 1e-10, 1e-11, 1e-12)
             try
-                cache = audit_cache(reference; tol, floor_tol=max(tol, floor_tolerance(spec)))
+                cache = audit_cache(spec, reference; tol, floor_tol=max(tol, floor_tolerance(spec)))
                 rates, evaluated = rhs_rates(cache, solution, amplitudes, background)
                 seconds = minimum(@elapsed(rhs_rates(cache, solution, amplitudes, background)) for _ in 1:3)
                 frequencies = mode_frequencies(evaluated)

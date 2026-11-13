@@ -31,7 +31,11 @@ Base.@kwdef struct Discretisation
     horizon_offset_ratio::Float64 = 1e-6
     max_order::Int = 3
     n_angular::Int = 1
+    lattice_points::Int = 0   # 0: tensor grid of n_phase² points; otherwise a rank-1 lattice rule (K = 2) with this many points
 end
+
+"""Korobov generating vectors (1, g) for K = 2 (`../scaling-work/lattice_proto.jl` search, aliases up to order 24)."""
+const LATTICE_GENERATORS = Dict(31 => [1, 12], 61 => [1, 11], 85 => [1, 13], 101 => [1, 18], 151 => [1, 20])
 
 const PRODUCTION = Discretisation()
 const FINER = Discretisation(n_phase=24, n_polar=16, step=0.3, stretch_factor=1.015, containment=1e-6,
@@ -46,6 +50,7 @@ const STUDIES = Dict(
     "inner" => [Discretisation(horizon_offset_ratio=r) for r in (1e-4, 1e-5, 1e-6, 1e-8)],
     "truncation" => [Discretisation(), Discretisation(max_order=5), Discretisation(n_angular=2)],
     "combined" => [PRODUCTION, FINER],
+    "lattice" => vcat([Discretisation(lattice_points=m) for m in (31, 61, 85, 101, 151)], [PRODUCTION, Discretisation(n_phase=32)]),
 )
 
 const SOLVE_TOLERANCE = 1e-12
@@ -85,8 +90,10 @@ function reference_problem(spec, settings::Discretisation)
     mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]; max_order=settings.max_order, n_angular=settings.n_angular)
     mesh = RadialMesh(background, spec.mass_coupling, mode_set; step=settings.step, stretch_factor=settings.stretch_factor,
                       containment=settings.containment, horizon_offset_ratio=settings.horizon_offset_ratio)
+    phase_grid = settings.lattice_points == 0 ? nothing :
+        AC.PhaseGrid(rank1_lattice(LATTICE_GENERATORS[settings.lattice_points], settings.lattice_points), mode_set)
     return RadialProblem(background, CosinePotential(), spec.mass_coupling, mode_set; mesh, n_polar=settings.n_polar,
-                         n_phase=settings.n_phase)
+                         n_phase=settings.n_phase, phase_grid)
 end
 
 same_layout(settings::Discretisation) =
@@ -162,7 +169,8 @@ end
 
 settings_label(settings::Discretisation) =
     @sprintf("np%d_npol%d_h%g_sf%g_c%g_hr%g_mo%d_na%d", settings.n_phase, settings.n_polar, settings.step, settings.stretch_factor,
-             settings.containment, settings.horizon_offset_ratio, settings.max_order, settings.n_angular)
+             settings.containment, settings.horizon_offset_ratio, settings.max_order, settings.n_angular) *
+    (settings.lattice_points == 0 ? "" : "_lat$(settings.lattice_points)")
 
 state_file(directory, study, settings, name) = joinpath(directory, "states", "$(study)_$(settings_label(settings))_$(name).jls")
 

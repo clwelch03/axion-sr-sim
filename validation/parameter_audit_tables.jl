@@ -22,7 +22,9 @@ format_change(change) = change == 0 ? "0" : @sprintf("%.1e", change)
 """The settings tokens of a label that differ from production (`n_phase` np, `n_polar` npol, step h, stretch sf, containment c, horizon ratio hr, max_order mo, n_angular na)."""
 function short_label(label)
     label == PRODUCTION_LABEL && return "production"
-    tokens = [token for (token, production) in zip(split(label, "_"), split(PRODUCTION_LABEL, "_")) if token != production]
+    parts = split(label, "_")
+    tokens = [token for (token, production) in zip(parts, split(PRODUCTION_LABEL, "_")) if token != production]
+    append!(tokens, parts[length(split(PRODUCTION_LABEL, "_"))+1:end])   # lattice rule, replaces the tensor grid
     return join(tokens, " ")
 end
 

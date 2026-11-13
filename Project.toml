@@ -1,16 +1,18 @@
 name = "AxionCloud"
 uuid = "6f1c2b3a-7d4e-4c5b-9a8f-1e2d3c4b5a60"
-authors = ["Catherine Welch <clwelch@berkeley.edu>"]
 version = "0.1.0"
+authors = ["Catherine Welch <clwelch@berkeley.edu>"]
 
 [deps]
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+OrdinaryDiffEqRosenbrock = "43230ef6-c299-4910-a778-202eb28ce4ce"
 OrdinaryDiffEqTsit5 = "b1df2697-797e-41e3-8120-5422d3b24e4a"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
+OrdinaryDiffEqRosenbrock = "2.7.5"
 julia = "1.10"
 
 [extras]

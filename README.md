@@ -44,7 +44,9 @@ Julia implementation of the method described in `docs/multiphase.tex`.
   `J = Σ m_i N_i`. The evolution drivers take `balance=:action` (default since 2026-11-09: one action
   balance per phase, any number of modes, no metric work) or `balance=:energy` (energy and angular
   momentum, two modes; the earlier default, needed to reproduce results from before that date).
-  `metric_work` is the action-based `(∂E)|_N` work, independent of the inner endpoint.
+  `metric_work` is the action-based `(∂E)|_N` work, independent of the inner endpoint. Under the action
+  balance the energy, angular momentum and metric work are not computed (the diagnostics hold `NaN` for
+  `w`) unless `record_metric_work=true` or `include_metric_work=true` is passed; the amplitude rates do not change.
 * The evolution state is `ln A` by default (`log_amplitudes`), with the first step set from the
   initial e-folding time; read amplitudes with `amplitude_trajectory(result)`.
 

@@ -53,6 +53,39 @@ struct FieldBilinears{T<:Real}
 end
 
 """
+    potential_slope(potential, field_value)
+
+`U'(Φ) = Φ − h(Φ)`, from the nonlinearity `h` that every potential defines.
+"""
+potential_slope(potential::AxionPotential, field_value) = field_value - nonlinearity(potential, field_value)
+
+"""
+    averaged_potential(quadrature, potential, profiles)
+
+`⟨U(Φ)⟩_ξ` at each polar node, like `phase_averaged_potential`. For profiles
+that are `ForwardDiff` duals the field is reconstructed from the values only,
+and each partial is the exact derivative `2 Re Σ_q dF_q conj(⟨e^{+iq·ξ} U'(Φ)⟩)`
+(with `dF_q` the partial of the polar-summed profile of component `q`), which
+needs no arithmetic on dual-number matrices.
+"""
+averaged_potential(quadrature::FieldQuadrature, potential::AxionPotential, profiles::AbstractVector) =
+    phase_averaged_potential(quadrature, potential, profiles)
+
+function averaged_potential(quadrature::FieldQuadrature, potential::AxionPotential,
+                            profiles::AbstractVector{Complex{D}}) where {Tag, V<:AbstractFloat, N, D<:ForwardDiff.Dual{Tag, V, N}}
+    value_profiles = complex.(ForwardDiff.value.(real.(profiles)), ForwardDiff.value.(imag.(profiles)))
+    field = reconstruct_field(quadrature, value_profiles)
+    averaged = vec(sum(potential_energy.(Ref(potential), field); dims=1)) ./ n_points(quadrature.phase)
+    slope_average = transpose(project_phases(quadrature, potential_slope.(Ref(potential), field)))   # [polar node, component]
+    partials = ntuple(Val(N)) do slot
+        partial_profiles = complex.(ForwardDiff.partials.(real.(profiles), slot), ForwardDiff.partials.(imag.(profiles), slot))
+        partial_components = component_profiles(quadrature, partial_profiles)                        # [polar node, component]
+        2 .* vec(sum(real.(partial_components) .* real.(slope_average) .+ imag.(partial_components) .* imag.(slope_average); dims=2))
+    end
+    return [D(averaged[node], ForwardDiff.Partials(ntuple(slot -> partials[slot][node], Val(N)))) for node in eachindex(averaged)]
+end
+
+"""
     field_bilinears(problem, s, profiles, slopes, real_frequencies)
 
 Bilinears at offset `s` from the *physical* profiles and tortoise slopes of all
@@ -77,7 +110,7 @@ function field_bilinears(problem::RadialProblem, s, profiles::AbstractVector, sl
                    vec(sum(2 .* abs2.(component_dr); dims=2)),
                    vec(sum(2 .* abs2.(component_dtheta); dims=2)),
                    -(squared * (real_frequencies .* azimuthal)),
-                   phase_averaged_potential(quadrature, potential, profiles))
+                   averaged_potential(quadrature, potential, profiles))
 end
 
 """
@@ -150,22 +183,50 @@ function real_component_frequencies(problem::RadialProblem, layout::UnknownLayou
 end
 
 """
+    integrated_densities(problem, layout, unknowns, scale; charges=true, actions=true)
+
+Simpson integrals over the mesh of the per-node densities, as the vector
+`[E, J]` (with `charges`) followed by the Klein–Gordon charge `n_q` of every
+component (with `actions`). Nodes are independent and are evaluated on the
+available threads into one column each; the sum then runs in node order, so the
+result does not depend on the thread count.
+"""
+function integrated_densities(problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector, scale;
+                              charges::Bool=true, actions::Bool=true)
+    mesh = problem.mesh
+    frequencies = real_component_frequencies(problem, layout, unknowns)
+    weights = simpson_weights(ForwardDiff.value.(mesh.rstar))
+    row_count = (charges ? 2 : 0) + (actions ? n_components(problem.mode_set) : 0)
+    element_type = promote_type(eltype(unknowns), typeof(scale), typeof(problem.mass_coupling), eltype(mesh.offsets))
+    densities = Matrix{element_type}(undef, row_count, layout.n_nodes)
+    Threads.@threads for node in 1:layout.n_nodes
+        state = physical_state(layout, unknowns, scale, node)
+        offset = mesh.offsets[node]
+        row = 0
+        if charges
+            bilinears = field_bilinears(problem, offset, state.profiles, state.slopes, frequencies)
+            node_charges = charge_densities(problem, offset, bilinears)
+            densities[1, node], densities[2, node] = node_charges.energy, node_charges.angular_momentum
+            row = 2
+        end
+        actions && (densities[row + 1:end, node] = component_action_densities(problem, offset, state.profiles, frequencies))
+    end
+    totals = zeros(element_type, row_count)
+    for node in 1:layout.n_nodes
+        totals .+= weights[node] .* view(densities, :, node)
+    end
+    return totals
+end
+
+"""
     cloud_charges(problem, layout, unknowns, scale)
     cloud_charges(solution)
 
 Energy and angular momentum of the field between the numerical endpoints.
 """
 function cloud_charges(problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector, scale)
-    mesh = problem.mesh
-    frequencies = real_component_frequencies(problem, layout, unknowns)
-    weights = simpson_weights(mesh.rstar)
-    total = Charges(zero(eltype(unknowns)), zero(eltype(unknowns)))
-    for node in 1:layout.n_nodes
-        state = physical_state(layout, unknowns, scale, node)
-        bilinears = field_bilinears(problem, mesh.offsets[node], state.profiles, state.slopes, frequencies)
-        total = total + weights[node] * charge_densities(problem, mesh.offsets[node], bilinears)
-    end
-    return total
+    totals = integrated_densities(problem, layout, unknowns, scale; actions=false)
+    return Charges(totals[1], totals[2])
 end
 
 cloud_charges(solution::RadialSolution) = cloud_charges(solution.problem, solution.layout, solution.unknowns, solution.scale)
@@ -230,14 +291,7 @@ Wave actions `N_i = Σ_q q_i n_q` of the independent phases between the
 numerical endpoints, in units of `f_a² M²` (like `J`), as a vector over modes.
 """
 function phase_actions(problem::RadialProblem, layout::UnknownLayout, unknowns::AbstractVector, scale)
-    mesh = problem.mesh
-    frequencies = real_component_frequencies(problem, layout, unknowns)
-    weights = simpson_weights(mesh.rstar)
-    component_totals = sum(weights[node] .* component_action_densities(problem, mesh.offsets[node],
-                                                                     physical_state(layout, unknowns, scale, node).profiles,
-                                                                     frequencies)
-                           for node in 1:layout.n_nodes)
-    return phase_weights(problem.mode_set) * component_totals
+    return phase_weights(problem.mode_set) * integrated_densities(problem, layout, unknowns, scale; charges=false)
 end
 
 phase_actions(solution::RadialSolution) = phase_actions(solution.problem, solution.layout, solution.unknowns, solution.scale)

@@ -1,6 +1,6 @@
 using Test
 using AxionCloud
-using ForwardDiff, LinearAlgebra, FastGaussQuadrature
+using ForwardDiff, LinearAlgebra, SparseArrays, FastGaussQuadrature
 const AC = AxionCloud
 
 @testset "AxionCloud" begin
@@ -364,6 +364,31 @@ end
                                         parameter_block)
         @test maximum(abs, block .- autodiff) < 1e-12 * maximum(abs, autodiff)
     end
+end
+
+@testset "Block factorization agrees with sparse LU" begin
+    background = KerrBackground(0.9)
+    mesh = RadialMesh(background; rstar_min=-10.0, rstar_max=30.0, step=5.0)
+    for mode_set in (ModeSet([BoundMode(2, 1, 1)]), ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]))
+        problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh, n_phase=8, n_polar=8)
+        layout = AC.UnknownLayout(problem)
+        amplitudes, scale = fill(0.05, length(mode_set.modes)), 0.05
+        unknowns = AC.initial_unknowns(problem, layout, amplitudes, scale) .+ 0.01 .* randn(AC.n_unknowns(layout))
+        jacobian = AC.jacobian(problem, layout, unknowns, amplitudes, scale)
+        scaling = AC.NewtonScaling(problem, layout, AC._complexify(unknowns[AC.parameter_range(layout)][AC.frequency_range(layout)]))
+        block = AC.ScaledFactorization(jacobian, scaling; method=:block)
+        reference = AC.ScaledFactorization(jacobian, scaling; method=:sparse_lu)
+        right_hand_sides = randn(AC.n_unknowns(layout), 3)
+        @test block isa AC.ScaledFactorization{AC.BlockFactorization}
+        @test maximum(abs, block \ right_hand_sides .- reference \ right_hand_sides) < 1e-9 * maximum(abs, reference \ right_hand_sides)
+        @test block \ right_hand_sides[:, 1] ≈ reference \ right_hand_sides[:, 1] rtol=1e-9
+        @test maximum(abs, jacobian * (block \ right_hand_sides) .- right_hand_sides) < 1e-8 * maximum(abs, right_hand_sides)
+    end
+    # An entry outside the block structure is rejected.
+    layout = AC.UnknownLayout(RadialProblem(background, CosinePotential(), 0.3, ModeSet([BoundMode(2, 1, 1)]); mesh, n_phase=8, n_polar=8))
+    size_total = AC.n_unknowns(layout)
+    misplaced = sparse([1], [size_total - 40], [1.0], size_total, size_total)
+    @test_throws ErrorException AC.stamp_panels(misplaced, layout, ones(size_total), ones(size_total))
 end
 
 @testset "Linear single mode: eigenvalue, fluxes, sensitivities" begin

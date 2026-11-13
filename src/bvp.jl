@@ -544,9 +544,9 @@ starting frequencies), and iterations stop when both the scaled residual and
 the scaled step fall below `tol` in the max norm, or when the residual is below
 `tol` and a step below `√tol` no longer reduces it (its roundoff floor). On
 domains that do not reach far into the tails the scaling is close to the identity.
-A floor above `tol` stops the solve unconverged after one such step; with
-`floor_tol > tol` (opt-in) a Newton step at a floor below `floor_tol` counts as
-converged. The floor is set by the outer-boundary rows, whose roundoff is
+A floor above `tol` stops the solve unconverged as soon as a Newton step below
+`tol` fails to reduce the residual (`_floor_action`); with `floor_tol > tol`
+(opt-in) a Newton step at a floor below `floor_tol` counts as converged. The floor is set by the outer-boundary rows, whose roundoff is
 amplified by the envelope row weights: about 1e-14 to 1e-10 on the 690-node
 α = 0.3 meshes, 5e-10 on the 1355-node α = 0.187 mesh.
 
@@ -606,27 +606,29 @@ function solve_radial(problem::RadialProblem, amplitudes::AbstractVector; guess=
         step = _rescale_frequency_step!(-(factorization \ current), layout, scale / factorization_scale)
         # Backtracking line search on the residual norm (Armijo condition); a
         # chord step must at least halve the residual or it is abandoned.
-        # A full step below √tol that does not reduce the residual means the residual is at its roundoff floor:
-        # backtracking would only shrink the step (up to 14 residual evaluations), and repeating the Newton step
-        # from the same point gives the same result. Below tol that is convergence; above it (a floor above tol)
-        # the solve stops unconverged at once instead of after `maxiter` identical iterations.
+        # A small full step that does not reduce the residual may mean the residual is at its roundoff floor
+        # (`_floor_action`); backtracking would then only shrink the step (up to 14 residual evaluations).
         damping = 1.0
         trial, trial_residual, trial_norm = unknowns, current, current_norm
-        at_floor = false
+        floor_action = nothing
         while damping ≥ 1e-4
             trial = unknowns .+ damping .* step
             trial_residual = residual(problem, layout, trial, amplitudes, scale)
             trial_norm = scaled_norm(trial_residual)
             trial_norm ≤ (1 - 1e-4damping) * current_norm && break
-            at_floor = damping == 1 && scaled_step_norm(step) < sqrt(tol)
-            at_floor && break
+            damping == 1 && (floor_action = _floor_action(chord, current_norm, scaled_step_norm(step), tol, floor_tol))
+            floor_action === nothing || break
             damping /= 2
         end
-        if at_floor && (current_norm < tol || (!chord && current_norm < floor_tol))
+        if floor_action == :refactorise
+            verbose && println("  chord step $iteration does not reduce |F| = $current_norm; refactorising")
+            factorization = nothing
+            continue
+        elseif floor_action == :converged
             verbose && println("  $(chord ? "chord" : "newton") $iteration: |F| = $current_norm is at its roundoff floor; converged")
             converged = true
             break
-        elseif at_floor && !chord
+        elseif floor_action == :stuck
             verbose && println("  newton $iteration: |F| = $current_norm is at its roundoff floor, above tol; stopping")
             break
         end
@@ -689,6 +691,27 @@ iteration then reduced the residual by 0.38 per step instead of 0.11–0.18.
 function _rescale_frequency_step!(step::AbstractVector, layout::UnknownLayout, scale_ratio)
     scale_ratio == 1 || (step[parameter_range(layout)[frequency_range(layout)]] .*= scale_ratio)
     return step
+end
+
+"""
+    _floor_action(chord, residual_norm, step_norm, tol, floor_tol)
+
+What to do when a full step of scaled size `step_norm` does not reduce the residual, or `nothing` to backtrack
+as usual. With the residual below `tol` and the step below `√tol` the residual is at its roundoff floor:
+`:converged` (for a chord step only if the step is also below `tol`; a larger one may come from an out-of-date
+Jacobian, so `:refactorise` and let a Newton step decide). A Newton step at a residual below the opt-in
+`floor_tol` likewise converges. A Newton step below `tol` that does not reduce a residual above `tol` means a
+floor above `tol`: `:stuck`, since repeating the step from the same point gives the same result.
+"""
+function _floor_action(chord::Bool, residual_norm, step_norm, tol, floor_tol)
+    step_norm < sqrt(tol) || return nothing
+    if chord
+        residual_norm < tol && step_norm < tol && return :converged
+        return :refactorise
+    end
+    (residual_norm < tol || residual_norm < floor_tol) && return :converged
+    step_norm < tol && return :stuck
+    return nothing
 end
 
 """

@@ -27,3 +27,16 @@ function log_axis_resample(times, series...; logarithmic, time_min, time_max, po
     end
     new_times, resampled...
 end
+
+"""
+    display_label(run_name)
+
+Text shown on a figure for a run. The short run names used in file names and on the command line stay as they are.
+Runs are described by what is in the equations: the free-field runs are "linear", and the linear benchmarks say where
+their rates come from. A name not listed here is shown unchanged.
+"""
+display_label(run_name) = get(Dict("free" => "linear (no self-interaction)",
+                                   "cosine" => "self-interacting (cosine)",
+                                   "Leaver" => "linear, exact rates (Leaver)",
+                                   "free (Leaver)" => "linear, exact rates (Leaver)",
+                                   "hydrogenic" => "linear, small-α rates"), run_name, run_name)

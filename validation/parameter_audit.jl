@@ -51,6 +51,7 @@ const STUDIES = Dict(
     "inner" => [Discretisation(horizon_offset_ratio=r) for r in (1e-4, 1e-5, 1e-6, 1e-8)],
     "truncation" => [Discretisation(), Discretisation(max_order=5), Discretisation(n_angular=2)],
     "combined" => [PRODUCTION, FINER],
+    "recommended" => [Discretisation(lattice_points=85, n_polar=8), PRODUCTION, Discretisation(n_phase=32, n_polar=24)],
     "outer_fine_tail" => [Discretisation(containment=c, max_step=0.8) for c in (1e-4, 1e-6, 1e-8)],
     "lattice" => vcat([Discretisation(lattice_points=m) for m in (31, 61, 85, 101, 151)], [PRODUCTION, Discretisation(n_phase=32)]),
 )

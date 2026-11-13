@@ -14,9 +14,9 @@ one evaluation costs at each setting, and a recommendation. Status: complete for
 | `n_polar` | 12 | $2\times10^{-15}$ | loosen to 8 | $-22\%$ / $0\%$ |
 | radial `step` | 0.4 | $2.5\times10^{-6}$ | keep | |
 | outer endpoint (`containment`) | $10^{-4}$ | $6\times10^{-4}$ (strong takeover), $4\times10^{-6}$ elsewhere; **does not converge** | not a parameter fix: see Section 3.2 | |
-| inner endpoint (`horizon_offset_ratio`) | $10^{-6}$ | $\le 10^{-7}$ on the $\alpha = 0.3$ states (strong states pending) | keep | |
+| inner endpoint (`horizon_offset_ratio`) | $10^{-6}$ | $\le 3\times10^{-8}$ on the weaker states, $2\times10^{-5}$ on the strong ones; **does not converge** (same cause as the outer endpoint) | keep; see Section 3.3 | |
 | `stretch_factor` | 1.03 | $3\times10^{-7}$ | keep | |
-| `n_angular` (polar indices per component) | 1 | $7\times10^{-4}$ (plateau, takeover) | the largest error found; decide whether to run with 2 | $+91\%$ / $+148\%$ |
+| `n_angular` (polar indices per component) | 1 | $2\times10^{-2}$ (strong states), $7\times10^{-4}$ (plateau, takeover) | the largest error found; run with 2 at least for strongly nonlinear cases, after checking 3 | $+91\%$ / $+148\%$ |
 | `max_order` (Fourier truncation) | 3 | $\lesssim 3\times10^{-6}$ (mixed with the outer endpoint) | keep | |
 | `newton_tol` | $10^{-10}$ | $\le 2\times10^{-9}$ even at $10^{-7}$ | keep on the $\alpha = 0.3$ meshes; use $10^{-8}$ on the $\alpha = 0.187$ mesh | $0$ to $-14\%$; $-28\%$ at $\alpha = 0.187$ |
 | integrator `reltol`/`abstol` | $10^{-7}$ | see the methods report | keep $10^{-7}$ (Tsit5) or FBDF at $10^{-9}$-$10^{-10}$ on stiff plateaus | |
@@ -27,13 +27,16 @@ needs one confirmation run before production.
 
 Three findings matter more than any saving:
 
-1. **The angular truncation is the largest error.** Allowing a second polar index per Fourier component changes the
-   amplitude rates by $7\times10^{-4}$ on the plateau and $6\times10^{-4}$ at the takeover. That is 300 times the
-   radial-step error and $10^{4}$ times the integrator tolerance. Whether `n_angular` = 2 is itself converged is not
-   known (3 was not run).
-2. **The outer-endpoint dependence does not converge.** Moving the outer endpoint out changes the rates linearly in
-   the endpoint radius, without levelling off, between $r_* = 428$ and $860$. At the strong takeover the cause is
-   identified: outgoing radiation in the $q = (-1, 2)$ component inside the domain is counted in the phase actions.
+1. **The angular truncation is the largest error.** Allowing a second polar index per Fourier component changes
+   $d\ln A_{322}/dt$ by 2% at the strong $|211\rangle$ peak, 1.3% at the strong takeover, $7\times10^{-4}$ on the
+   plateau and $6\times10^{-4}$ at the takeover. That is $10^{3}$-$10^{4}$ times the radial-step error. Whether
+   `n_angular` = 2 is itself converged is not known (3 was not run).
+2. **The endpoint dependence does not converge, at either end.** Moving either endpoint changes the rates in
+   proportion to the change of the domain length in $r_*$, without levelling off. The cause is identified for the
+   strong states: the phase actions $N_i$ are integrals over the domain, and they include wave action that is only
+   passing through, outgoing radiation near the outer endpoint (component $q = (-1,2)$) and waves falling into the
+   horizon near the inner endpoint (component $q = (2,-1)$ and the $|211\rangle$ mode itself). That part grows
+   linearly with the domain. It is a question of definition in the action balance, not of resolution.
 3. **The integrator tolerance is already tighter than the discretisation.** The radial step alone gives relative rate
    errors of about $2\times10^{-6}$. Tightening `reltol` below $10^{-7}$ does not make the result more accurate.
 
@@ -256,7 +259,7 @@ is already in the loss terms). The owner should decide that before rerunning str
 
 *At the weaker states the cause is not identified.* On the plateau the propagating components hold only $10^{-12}$ of
 the actions, so radiation in the box is ruled out there; instead $n_{(1,0)}$ itself drifts down linearly, by
-$4.6\times10^{-9}$ (relative) per unit of $r_{*,\max}$. A candidate is the discretisation error of the exponential
+$5\times10^{-9}$ (relative) per unit of $r_{*,\max}$. A candidate is the discretisation error of the exponential
 decay on the coarse stretched intervals (1.86 wide), which accumulates linearly with the length of the tail. The
 decisive test, the same endpoint study with the stretched intervals capped at 0.8 (`outer_fine_tail`, job 27825217),
 is *pending*: if the slope drops by about $(0.8/1.86)^4 \approx 0.03$, the tail discretisation is the cause and
@@ -271,18 +274,26 @@ the radiation accounting before relying on strongly nonlinear runs.
 The radial functions are expanded in a Frobenius series at the inner endpoint; the series converges within the gap
 $r_+ - r_-$, and `horizon_offset_ratio` says how far inside that radius the mesh starts.
 
-| `horizon_offset_ratio` | nodes | rate error / fastest rate, five $f_a/M_\mathrm{Pl} = 0.047$ states | cost 1 thr | cost 8 thr |
-|---|---|---|---|---|
-| $10^{-4}$ | 652 | $1.1\times10^{-7}$ | 1.03 | 1.01 |
-| $10^{-5}$ | 671 | $8.8\times10^{-8}$ | 1.01 | 1.00 |
-| $10^{-6}$ (production) | 690 | $9.7\times10^{-8}$ | 1.00 | 1.00 |
-| $10^{-8}$ (reference) | 727 | 0 | 1.08 | 0.99 |
+| `horizon_offset_ratio` | $r_{*,\min}$ | nodes | rate error / fastest rate, weaker five states | strong_peak | strong_takeover | cost 1 thr | cost 8 thr |
+|---|---|---|---|---|---|---|---|
+| $10^{-4}$ | $-29.2$ | 652 | $3.3\times10^{-8}$ | $4.6\times10^{-5}$ | $1.6\times10^{-5}$ | 1.03 | 1.01 |
+| $10^{-5}$ | $-36.8$ | 671 | $2.4\times10^{-8}$ | $3.4\times10^{-5}$ | $1.2\times10^{-5}$ | 1.01 | 1.00 |
+| $10^{-6}$ (production) | $-44.3$ | 690 | $1.6\times10^{-8}$ | $2.3\times10^{-5}$ | $7.9\times10^{-6}$ | 1.00 | 1.00 |
+| $10^{-8}$ (reference) | $-59.5$ | 727 | 0 | 0 | 0 | 1.08 | 0.99 |
 
-The changes do not depend on the endpoint between $10^{-4}$ and $10^{-6}$; they are the change of the uniform mesh
-itself (moving the inner endpoint shifts every node of the uniform region by a fraction of a step), not of the series.
-Strong states: *pending*.
+(Rate errors of the strong states are $d\ln A_{322}/dt$, the faster rate there. The weaker states' column is the
+largest relative change of either amplitude rate.) For the weaker states the inner endpoint does not matter. For the
+strong states the change is proportional to the shift of $r_{*,\min}$ (each decade of the offset moves $r_{*,\min}$
+by about 7.6 and the rate by about $1.2\times10^{-5}$) and does not level off. The cause is checked
+(`../audit-work/horizon_waves_in_box.jl` on the saved strong_peak states): the Klein-Gordon charge of the component
+$q = (2,-1)$ in the domain grows linearly with $|r_{*,\min}|$, $2.585$, $2.638$, $2.692$, $2.800\times10^{-4}$, about
+$7\times10^{-7}$ per unit of $r_*$. Near the horizon each component is a wave falling in, whose action density per
+unit $r_*$ is constant, so the integral over the domain grows with its length. That component enters $N_{322}$ with
+weight $-1$; the $|211\rangle$ mode's own charge also drifts ($-2.9\times10^{-5}$ per unit of $r_*$; it is
+superradiant, so its infalling wave carries negative action). This is the same accounting question as in 3.2.
 
-**Recommendation: keep.**
+**Recommendation: keep $10^{-6}$**, and treat the inner and outer endpoint dependence together when the definition of
+the cloud actions is revisited.
 
 ### 3.4 `stretch_factor`
 
@@ -292,7 +303,7 @@ Strong states: *pending*.
 | 1.03 (production) | 690 | $2.6\times10^{-7}$ | 1.00 | 1.00 |
 | 1.015 (reference) | 715 | 0 | 1.09 | 1.06 |
 
-(Five $f_a/M_\mathrm{Pl} = 0.047$ states; strong states *pending*.) **Recommendation: keep**; the factor mostly
+(All seven states; the largest is strong_takeover, $3.6\times10^{-7}$ at production.) **Recommendation: keep**; the factor mostly
 changes how quickly the intervals reach the cap, and the cap is what matters (3.2).
 
 ## 4. Truncation
@@ -303,7 +314,7 @@ higher components or polar indices is a *truncation error*: it does not shrink w
 
 | setting | channels | rate error / fastest rate, against `n_angular` = 2 | cost 1 thr | cost 8 thr |
 |---|---|---|---|---|
-| production (`max_order` 3, `n_angular` 1) | 8 | $7.3\times10^{-4}$ (plateau), $6.1\times10^{-4}$ (takeover), $1.3\times10^{-5}$ (nonlinear), $7.5\times10^{-8}$ (linear) | 1.00 | 1.00 |
+| production (`max_order` 3, `n_angular` 1) | 8 | $2.0\times10^{-2}$ (strong_peak), $1.3\times10^{-2}$ (strong_takeover), $7.3\times10^{-4}$ (plateau), $6.1\times10^{-4}$ (takeover), $1.3\times10^{-5}$ (nonlinear), $7.5\times10^{-8}$ (linear) | 1.00 | 1.00 |
 | `max_order` 5 | 18 | change from production $\le 2.7\times10^{-6}$ | 2.89 | 3.31 |
 | `n_angular` 2 | 16 | reference | 1.91 | 2.48 |
 
@@ -311,11 +322,14 @@ higher components or polar indices is a *truncation error*: it does not shrink w
 $2.7\times10^{-6}$ includes an outer-endpoint change of the size found in 3.2; the Fourier truncation itself is at
 most that. The polar truncation is the largest error in this audit. The large_mesh state shows $9\times10^{-5}$ with
 `n_angular` = 2 although it is linear; at $\alpha = 0.187$ that would have to be the Kerr coupling between $l$ and
-$l + 2$, and I have not checked why it is so much larger than at $\alpha = 0.3$ ($7.5\times10^{-8}$). Strong states:
-*pending*. Whether `n_angular` = 2 is converged would need `n_angular` = 3, which was not run.
+$l + 2$, and I have not checked why it is so much larger than at $\alpha = 0.3$ ($7.5\times10^{-8}$). At the strong
+states `max_order` = 5 changes nothing beyond $10^{-6}$ while `n_angular` = 2 changes $d\ln A_{322}/dt$ by 1-2% and
+$db/dt$ by up to 1.6%: the error grows roughly like the square of the field amplitude. Whether `n_angular` = 2 is converged would need `n_angular` = 3, which was not run.
 
-**Recommendation:** the owner should decide whether $7\times10^{-4}$ in the rates matters for the physics questions
-of the reruns. If it does, run production with `n_angular` = 2 (about twice the cost per evaluation, 2.5 times at 8
+**Recommendation:** at strong nonlinearity (the $f_a/M_\mathrm{Pl} = 3\times10^{-3}$ runs) a 1-2% error in the rates
+is not acceptable for quantitative results; run those with `n_angular` = 2 after checking `n_angular` = 3 at the
+strong states. For the $f_a/M_\mathrm{Pl} = 0.047$ runs the owner should decide whether $7\times10^{-4}$ matters. If it
+does, run production with `n_angular` = 2 (about twice the cost per evaluation, 2.5 times at 8
 threads) and first check `n_angular` = 3 at the plateau and takeover states. Keep `max_order` = 3.
 
 ## 5. Tolerances
@@ -331,7 +345,7 @@ the tolerance of all radial solves inside it) from $10^{-7}$ to $10^{-12}$, at p
 | linear | $8\times10^{-12}$ | 4 / 5 / 6 | 0.352 / 0.347 s |
 | plateau | $1.8\times10^{-9}$ | 3 / 4 / 4 | 0.307 / 0.357 s |
 | takeover | $2.1\times10^{-9}$ | 3 / 5 / 6 | 0.317 / 0.359 s |
-| nonlinear | $1\times10^{-11}$ | 4 / 5 / 9 | 0.337 / 0.358 s |
+| nonlinear | $4\times10^{-11}$ | 4 / 5 / 9 | 0.337 / 0.358 s |
 | large_mesh | $0$ | 4 / 7 / 7 | 0.837 / 1.195 s |
 
 Newton's method converges quadratically, so the last iteration usually lands far below the tolerance: at $10^{-7}$ the

@@ -7,11 +7,12 @@
 # up to the end of the shortest run. Right column: all runs on a log time axis; a run that ends before the window does
 # is continued by a thin dotted line at its final value. On the log axis lines pass through points interpolated between
 # accepted states (plot_helpers.jl). --compact: only the log-time column, occupation and spin rows, larger type, for
-# slides; output name gets _compact.
+# slides; output name gets _compact. The compact log axis starts at the earliest first state after t = 0 (whole run).
 #
 # Rows from evolution_spindown.jl log every rhs evaluation; only accepted states are kept, with the filter of
 # scripts/plot_spindown.jl (see its header). A CSV without repeated times (one row per saved state, as from
-# hydrogenic_spindown.jl) is used as is. The threshold is the CSV's `threshold` column when present (hydrogenic: the
+# hydrogenic_spindown.jl) is used as is. A restart prefix (<parent>_t<final>_restart) is joined to its parent run, as
+# in scripts/plot_spindown.jl. The threshold is the CSV's `threshold` column when present (hydrogenic: the
 # zero of its rate formula), otherwise a = 4Ω/(1 + 4Ω²) with Ω = Re ω₂₁₁.
 #
 # Run from the package root:
@@ -36,7 +37,15 @@ output_path = isodd(length(arguments)) ? arguments[end] :
 
 """Accepted states of one run as a named tuple of columns."""
 function read_run(prefix)
-    table, header = readdlm(joinpath(@__DIR__, "..", "results", prefix * "_diagnostics.csv"), ','; header=true)
+    read_diagnostics(run_prefix) = readdlm(joinpath(@__DIR__, "..", "results", run_prefix * "_diagnostics.csv"), ','; header=true)
+    table, header = read_diagnostics(prefix)
+    # a restart prefix (<parent>_t<final>_restart) is joined to its parent run, as in scripts/plot_spindown.jl
+    parent_prefix = replace(prefix, r"_t[^_]+_restart$" => "")
+    if parent_prefix != prefix
+        parent_table, parent_header = read_diagnostics(parent_prefix)
+        parent_header == header || error("parent and restart diagnostics have different columns")
+        table = vcat(parent_table, table)
+    end
     column(name) = table[:, findfirst(==(name), vec(header))]
     raw_times = column("time")
     earliest_later_time = similar(raw_times)
@@ -104,7 +113,10 @@ longest_end = maximum(run.time[end] for run in runs)
 # a log axis) and that span is already in the left column
 windows = ((0.0, shared_end, false, "All runs, t ≤ $(scientific(shared_end)) M₀"),
            (0.2shared_end, longest_end, true, "To $(scientific(longest_end)) M₀ (log time); dotted: final value of a shorter run"))
-compact && (windows = ((windows[2][1], windows[2][2], true, "Log time; dotted: final value of the shorter run"),))
+# compact has no linear column, so its log axis shows the whole run: from the earliest first state after t = 0, as in
+# the whole-run column of scripts/plot_spindown.jl
+compact && (windows = ((minimum(run.time[2] for run in runs), longest_end, true,
+                        "Whole run (log time); dotted: final value of the shorter run"),))
 for (column_index, (time_min, time_max, log_axis, window_title)) in enumerate(windows)
     first_column = column_index == 1
     time_scale = log_axis ? log10 : identity
@@ -171,9 +183,11 @@ for (column_index, (time_min, time_max, log_axis, window_title)) in enumerate(wi
                        MarkerElement(marker=:circle, markersize=7, strokewidth=1.2, color=:transparent, strokecolor=ink) :
                        LineElement(color=ink, linewidth=2, linestyle=line_styles[index]) for index in eachindex(runs)]
         axislegend(axis_occupation, [level_entries, run_entries], [[L"|211\rangle", L"|322\rangle"], collect(labels)],
-                   ["level", "run"]; position=:rc, framevisible=false, orientation=:horizontal, nbanks=2)
+                   ["level", "run"]; position=compact ? :lt : :rc, framevisible=false, orientation=:horizontal, nbanks=2)
+        # compact (whole run on a log axis): the early part on the left is flat, so the legends go there
         axislegend(axis_spin, [LineElement(color=ink, linewidth=2), LineElement(color=(mode_211_color, 0.8), linewidth=1.5)],
-                   ["spin a", L"|211\rangle threshold ($\omega_{211} = \Omega_H$)"]; position=:rt, framevisible=false)
+                   ["spin a", L"|211\rangle threshold ($\omega_{211} = \Omega_H$)"]; position=compact ? :lb : :rt,
+                   framevisible=false)
     end
 end
 rowsize!(figure.layout, 1, Relative(compact ? 0.55 : 0.42))

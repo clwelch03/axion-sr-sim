@@ -1178,76 +1178,85 @@ Manifest with Julia 1.11.7 was not tested.
 ## 7. Scaling to more bound modes
 
 You want the method to handle of order ten bound modes eventually. $K$ is the number of bound modes (in the code, the
-length of the `ModeSet`). This section says what grows how fast with $K$ in the code as it stands. The short version:
-$K = 3$ is affordable, $K = 4$ is possible for single runs, and $K \approx 10$ needs changes to the method, not only to
-the quadrature. None of the counts below was changed by the speedup work.
+length of the `ModeSet`). The first version of this section estimated the costs from counts in the code. A separate
+scaling study has since measured them and tested remedies; its document, `docs/mode-scaling-study.md`, has the detail.
+This section summarises it. None of the growth described here was changed by the speedup.
 
-**What the calculation does with the modes.** The field is expanded in Fourier components $e^{-i q\cdot\xi}$, where
-$\xi$ is the vector of the $K$ phases and $q$ is a vector of $K$ integers. The code keeps every $q$ with odd
-$|q|_1 = \sum_i |q_i| \le 3$ and $\sum_i q_i > 0$: the $K$ fundamentals and all third-order combinations. Each
-component has its own radial profile, so the number of components sets the number of unknowns at every mesh node.
-The self-interaction term is obtained by reconstructing the field on a grid in $\xi$ (and in the polar angle),
-applying the potential, and projecting back onto the components.
+**What grows with $K$.** The field is expanded in Fourier components $e^{-iq\cdot\xi}$, where $\xi$ is the vector of
+the $K$ phases and $q$ a vector of $K$ integers; the code keeps every $q$ with odd $\sum_i |q_i| \le 3$ (one of each
+pair $\pm q$). Three things grow:
 
-**Three things grow with $K$.**
+1. *The phase grid*, exponentially. The self-interaction term is computed by evaluating the field on a grid of phase
+   points and averaging. The present grid has 16 points per phase, $16^K$ in all: 256, 4096, 65536 for
+   $K = 2, 3, 4$.
+2. *The number of components* $C = 2K + 2K(K-1) + 4\binom{K}{3}$, about $\tfrac23 K^3$: 8, 22, 48, 680 for
+   $K = 2, 3, 4, 10$. Each component brings its own radial profile, so the dense blocks of the Jacobian have side
+   $4C$, and the block LU of 2.2 costs $(4C)^3$ per mesh node: $K^9$ in time and $K^6$ in memory.
+3. *The mesh*, for some choices of mode. Adding $|433\rangle$ at $\alpha = 0.3$ brings a combination component whose
+   frequency lies just below the mass threshold, so its profile decays very slowly and the mesh must be six times
+   longer (4256 nodes instead of 690).
 
-1. *The phase grid: exponential.* The grid in $\xi$ is a tensor product with $n_{\mathrm{phase}} = 16$ points per phase,
-   so it has $16^K$ points. Every evaluation of the self-interaction term at every mesh node does work proportional to
-   that number, and the tables of sines and cosines at the grid points take memory proportional to it.
-2. *The number of Fourier components: polynomial, but steep.* Counting the integer vectors above gives
-   $2K + 2K(K-1) + 4\binom{K}{3}$ components, which grows like $\tfrac{2}{3}K^3$. (Checked against the code for
-   $K = 2, 3, 4$.) With one angular channel per component the node block of the Jacobian has four reals per component.
-   The block LU of section 2.2 costs the cube of the block size per mesh node, so the linear solve grows roughly like
-   $K^9$, and storing the Jacobian blocks grows like $K^6$.
-3. *Building the list of components: exponential, but trivially fixable.* The `ModeSet` constructor lists all $7^K$
-   integer vectors with entries from $-3$ to $3$ and filters them. At $K = 10$ that is $2.8\times10^8$ candidates; a count
-   I attempted for $K$ up to 10 did not finish in four minutes. Generating only the vectors that pass the filter removes
-   this.
+**Measured cost** (8 threads, 690-node mesh, lr7). One warm radial solve, the closest single number to one
+right-hand-side evaluation:
 
-Everything else is mild: the rates Jacobian for a stiff integrator has $K + 2$ columns, and the derivative pass of the
-balance terms carries $K + 2$ dual partials.
+| $K$ | modes | components | phase points | warm solve | memory of Jacobian and factorisation |
+|---|---|---|---|---|---|
+| 2 | $|211\rangle, |322\rangle$ | 8 | 256 | 0.10 s | 37 MB |
+| 3 | adding $|311\rangle$ | 22 | 4096 | 1.5 s | 268 MB |
+| 4 | adding $|311\rangle, |433\rangle$ | 48 | 65536 | about 47 s, from measured pieces | 1.26 GB |
 
-| $K$ | phase points $16^K$ | components | reals per mesh node | distinct wavevectors $q \pm q'$ | phase tables | stored Jacobian | node cost relative to $K = 2$ |
-|---|---|---|---|---|---|---|---|
-| 2 | 256 | 8 | 32 | 25 | 0.2 MB | 12 MB | 1 |
-| 3 | 4096 | 22 | 88 | 116 | 12 MB | 88 MB | about 70 |
-| 4 | 65536 | 48 | 192 | 417 | 590 MB | 415 MB | about 4000 |
-| 10 | $1.1\times10^{12}$ | 680 | 2720 | about $5\times10^4$ | not feasible | about 80 GB | not feasible |
+On one thread the $K = 3$ solve takes 7.7 s, 25 times the $K = 2$ solve. At this cost the production window (2233
+evaluations) would take about an hour at $K = 3$, and at $K = 4$ on the 4256-node mesh that $|433\rangle$ needs,
+about a week (extrapolated). From $K = 3$ to $K = 4$ the measured pieces follow the cost model (work proportional to
+components times phase points, and $(4C)^3$ for the factorisation) to within 10 to 25%. A $K = 3$ case with
+$|433\rangle$ on its own long mesh did not converge: the first Newton iterations hit an exactly singular pivot, cause
+not investigated.
 
-Sources and limits of this table: the first four columns for $K \le 4$ were read from the code on 2026-11-13 with the
-example modes $|211\rangle, |322\rangle, |433\rangle, |544\rangle$; the $K = 10$ row is from the counting formula and my own
-count of integer vectors with $|k|_1 \le 6$; memory figures and the "node cost" column are computed from the sizes and
-from the assembly agent's cost formula for the source Jacobian (potential evaluations at every phase point and polar
-node, plus a projection onto every distinct wavevector), not measured. The per-thread scratch arrays add about 1.6 MB
-per thread at $K = 3$ and 25 MB at $K = 4$ (estimate).
+**A phase rule that is not a tensor grid.** The phase average only has to deliver a polynomial number of Fourier
+coefficients, so a much smaller point set will do. A **rank-1 lattice rule** with $M$ points uses the points
+$\xi_j = 2\pi (j z \bmod M)/M$, $j = 0, \dots, M - 1$, for one integer vector $z$: a straight line on the torus of
+phases that wraps around. It averages every Fourier harmonic $e^{ik\cdot\xi}$ exactly except those with
+$k\cdot z \equiv 0 \pmod M$, so $z$ is chosen to keep those (the *aliases*) at high order, where the harmonics of the
+nonlinearity are negligible. At the field amplitudes of the clouds, about 100 lattice points at $K = 2$ and 700 at
+$K = 3$ reproduce the source and its Jacobian to $10^{-10}$, against 256 and 4096 tensor points. The number needed
+grows like $K^6$, not exponentially. The rule is in the library behind the `phase_grid` keyword (tensor grid by
+default), and the parameter audit tested it in full solves at $K = 2$ (section 8, item 2).
 
-**What this means in run time (extrapolated, not measured).** About 0.15 s of today's one-core right-hand-side
-evaluation is work proportional to the phase grid. At $K = 3$ that becomes of order 10 s on one core, which roughly
-cancels the speedup of this project. At $K = 4$ it becomes 4 to 10 minutes on one core and about a minute on eight,
-with the factorisation at about 3.5 s; a run of 2000 evaluations would take a day or two on eight cores, so a single
-run is feasible and a parameter scan is not. At $K = 10$ the tensor grid alone has $10^{12}$ points.
+**Which components matter.** The components whose frequency is near $3\mu$ ($\sum_i q_i = 3$) carry less than
+$10^{-12}$ of the rates. What matters are the fundamentals and the components that are the outgoing fourth leg of a
+two-to-two process between populated modes, such as $(2,-1)$ and $(-1,2)$: at $K = 3$, 6 of the 22 components give
+the rates to $10^{-4}$. Size alone is a poor guide: $(-1,2)$ has a profile $10^{-5}$ of the fundamentals but carries
+5 to 7% of the $|322\rangle$ rate, because it radiates to infinity.
 
-**What would remove each obstacle.**
+**Linear algebra.** A Newton step can be solved without forming the dense blocks, by an iterative (Krylov) method that
+only needs products of the Jacobian with vectors, preconditioned by the part of the Jacobian that does not couple
+components. It converged in 2 to 5 iterations at the clouds' amplitudes, at $K = 2$ and 3 alike. It removes the
+$(4C)^3$ cost but needs more residual evaluations, so it pays only beyond about $K = 5$.
 
-- *Phase grid.* The $16^K$ points are used to compute a number of Fourier coefficients that grows only polynomially:
-  the distinct wavevectors $q \pm q'$ in the table. A quadrature rule matched to those wavevectors, for example a rank-1
-  lattice rule (points $\xi_n = 2\pi n z / P$ for one integer vector $z$, chosen so that no two needed wavevectors
-  alias), needs a number of points of that order. The new node kernels take the phase points as a plain list with
-  precomputed tables, so they do not need rewriting for a different point set. This changes the quadrature, so it needs
-  a convergence comparison against the tensor grid at $K = 2$ and $3$. It is the first item of the numerical-parameter
-  audit (section 8) and has not been started.
-- *Component list.* Generate the vectors directly.
-- *Number of components.* The quadrature does not help here. Treating all $K$ modes on an equal nonlinear footing is
-  what produces the $K^3$ growth. A possible reformulation (a suggestion, not designed or tested): keep the two or
-  three modes that are large at a given time fully nonlinear, as now, and treat each other mode as a linear
-  perturbation on that nonlinear background, with a rule for promoting a mode to the nonlinear set when it has grown.
-  The cost would then be one small nonlinear solve plus one linear solve per extra mode, linear in $K$. This is close in
-  spirit to how Omiya et al. treat the secondary cloud. Whether it captures the physics you want from a ten-mode
-  calculation is a physics judgement; if it does, it is a separate piece of method design on top of the present code.
+**Strong and weak modes, and the recommendation.** Cannizzaro, Spieksma and Witte (arXiv:2611.15865, PDF in
+`docs/papers/`) find two dominant states at the production parameters and at most four or five dominant ones at late
+times elsewhere, with many weakly populated states that barely feed back. The study's estimate is that $K = 10$
+fully nonlinear costs hours per right-hand-side evaluation even with the lattice, the component selection and the
+Krylov solver, because the residual alone grows like $C$ times the number of phase points, about $K^3 \times K^6$. Its
+recommendation is therefore not ten fully nonlinear modes but **two to four strong modes treated as now, plus tens of
+weak modes**. A weak mode is one whose amplitude is small enough for the field equations to be linearised in it. Each
+weak mode is then a separate linear problem on the background of the strong cloud, with $1 + 2S^2$ components for $S$
+strong modes; the weak modes are independent of one another, so the cost is linear in their number and they can run
+in parallel. This is the primary/secondary construction of Omiya et al. that the old branch implemented. A weak mode
+is promoted to strong when the terms of second order in its amplitude reach the wanted accuracy. Suggested order: the
+lattice in full solves (now done at $K = 2$ by the audit); a small-amplitude check of the $(2,-1)$ flux against the
+paper's rates (needs their data release); the weak-mode solver; dropping the $\sum_i q_i = 3$ components; a $K = 3$
+strong evolution; a Krylov solver only beyond about four strong modes.
 
-*For the cleanup pass: `PhaseGrid` and its point-list tables `synthesis`, `analysis`, `jacobian_table` in `src/field.jl`;
-`ModeSet` and `_integer_vectors` in `src/modes.jl` (`max_order`, `n_angular`); the agent's cost formula uses $P$ phase
-points, $X$ polar nodes, $S$ distinct wavevectors up to sign, $L$ channels, and $h'$ the derivative of the nonlinearity.*
+What this does not establish: no accuracy or convergence study was done at $K = 3$; the $K = 4$ cost is from pieces,
+not solves; the lattice was tested at single mesh nodes for $K = 3$; the component ranking was measured at small
+field amplitudes and not near resonances; and the strong/weak scheme is a design, not code.
+
+*For the cleanup pass: branch `speedup/scaling` (`e90db99`), library change `49ad331` (`PhaseGrid(points, mode_set)`,
+`rank1_lattice`, `phase_grid` keyword; cherry-picked onto the audit branch as `b3bcdb4`), scratch
+`axion-sr-sim-speedup/scaling-work/`. `ModeSet` still enumerates all $7^K$ integer vectors with entries from $-3$ to
+$3$ and filters them (`_integer_vectors` in `src/modes.jl`), which is $2.8\times10^8$ candidates at $K = 10$;
+generating only the vectors that pass the filter removes this.*
 
 ## 8. Open items and decisions for you
 

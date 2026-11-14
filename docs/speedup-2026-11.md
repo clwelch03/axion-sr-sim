@@ -1258,34 +1258,153 @@ field amplitudes and not near resonances; and the strong/weak scheme is a design
 $3$ and filters them (`_integer_vectors` in `src/modes.jl`), which is $2.8\times10^8$ candidates at $K = 10$;
 generating only the vectors that pass the filter removes this.*
 
-## 8. Open items and decisions for you
+## 8. Decisions and their outcomes
 
-1. **Default of the metric-work diagnostic** (`record_metric_work`). Off now under the action balance, so `w` is
-   `NaN` unless requested. Option off: saves 30 to 65 ms per evaluation on one core (measured before later speedups;
-   the script comment says "a few percent"), at the price of a `NaN` column. Option on: simpler output, costs that
-   time. The coordinator was to decide from the final cost per evaluation; no decision or recommendation is recorded.
-2. **Numerical-parameter audit** ($n_{\mathrm{phase}}$, $n_{\mathrm{polar}}$, mesh step, tolerances): convergence
-   tables for you to decide on. First item: a phase quadrature that is not $n_{\mathrm{phase}}^K$. Not started.
-3. **Integrator choice.** Waiting for the work-precision comparison on the final code. The preliminary recommendation
-   is in section 5.
-4. **Existing results.** Whether to rerun anything computed with the old code, given 3.1: $A_{322}$ offsets of
-   $7.6\times10^{-5}$ in the linear window, inherited by restarted windows. For the one parameter point measured, the
-   new code took 64 s for the linear window and 295 s for the long window on 8 cores. The test of whether the offset
-   matters is to restart a late window from a state produced by the new code. No recommendation is recorded.
-5. **Remaining serial floor.** The factorisation (16 ms) and one boundary component (8 to 9 ms) limit scaling beyond 8
-   threads, and garbage collection is 16 to 20% of wall time at 8 to 16 threads. Whether to work on this is not
-   decided; the possible gain was not measured. A cost-aware refactorisation rule (about 25% fewer steps in long chord
-   sequences) was not implemented.
-6. **Review findings not yet in the code**, assigned to the integrator-comparison work: the failed-solve flag with
-   integrators that run their own nonlinear solve; accepted state versus stage for integrators without FSAL (4.4).
-7. **The action balance still computes $E$ and $J$ once per evaluation for diagnostics.** The review asks to document
-   this or make it optional. Related to item 1.
-8. **Unexplained difference** (Newton agent, preliminary). Nonlinear state, fixed background, fixed step: old and new
-   code differ by $2.1\times10^{-8}$ in $\ln A_{211}$ after 6 steps, while each agrees with its own tighter-tolerance
-   run to $3\times10^{-11}$. The agent's note named the out-of-date factorisation (3.1) as the likely cause, "to be
-   checked". I did not find that it was checked.
-9. **Merge and push.** Nothing is merged into `rewrite/axioncloud`; this needs your sign-off.
-10. **Reproduction on Perlmutter** with Julia 1.11.7 (section 6).
+The first version of this document ended with ten open items. You answered them on 2026-11-13; this section gives
+each item, the decision, and what came of it.
+
+**1. Default of the metric-work diagnostic: stays off.** You asked whether the metric work must be included in the
+spindown and therefore recorded by default. It need not. Under the default action balance the rates come from the
+balance of the wave actions $N_i$ of the modes. A wave action is an adiabatic invariant: when the background changes
+slowly compared with the oscillation, the action does not change, and the work that the changing metric does on the
+cloud shows up as a change of the cloud's frequency and energy at fixed action, not as a separate term. So the action
+balance has no metric-work term, and `w` is only a diagnostic (the coordinator's answer). `record_metric_work` stays
+off by default, and `w` is `NaN` in the output unless you set `AXION_RECORD_METRIC_WORK=1`. The energy balance
+(`balance=:energy`) still uses the metric work when `include_metric_work=true`.
+
+**2. Numerical-parameter audit: done.** The audit is `docs/parameter-audit.md`. For each numerical parameter it
+measured how much the four rates the integrator uses ($d\ln A_{211}/dt$, $d\ln A_{322}/dt$, $db/dt$, $dj/dt$)
+change when the parameter is made finer, at seven states from linear to strongly nonlinear, and what one evaluation
+then costs. The two strongly nonlinear states come from a run at $f_a = 3.7\times10^{16}$ GeV, where $A_{211}$
+reaches about $2\times10^{-2}$, seven times the plateau of the production run. The error measure is the change of the
+amplitude rates divided by the faster of the two rates. Each table is self-convergence: it shows how far production is
+from a finer discretisation of the same equations, not that the equations are right. Summary of its recommendations
+(cost change is per evaluation, at 1 / 8 threads):
+
+| Parameter | Production | Error at production, worst state | Recommendation | Cost change |
+|---|---|---|---|---|
+| phase quadrature | tensor grid, 16 points per phase | $3\times10^{-15}$ | 85-point rank-1 lattice (section 7) if the new code path is accepted, otherwise 12 points per phase | lattice $-42\%$ / $-19\%$; 12 points $-26\%$ / $-15\%$ |
+| `n_polar` (polar quadrature nodes) | 12 | $2\times10^{-15}$ | 8 | $-22\%$ / $0\%$ |
+| **lattice and `n_polar` 8 together (measured)** | | $1.8\times10^{-13}$ | **the recommended quadrature** | $-49\%$ / $-20\%$ |
+| radial `step` | 0.4 | $2.5\times10^{-6}$ | keep | |
+| cap on the stretched outer intervals (`max_step`) | 1.86 | about $3\times10^{-6}$ | keep, unless `n_angular` is raised; 0.8 removes this error | $+45\%$ at 8 threads |
+| outer endpoint (`containment`) | $10^{-4}$ | about $4\times10^{-6}$; $2\times10^{-5}$ at the strong takeover on the merged code | keep | |
+| inner endpoint (`horizon_offset_ratio`) | $10^{-6}$ | $\le 6\times10^{-8}$ on the merged code | keep | |
+| `stretch_factor` | 1.03 | $3\times10^{-7}$ | keep | |
+| `n_angular` (polar indices per component) | 1 | $2\times10^{-2}$ at the strong states, $7\times10^{-4}$ on the plateau and at the takeover | the largest error found: use 2 for strongly nonlinear runs, after checking 3 | $+91\%$ / $+148\%$ |
+| `max_order` (Fourier truncation) | 3 | $\lesssim 3\times10^{-6}$ | keep | |
+| `newton_tol` | $10^{-10}$ | $\le 2\times10^{-9}$ even at $10^{-7}$ | keep at $\alpha = 0.3$; $10^{-8}$ on the $\alpha = 0.187$ mesh | up to $-28\%$ at $\alpha = 0.187$ |
+| integrator tolerance | $10^{-7}$ | | keep $10^{-7}$ with Tsit5, or FBDF at $10^{-9}$ to $10^{-10}$ (section 5) | |
+
+Main findings:
+
+- *The angular truncation is the largest error.* Each Fourier component carries one polar index by default. Allowing
+  a second one changes $d\ln A_{322}/dt$ by 2% at the strong $|211\rangle$ peak and by $7\times10^{-4}$ on the
+  plateau of the production run: $10^3$ to $10^4$ times the radial-step error. Whether two polar indices are enough
+  is not known; three were not run.
+- *The quadratures can be made cheaper at no cost in accuracy*: the recommended lattice with 8 polar nodes agrees with a
+  much finer quadrature to $1.8\times10^{-13}$ and halves the one-thread cost.
+- *On the weaker states the drift with the outer endpoint is a resolution error of the coarse outer intervals*: a cap
+  of 0.8 instead of 1.86 reduces it about 30-fold, as expected for a fourth-order scheme.
+- *The integrator tolerance is already tighter than the discretisation*: the radial step alone gives relative rate
+  errors of a few times $10^{-6}$, so tightening below $10^{-7}$ does not make results more accurate.
+- *At $\alpha = 0.187$*, `newton_floor_tol=1e-9` is not enough; use `newton_tol=1e-8` or a floor tolerance of at least
+  $3\times10^{-9}$ (section 3.2).
+
+The audit's tables were computed on the code before the merge (`ebf0ae9`), without the conjugate-frequency rule
+(4.1). Its Section 7 reran the checks that involve the affected components on the merged code, at the strong states,
+and this changed one conclusion. On the old code the rates at the strong states moved by $6.3\times10^{-4}$ when the
+outer endpoint was moved, and by $2.3\times10^{-5}$ for the inner endpoint, together with the amount of radiation
+(the components $(-1,2)$ and $(2,-1)$ travelling out or into the hole) held inside the domain. That looked like a
+question of whether radiation in transit should count in the cloud's actions, and the first report to you asked you
+to decide it. On the merged code the domain holds the same radiation, but the rates move by only $2.2\times10^{-5}$
+and $6.3\times10^{-8}$: with the new rule those components' growth is consistent with the action balance, so the
+large endpoint dependence was mostly a symptom of the old frequency rule, and that question is withdrawn. The polar
+truncation error is unchanged on the merged code (1.5 to 2%). The rule itself moves the strong-state rates by up to
+$1.2\times10^{-3}$. The weaker-state numbers were not rerun on the merged code; the audit expects them to be
+unchanged, since the driven components are tiny there, but did not measure it.
+
+**3. Integrator: FBDF for stiff runs, Tsit5 otherwise.** Section 5 has the comparison and the conclusion: neither
+Rosenbrock method; FBDF at $10^{-9}$ on long stiff plateaus and $10^{-10}$ through a $|322\rangle$ takeover; Tsit5
+stays the default and is best where the problem is not stiff or very small errors are wanted.
+
+**4. Existing results: you are rerunning everything with the new code.** This removes the $7.6\times10^{-5}$ offset of
+3.1 from new results. The end-to-end window has not been rerun on the merged code by this project, so your reruns are
+also the first full runs with the conjugate-frequency rule and the new code together.
+
+**5. Remaining serial floor: not worked on.** Beyond about 8 threads the speedup stops, because the elimination
+stages of the factorisation, one outer-boundary component and garbage collection do not use more threads (2.8). You
+asked what removing them would gain. The coordinator's estimate, not a measurement, is a factor of 1.3 to 1.6 on 8
+threads and nothing on 1 thread, since on one thread there is nothing to parallelise. It was not done, and neither
+was the cost-aware refactorisation rule of 2.3.4 (an estimated 25% fewer steps in long chord sequences).
+
+**6. The two review findings: fixed.** Both concern how the evolution keeps track of radial solves when the
+integrator is not Tsit5 (4.4).
+
+- *Failure record per step attempt.* When a radial solve fails inside a step, the step must be rejected and retried
+  with a smaller step. The old code set a flag on failure and cleared it at the next accepted step. An integrator that
+  runs its own Newton iteration, such as FBDF, can abandon a step attempt by itself, and then the flag stayed set and
+  spoiled the next attempt; with fixed steps (`adaptive=false`) a failure froze the evolution. Now the integrator's
+  own counter of step attempts, which increases at every attempt whether it is accepted or not, is recorded at the
+  failure. The rest of that attempt returns zero rates and is rejected, and the next attempt has a new number, so
+  there is nothing to clear. With fixed steps a failed solve now stops the run with an error. This was tested with a
+  stand-in integrator and by reading the integrator library's source, not with a real integrator whose own Newton
+  iteration fails.
+- *Radial solution at the accepted state.* Checkpoints and the final result need the radial solution at the state
+  the integrator accepted. For an integrator without the first-same-as-last property (2.7) the stored solution was
+  that of a nearby stage: for Rodas5P its last stage, for FBDF its last Newton iterate, since FBDF never evaluates the
+  right-hand side at the accepted state. A new function, `accepted_radial_solution!`, returns the solution at the
+  accepted state, doing one extra radial solve when needed; the checkpoint writer of the script uses it, and the final
+  radial solution of a run is now taken at the final state for every integrator. The docstrings were corrected.
+
+**7. $E$ and $J$ under the action balance: recorded at each step, not each evaluation.** You wanted $E$ and $J$
+recorded at each time step, not necessarily at every evaluation. They are now computed for the first evaluation and
+for the last evaluation of each accepted step, and are `NaN` in the other rows of the diagnostics. For Tsit5 the last
+evaluation of a step is at the accepted state itself; for FBDF and Rodas5P it is a nearby state. Setting
+`charges_every_evaluation=true` (script: `AXION_CHARGES_EVERY_EVALUATION=1`) restores a value in every row. Computing
+$E$ and $J$ took 19 ms of a 227 ms evaluation on 1 thread and 3 ms of 82 ms on 8. The rates do not use them and are
+unchanged. Plotting code that reads those columns has to skip `NaN`. The fixed-background driver is unchanged.
+
+**8. The unexplained $2.1\times10^{-8}$ difference: explained.** The finding was: on the nonlinear state, with fixed
+background and fixed Tsit5 step, the old and the new code differed by $2.1\times10^{-8}$ in $\ln A_{211}$ after 6
+steps, while each agreed with its own run at tighter Newton tolerance to $3\times10^{-11}$. The suspected cause was the
+out-of-date factorisation of 3.1. An agent tested this by patching the old code to refactorise at the converged point.
+In this run the old code already did so in every solve, and the patched code gave identical results bit for bit. So
+the out-of-date factorisation is not the cause.
+
+The cause is a property of the radial problem at that state. At two of the 37 right-hand-side evaluations (stages 5
+and 6 of step 5) the Jacobian is nearly singular in one direction $d$ of the space of unknowns: moving the unknowns
+along $d$ changes the residual very little, $|Jd|/|d| \approx 2\times10^{-3}$. The direction involves the horizon
+coefficient of one driven channel, two outer coefficients and the unknowns at nodes near the horizon. Along such a
+direction Newton's method cannot locate the solution better than the residual's roundoff floor allows: two points
+$4.9\times10^{-9}$ apart both have residuals at that floor ($6\times10^{-13}$ to $6\times10^{-12}$), so both count as
+the solution. (My arithmetic: a floor of $6\times10^{-12}$ divided by $2\times10^{-3}$ is $3\times10^{-9}$, consistent
+with that separation.) The two points give values of $d\ln A_{211}/dt$ that differ by $3.5\times10^{-8}$ relative.
+Which of them a solve returns depends on the path its Newton iteration takes, in either code, and the old and new code
+take different paths. A tighter tolerance does not help, since both points already satisfy it, which is why each code
+agrees with its own tight run (my reading). Tsit5 combines the stages of a step with fixed weights, $-3.29$ and $+2.32$
+for those two stages, which turns the $3.5\times10^{-8}$ into the $2.1\times10^{-8}$ seen after the step. So at that
+state the rate is determined only to about $3\times10^{-8}$ relative, by the problem, not by either code. That is below
+the integrator tolerance ($10^{-7}$) and far below the discretisation errors of item 2, so it does not limit results.
+
+What this does not establish: how common such states are along a run (2 of 37 evaluations here); whether the nearly
+singular direction is physical or a weakness of how the unknowns are parametrised; and anything about the 1.1% rate
+errors of the out-of-date factorisation elsewhere (3.1), which this test does not touch. A separate finding of the
+same test: on the linear state the old code differs from its own tight run by $5.7\times10^{-7}$ (fixed background)
+and $3.1\times10^{-6}$ (spindown) in $\ln A_{211}$, the new code by $4\times10^{-8}$ and $3\times10^{-9}$.
+
+**9. Merge: done.** Merged into `rewrite/axioncloud` on 2026-11-14 as pull request #1, after the branch took in the
+conjugate-frequency rule and passed the regression against the target's own solver (4.1, section 10).
+
+**10. Reproduction on Perlmutter with Julia 1.11.7: still open.** Nothing in the sources records a run of the new code
+there (section 6).
+
+*For the cleanup pass: item 1, `record_metric_work`, `_computes_charges`; item 2, `validation/parameter_audit*.jl`,
+results in `axion-sr-sim-speedup/audit-work/run1` to `run8_merged`, spot check job 27847112; item 6, `failed_attempt`,
+`_step_attempt`, `_fail_step_attempt!`, `_reject_failed_step`, `accepted_radial_solution!`, `_accepted_evaluation!`,
+`_final_spindown_solution!` in `src/evolution.jl`, commit `2a1089a`; item 7, commit `057a167`, `_recorded_charges`,
+`_fill_last_charges!`, default `false` in `evolve_with_spindown` and `true` on a bare `EvolutionCache`; item 8,
+scripts and outputs in `axion-sr-sim-speedup/item8-work/`, STATUS.md paragraph "Item 8 resolved".*
 
 ## 9. Notes for the cleanup pass
 

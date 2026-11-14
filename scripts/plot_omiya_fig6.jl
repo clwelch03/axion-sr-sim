@@ -69,10 +69,11 @@ for (column_index, alpha) in enumerate((0.42, 0.3))
     for (potential, style) in (("cosine", :solid), ("chiral", :dash))
         run = read_run(alpha, potential)
         run === nothing && continue
+        potential_text = potential == "chiral" ? "QCD potential" : potential   # text shown in the legend
         lines!(axis, run.phase_time, run.energy_211; color=mode_211_color, linewidth=2, linestyle=style,
-               label="|211⟩, $potential")
+               label="|211⟩, $potential_text")
         lines!(axis, run.phase_time, run.energy_322; color=mode_322_color, linewidth=2, linestyle=style,
-               label="|322⟩, $potential")
+               label="|322⟩, $potential_text")
         peak = argmax(run.energy_211)
         @printf("α = %.2f %-6s: peak ω₂₁₁N₂₁₁ = %.1f at ω₁,I t = %.3f; final (ω₁,I t = %.2f): ωN = (%.1f, %.1f), E = %.1f\n",
                 alpha, potential, run.energy_211[peak], run.phase_time[peak], run.phase_time[end], run.energy_211[end],

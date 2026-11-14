@@ -58,7 +58,9 @@ Snapshot recorded at every right-hand-side evaluation: time, amplitudes,
 complex mode frequencies, reference-unit charges and losses, and (with
 spindown) the background state and metric work; also the occupations
 `N_i` (`phase_actions`) and their losses `L_{N_i}` (`action_losses`), in
-reference units.
+reference units. Under the action balance `evolve_with_spindown` by default
+fills `charges` only for the first evaluation and the last evaluation of every
+accepted step, and leaves `NaN` elsewhere (`charges_every_evaluation`).
 """
 struct EvolutionDiagnostics{T<:Real}
     time::T
@@ -190,31 +192,41 @@ mutable struct EvolutionCache{P<:RadialProblem, T<:Real}
     accepted_tangents::Union{Nothing, SolutionTangents}   # tangents of `accepted_solution`
     solve_counts::RadialSolveCounts
     newton_floor_tol::T   # `floor_tol` of every `solve_radial` (equal to `newton_tol` unless opted in)
+    charges_every_evaluation::Bool   # action balance: E and J in the balance terms of every evaluation (else `NaN`)
 end
 
 """
     EvolutionCache(problem; decay_constant_ratio=0.0, include_metric_work=false, record_metric_work=false,
                    newton_tol=1e-10, newton_floor_tol=newton_tol, verbose=false, log_amplitudes=true, balance=:action,
-                   last_solution=nothing, tangent_predictor=true)
+                   last_solution=nothing, tangent_predictor=true, charges_every_evaluation=true)
 
 Fresh cache for an evolution of `problem` (also handy for calling
 `balance_terms` directly). The energy, the angular momentum and the metric work
 are computed only when the energy balance, `include_metric_work` or
 `record_metric_work` asks for them (`_computes_charges`). `newton_tol` and
-`newton_floor_tol` are the `tol` and `floor_tol` of every radial solve.
+`newton_floor_tol` are the `tol` and `floor_tol` of every radial solve. Without
+`charges_every_evaluation` the action balance skips the energy and angular
+momentum altogether (`BalanceTerms.charges` is `NaN`).
 """
 function EvolutionCache(problem::RadialProblem; decay_constant_ratio=0.0, include_metric_work=false, record_metric_work=false,
                         newton_tol=1e-10, newton_floor_tol=newton_tol, verbose=false, log_amplitudes=true, balance=:action,
-                        last_solution=nothing, tangent_predictor=true)
+                        last_solution=nothing, tangent_predictor=true, charges_every_evaluation=true)
     _check_balance(problem, balance)
     EvolutionCache(problem, problem.mass_coupling, float(decay_constant_ratio)^2, include_metric_work, record_metric_work, last_solution,
                    EvolutionDiagnostics{Float64}[], float(newton_tol), verbose, log_amplitudes, balance,
                    last_solution, -1, nothing, tangent_predictor, Float64[], Float64[], nothing, nothing, RadialSolveCounts(),
-                   float(newton_floor_tol))
+                   float(newton_floor_tol), charges_every_evaluation)
 end
 
 """Whether the balance terms include the energy, angular momentum and metric work: the action balance does not need them."""
 _computes_charges(cache::EvolutionCache) = cache.balance == :energy || cache.include_metric_work || cache.record_metric_work
+
+"""Reference-unit energy and angular momentum of the cloud for the diagnostics, by quadrature of `solution`."""
+_diagnostic_charges(solution::RadialSolution, state) = reference_charges(cloud_charges(solution), state)
+
+"""Charges of balance terms that do not need them: computed for the record, or `NaN` without `charges_every_evaluation`."""
+_unused_charges(cache::EvolutionCache, solution::RadialSolution, state) =
+    cache.charges_every_evaluation ? _diagnostic_charges(solution, state) : Charges(NaN, NaN)
 
 """Print one progress line per right-hand-side evaluation when the cache is verbose."""
 function _report_step(cache::EvolutionCache, time, amplitudes, solution::RadialSolution, state_text::String)
@@ -985,7 +997,7 @@ function _exact_balance_pieces(cache::EvolutionCache, solution::RadialSolution, 
     values, partials = observable_partials(cache, solution, state, tangents, directions; include_charges)
     rows = observable_ranges(mode_count, include_charges)
     amplitude_slots = 3:2 + mode_count
-    charges = include_charges ? Charges(values[1], values[2]) : reference_charges(cloud_charges(solution), state)
+    charges = include_charges ? Charges(values[1], values[2]) : _unused_charges(cache, solution, state)
     return (derivatives=BackgroundDerivatives(partials[:, 1], partials[:, 2], mode_count; include_charges),
             charge_matrix=include_charges ? partials[rows.charges, amplitude_slots] : fill(NaN, 2, mode_count),
             action_matrix=partials[rows.actions, amplitude_slots], charges, actions=values[rows.actions])
@@ -1014,7 +1026,7 @@ function _resolved_balance_pieces(cache::EvolutionCache, solution::RadialSolutio
     return (derivatives=BackgroundDerivatives(wrt_mass, wrt_spin, mode_count; include_charges),
             charge_matrix=include_charges ? charge_jacobian(solution; directions) .* [state.mass, state.mass^2] : fill(NaN, 2, mode_count),
             action_matrix=state.mass^2 .* action_jacobian(solution; directions),
-            charges=reference_charges(cloud_charges(solution), state),
+            charges=include_charges ? _diagnostic_charges(solution, state) : _unused_charges(cache, solution, state),
             actions=reference_actions(phase_actions(solution), state))
 end
 
@@ -1141,8 +1153,9 @@ function _spindown_rhs!(rates, state_vector, cache::EvolutionCache, time)
     end
     rates .= evaluation.rates
     cache.last_solution, cache.last_rates, cache.last_tangents = solution, evaluation.rates, evaluation.tangents
+    charges = isempty(cache.diagnostics) ? _recorded_charges(terms.charges, solution, state) : terms.charges
     push!(cache.diagnostics, EvolutionDiagnostics(time, copy(evaluation.amplitudes), mode_frequencies(solution),
-                                                  terms.charges, terms.losses, state.mass, dimensionless_spin(state),
+                                                  charges, terms.losses, state.mass, dimensionless_spin(state),
                                                   terms.metric_work, terms.actions, terms.action_losses))
     _report_step(cache, time, evaluation.amplitudes, solution,
                  "  b = $(state.mass)  j = $(state.angular_momentum)  w = $(terms.metric_work)")
@@ -1231,6 +1244,25 @@ attempt; nothing needs clearing, since the failure is recorded per attempt.
 """
 _reject_failed_step(state_vector, cache::EvolutionCache, time) = cache.failed_attempt == _step_attempt(cache)
 
+"""`charges` if they were computed, otherwise the charges of `solution` by quadrature."""
+_recorded_charges(charges::Charges, solution::RadialSolution, state) =
+    isnan(charges.energy) ? _diagnostic_charges(solution, state) : charges
+
+"""
+Give the last diagnostics entry (the last evaluation of the step just accepted, which is the solution
+`cache.last_solution`) its energy and angular momentum if the balance terms left them out.
+"""
+function _fill_last_charges!(cache::EvolutionCache)
+    entry = cache.diagnostics[end]
+    isnan(entry.charges.energy) || return nothing
+    state = BackgroundState(entry.black_hole_mass, entry.black_hole_spin * entry.black_hole_mass^2)
+    cache.diagnostics[end] = EvolutionDiagnostics(entry.time, entry.amplitudes, entry.mode_frequencies,
+                                                  _diagnostic_charges(cache.last_solution, state), entry.losses,
+                                                  entry.black_hole_mass, entry.black_hole_spin, entry.metric_work,
+                                                  entry.actions, entry.action_losses)
+    return nothing
+end
+
 """
 Callback after every accepted step: keep the step's last right-hand-side
 solution, its rates and its tangents as the warm start of the next step's
@@ -1246,6 +1278,7 @@ a Jacobian or `accepted_radial_solution!` needs it (`_accepted_evaluation!`).
 """
 function _record_accepted_solution!(integrator)
     cache = integrator.p
+    _fill_last_charges!(cache)
     cache.accepted_solution, cache.accepted_rates, cache.accepted_tangents =
         cache.last_solution, cache.last_rates, cache.last_tangents
     u_modified!(integrator, false)
@@ -1278,8 +1311,8 @@ end
     evolve_with_spindown(problem, amplitudes, time_span, decay_constant_ratio; balance=:action,
                          include_metric_work=false, record_metric_work=false, log_amplitudes=true, initial_step_fraction=0.05,
                          newton_tol=1e-10, newton_floor_tol=newton_tol, verbose=false, initial_background, initial_guess=nothing,
-                         tangent_predictor=true, algorithm=Tsit5(), jacobian_settings=FiniteDifferenceJacobian(),
-                         callback=nothing, reltol, abstol, kwargs...)
+                         tangent_predictor=true, charges_every_evaluation=false, algorithm=Tsit5(),
+                         jacobian_settings=FiniteDifferenceJacobian(), callback=nothing, reltol, abstol, kwargs...)
 
 Integrate `[A₁ … A_K, b, j]` (or `[ln A₁ … ln A_K, b, j]`, the default) with
 `algorithm` (default Tsit5), starting from `initial_background`, by default `b = 1` and `j = a` of
@@ -1297,7 +1330,10 @@ that earlier energy-balance runs reproduce, and is of relative order `(f_a/M_Pl)
 background-drift terms. The energy, the angular momentum and the work are computed (and the work
 recorded in the diagnostics) only for the energy balance, with `include_metric_work`, or with
 `record_metric_work=true`; under the default action balance the diagnostics hold `NaN` for the work
-and the amplitude rates are unchanged (`_computes_charges`).
+and the amplitude rates are unchanged (`_computes_charges`). The action balance then needs `E` and
+`J` only for the record: they are written for the first evaluation and for the last evaluation of
+every accepted step (for Tsit5 the accepted state itself), and are `NaN` in the other diagnostics
+entries unless `charges_every_evaluation=true`.
 
 Each radial solve is warm-started from the solution at the last accepted step;
 with `tangent_predictor` (default) it starts from that solution moved to first
@@ -1337,12 +1373,12 @@ function evolve_with_spindown(problem::RadialProblem, amplitudes::AbstractVector
                               balance::Symbol=:action, include_metric_work=false, record_metric_work=false, log_amplitudes=true,
                               initial_step_fraction=0.05, newton_tol=1e-10, newton_floor_tol=newton_tol, verbose=false,
                               initial_background::BackgroundState=BackgroundState(1.0, problem.background.a),
-                              initial_guess=nothing, tangent_predictor=true, algorithm=Tsit5(),
-                              jacobian_settings::FiniteDifferenceJacobian=FiniteDifferenceJacobian(), callback=nothing,
+                              initial_guess=nothing, tangent_predictor=true, charges_every_evaluation=false,
+                              algorithm=Tsit5(), jacobian_settings::FiniteDifferenceJacobian=FiniteDifferenceJacobian(), callback=nothing,
                               reltol=(log_amplitudes ? 1e-7 : 1e-6), abstol=(log_amplitudes ? 1e-7 : 1e-12), kwargs...)
     cache = EvolutionCache(problem; decay_constant_ratio, include_metric_work, record_metric_work, newton_tol, newton_floor_tol,
                            verbose, log_amplitudes,
-                           balance, last_solution=initial_guess, tangent_predictor)
+                           balance, last_solution=initial_guess, tangent_predictor, charges_every_evaluation)
     initial_amplitudes = collect(float.(amplitudes))
     initial_solution = _solve_cached!(cache, current_problem(cache, initial_background), initial_amplitudes)
     cache.solve_counts.accepted_state += 1

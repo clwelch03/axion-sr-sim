@@ -23,45 +23,43 @@
 \maketitle
 
 \begin{abstract}
-    This document describes the methodology I use in constructing my multiphase adiabatic evolution framework. This method treats self-interactions non-perturbatively, and allows us to reliably track the evolution of a BH-axion cloud system over time even at high $\alpha$. I currently have this working for two independent axion modes, with the black hole’s mass and spin evolving as it absorbs the cloud’s horizon fluxes. A short evolution agrees with the energy-balance formulation; full-length spin-down runs are in progress.
+    Hi Josh! Hi Nick! This document contains vaguely presentable notes describing my methodology for superradiant cloud time evolution. In this framework, we model a superradiant axion cloud around a Kerr black hole as a Fourier series in the fast phases $\xi_i = \omega_i t - m_i\varphi$ of its bound modes (currently $\ket{211}$ and $\ket{322}$), where each integer combination $\mathbf{q}$ of the phases is a component driven by the self-interaction of the bound modes. Dropping the slow time derivatives and averaging the Klein--Gordon equation over the phases gives one radial equation for each retained Fourier component and angular harmonic, Eq.~\eqref{eq:radial}, with the nonlinear source evaluated on the full field and not expanded in the self-interaction strength. At fixed amplitudes these equations form a boundary-value problem, ingoing at the horizon and decaying or outgoing at large radius, which we solve by fourth-order collocation with Newton iterations to obtain the radial profiles and the complex frequency of each mode. Time evolution moves through a sequence of these stationary solutions: each phase carries an occupation number $\mathcal{N}_i$ that changes only through fluxes at the horizon and at infinity, giving one equation per mode for any number of modes, Eq.~\eqref{eq:evolution_law}. At the same time, the horizon fluxes affect the black hole's mass and spin. With self-interactions switched off, the resulting spin-down at $\alpha=0.3$ matches an independent calculation from Leaver frequencies to about $10^{-5}$ \CW{absolute? relative?} in spin and mass, and the spin-down times at $\alpha=0.187$ agree with Fig.~9 (right) of~\cite{Baryakhtar_2021}.
 \end{abstract}
 
 \textbf{NOTE:} Sections with a * are pretty technical, and can maybe be skipped if you just want to read about the physics.
 
-\ON{how high in alpha has this been tested?}
+\ON{Notes in purple are Orion's section summaries}
 
 \section{Formalism and Setup}
 \subsection{How we decompose the field}
 
 \ON{my own summary: without self-interactions the cloud is sum of hydrogen like bound modes, with its own fast phase. Self-interaction multiplies modes together in the phases, and now the field is written as Fourier series of the combinations $q$ which couple to the phases $\xi$. Each Fourier component is a physical process channel, for example $q = (2, -1)$ would correspond to something like $211 + 211 \to 322 + X$.}
 
-The axion field around a black hole contains components with many different phases. In the absence of self-interactions, the cloud comprises linear Kerr quasibound modes, labeled $\ket{nlm}$. These approach hydrogenic states in the limit $\alpha\ll1$. For a piece of the field with frequency $\omega$, azimuthal number $m$, and azimuthal coordinate $\varphi$, its oscillatory factor is\footnote{The below definition neglects the fact that $\omega$ can change over time. Later on we'll use the more accurate definition of $\xi \equiv \vartheta - m\varphi, \vartheta = \int_0^t \omega(\mathbf{A}(t'))dt'$.}
+The axion field around a black hole contains components with many different phases. In the absence of self-interactions, the cloud comprises linear Kerr quasibound modes, labeled $\ket{nlm}$. (These approach the hydrogenic states in the limit $\alpha\ll1$.) For a piece of the field with frequency $\omega$, azimuthal number $m$, and azimuthal coordinate $\varphi$, its oscillatory factor is\footnote{Writing $\omega t$ is shorthand for a snapshot at fixed amplitudes. When $\omega$ changes in time, $\dot\xi=\omega$ requires $\xi \equiv \vartheta - m\varphi$ with $\vartheta = \int_0^t \omega(\mathbf{A}(t'))\,dt'$, and any reconstruction of the field in time must use this. The evolution law of Section~\ref{sec:evolution} involves only phase-averaged quantities, so it does not depend on $\vartheta$.}
 \begin{equation}
     e^{-i\xi}, \quad \xi \equiv \omega t - m \varphi.
 \end{equation}
-Here and below, the $\omega$ are real phase frequencies. Let us consider a field with $K$ independently oscillating bound axion modes, labeled by their respective no-self-interaction state $\ket{nlm}$. Each bound mode $i$ in the cloud has a phase $\xi_i$ and an amplitude $A_i$\footnote{Defined through the asymptotic normalization of its fundamental radial profile; see Equation 20 of \cite{Omiya_2022} for details.}; we arrange these in vectors $\boldsymbol{\xi}, \mathbf{A}$. The nonlinear field equation couples these components. For example, a quartic term in the potential produces a cubic term in the field equation containing $\phi_{211}^{\,2}\phi_{322}^{*}$, where $\phi_{nlm}$ denotes the complex oscillatory contribution associated
-with that cloud. Its phase dependence is
+Here and below, the $\omega_i$ are real phase frequencies. Let us consider a field with $K$ independently oscillating bound axion modes, labeled by their corresponding linear-limit state $\ket{nlm}$. Each bound mode $i$ in the cloud has a phase $\xi_i$ and a prescribed amplitude $A_i$\footnote{Defined through the asymptotic normalization of its fundamental radial profile; see Eq. 20 of \cite{Omiya_2022} for details.}; we arrange these in vectors $\boldsymbol{\xi}, \mathbf{A}$. The nonlinear field equation couples these components. For example, a quartic term in the potential produces a cubic term in the field equation containing $\phi_{211}^{\,2}\phi_{322}^{*}$, where $\phi_{nlm}$ denotes the complex oscillatory contribution associated with that bound mode. Its phase dependence is
 \begin{equation}
     \phi_{211}^{\,2}\phi_{322}^{*}
     \propto e^{-i(2\xi_{211}-\xi_{322})}
     = e^{-i(2\omega_{211}-\omega_{322})t},
 \end{equation}
 since $2m_{211}-m_{322}=0$.
-More generally, nonlinear terms generate integer combinations of the independent phases, motivating a Fourier expansion in $\boldsymbol{\xi}$. We label each Fourier component by an integer vector $\mathbf{q} \equiv (q_1,\ldots,q_K)$. A component has an overall phase factor $e^{-i(\omega_\mathbf{q} t - m_\mathbf{q} \varphi)} = e^{-i\mathbf{q}\cdot\boldsymbol{\xi}}$, where $\omega_\mathbf{q} \equiv \mathbf{q} \cdot \boldsymbol{\omega}$ and $m_\mathbf{q} \equiv \mathbf{q} \cdot \mathbf{m}$. Since interactions can drive responses at different angular quantum numbers, each component also has an angular expansion with allowed indices $l \geq |m_\mathbf{q}|$. (In practice, we will truncate the set $L_\mathbf{q}$ for computability.)
+More generally, nonlinear terms generate integer combinations of the independent phases, motivating a Fourier expansion in $\boldsymbol{\xi}$. We label each Fourier component by an integer vector $\mathbf{q} \equiv (q_1,\ldots,q_K)$. A component has an overall phase factor $e^{-i(\omega_\mathbf{q} t - m_\mathbf{q} \varphi)} = e^{-i\mathbf{q}\cdot\boldsymbol{\xi}}$, where $\omega_\mathbf{q} \equiv \mathbf{q} \cdot \boldsymbol{\omega}$ and $m_\mathbf{q} \equiv \mathbf{q} \cdot \mathbf{m}$. Since interactions can drive responses at different angular quantum numbers, each component also has an angular expansion with allowed indices $l \geq |m_\mathbf{q}|$. (In practice, we will truncate the set $L_\mathbf{q}$ to make the numerical problem finite.)
 
 To write the field in terms of these components, we must introduce spatial profiles:
 \begin{equation}
     \label{eq:spatial_profile_Fq}
     F_\mathbf{q}(r,\theta;\mathbf{A}) = \sum_{l \in L_\mathbf{q}} R_{l,\mathbf{q}}(r;\mathbf{A}) \tilde{Y}_{l,|m_\mathbf{q}|}(\cos\theta),
 \end{equation}
-where $L_\mathbf{q}$ is the set of retained angular indices, $R_{l,\mathbf{q}}$ is a complex radial profile determined by the coupled field equations, and $\tilde{Y}_{l,m}$ is the polar part of the corresponding spherical harmonic (with azimuthal dependence removed). With all that defined, our field can be expanded as
+where $L_\mathbf{q}$ is the set of retained angular indices, $R_{l,\mathbf{q}}$ is a complex radial profile determined by the coupled field equations, and $\tilde{Y}_{l,m}$ is the polar part of the corresponding spherical harmonic. Our field can thus be expanded as
 \begin{equation}
-    \Phi = \sum_{\mathbf{q}} F_\mathbf{q}(r,\theta;\mathbf{A}) e^{-i \mathbf{q}\cdot\boldsymbol{\xi}} + \text{c.c.}
+    \Phi = \sum_{\mathbf{q}} F_\mathbf{q}(r,\theta;\mathbf{A}) e^{-i \mathbf{q}\cdot\boldsymbol{\xi}} + \text{c.c.},
 \end{equation}
-Note that the sum over $q$ considers only one of the two members of each complex conjugate pair $(\mathbf{q}, -\mathbf{q})$.
+where the only wrinkle is that once we include $\mathbf{q}$ we must exclude $-\mathbf{q}$.
 
 \subsection{Reducing the equation of motion to a radial form}
-
 \ON{plug Fourier expansion into the KG equation on Kerr with full axion potential. Drop the slow time derivatives (adiabatic approx) and average over the phases to pick out one equation per component. Project onto spherical harmonics to get Eq. 16, which is Teukosky/Detweiler for each $(l, q)$ with spheroidal $l$ mixing through $C$ and nonlinear source $N$ from the full field. this is the radial equation of interest.}
 
 Following~\cite{Omiya_2022}, we work in the Kerr metric $g_{\mu\nu}$ specified by
@@ -72,7 +70,11 @@ with
 \begin{equation}
     \Delta \equiv r^2 - 2Mr + a^2, \qquad \rho^2 \equiv r^2 + a^2 \cos^2 \theta.
 \end{equation}
-Define the physical axion field $a_\text{phys}$, and its dimensionless counterpart $\Phi = a_\text{phys}/f_a$. For the potential $V(\Phi)$, which we will usually take to be the QCD axion potential, define $U \equiv V/\mu^2$ for ease of calculation. Then the equation of motion is
+Define the physical axion field $a_\text{phys}$, and its dimensionless counterpart $\Phi = a_\text{phys}/f_a$. For the potential $V(\Phi)$, which we will usually take to be the QCD axion potential
+\begin{equation}
+    V(\Phi) = -m_\pi^2 f_\pi^2 \sqrt{1 - \frac{4m_um_d}{(m_u+m_d)^2}\sin^2(\Phi/2)}
+\end{equation}
+as in~\cite{di_Cortona_2016}, define $U \equiv V/\mu^2f_a^2$ for ease of calculation. Then the equation of motion is
 \begin{equation}
     \Box \Phi - \mu^2 U'(\Phi) = 0.
 \end{equation}
@@ -80,15 +82,14 @@ Working in units where $M=1$, we form the dimensionless version of the above by 
 \begin{equation}
     \Box\Phi - \alpha^2\Phi + \alpha^2 h(\Phi) = 0
 \end{equation}
-where $\alpha \equiv M \mu$. Expanding out the d'Alembertian,
+where $\alpha \equiv M \mu$. Expanding the d'Alembertian,
 \begin{equation}
     \begin{split}
         \frac{1}{\rho^2}\bigg[\partial_r (\Delta \partial_r \Phi) &+ \frac{1}{\sin \theta} \partial_\theta (\sin \theta \partial_\theta \Phi) - \left(\frac{(r^2+a^2)^2}{\Delta} - a^2\sin^2\theta \right) \partial_t^2\Phi \\
         &- \frac{4ar}{\Delta}\partial_t\partial_\varphi \Phi + \left(\frac{1}{\sin^2\theta}-\frac{a^2}{\Delta}\right)\partial_\varphi^2\Phi\bigg] - \alpha^2 \Phi + \alpha^2 h(\Phi) = 0.
     \end{split}
 \end{equation}
-
-To evaluate the d’Alembertian on the multiphase expansion, first consider its action on one term \(F_{\mathbf q}(r,\theta;\mathbf A)e^{-i \omega_q t + i m_\mathbf{q}\varphi}\). At leading adiabatic order, we neglect time derivatives of the slow amplitudes and frequencies. The time and azimuthal derivatives acting on this term become \(\partial_t\rightarrow-i\omega_{\mathbf q}\) and \(\partial_\varphi\rightarrow im_{\mathbf q}\). 
+To evaluate the d’Alembertian on the multiphase expansion, first consider its action on one term \(F_{\mathbf q}(r,\theta;\mathbf A)e^{-i \omega_\mathbf{q} t + i m_\mathbf{q}\varphi}\). At leading adiabatic order, we neglect time derivatives of the slow amplitudes and frequencies. The time and azimuthal derivatives acting on this term become \(\partial_t\rightarrow-i\omega_{\mathbf q}\) and \(\partial_\varphi\rightarrow im_{\mathbf q}\). 
 \begin{equation}
     \label{eq:component_dalembertian}
     \begin{split}
@@ -96,7 +97,7 @@ To evaluate the d’Alembertian on the multiphase expansion, first consider its 
         &- \frac{4arm_\mathbf{q}\omega_\mathbf{q}}{\Delta} F_\mathbf{q} + \left(-\frac{m_\mathbf{q}^2}{\sin^2\theta}+\frac{a^2m_\mathbf{q}^2}{\Delta}\right)F_\mathbf{q}\bigg].
     \end{split}
 \end{equation}
-Because the d’Alembertian is linear, its action on the full field is the sum of its actions on the individual components. Defining $\mathcal{D}_\mathbf{q}$ as shorthand for the differential expression in \eqref{eq:component_dalembertian}, we have
+Because the d’Alembertian is linear, its action on the full field is the sum of its actions on the individual components. Defining $\mathcal{D}_\mathbf{q}$ as shorthand for the differential operator in \eqref{eq:component_dalembertian}, we have
 \begin{equation}
     \sum_\mathbf{q} e^{-i\mathbf{q}\cdot\boldsymbol{\xi}} (\mathcal{D}_\mathbf{q}F_\mathbf{q} - \alpha^2 F_\mathbf{q}) + \mathrm{c.c.} + \alpha^2 h(\Phi) = 0.
 \end{equation}
@@ -119,7 +120,7 @@ The nonlinear source is evaluated on the full reconstructed field, without expan
 Collecting terms gives one radial equation for each retained pair \((l,\mathbf q)\):
 \begin{equation}
     \label{eq:radial}
-    \boxed{ \frac{d}{dr}\left(\Delta\frac{dR_{l,\mathbf q}}{dr}\right) +B_{l,\mathbf q}R_{l,\mathbf q} +a^2(\omega_{\mathbf q}^2-\alpha^2) \sum_{l'\in L_{\mathbf q}} C^{m_{\mathbf q}}_{ll'}R_{l',\mathbf q} +N_{l,\mathbf q}=0,}
+    \frac{d}{dr}\left(\Delta\frac{dR_{l,\mathbf q}}{dr}\right) +B_{l,\mathbf q}R_{l,\mathbf q} +a^2(\omega_{\mathbf q}^2-\alpha^2) \sum_{l'\in L_{\mathbf q}} C^{m_{\mathbf q}}_{ll'}R_{l',\mathbf q} +N_{l,\mathbf q}=0,
 \end{equation}
 where
 \begin{equation}
@@ -131,7 +132,7 @@ The linear angular coupling mixes different \(l\) values within a fixed phase co
 
 \ON{at fixed amplitudes $A$ the interacting cloud is a stationary snapshot. all radial profiles and the two complex fundamental frequencies are found as a BVP. The real parts of the frequencies give the energy level shifts and the imaginary parts give the growth or decay. These snapshots are the building blocks for time evolution in Section 3. The BCs are the usual SR ones but now also having escape channels from the self-interactions. The solver is MIRK4.}
 
-At fixed $a$, $\alpha$, and cloud amplitudes $\mathbf A$, we solve the coupled radial boundary-value problem using adaptive fourth-order MIRK collocation. This method determines the profiles and their slopes across a radial mesh, together with the unknown frequencies and free boundary coefficients, by imposing the discretized field equations and both endpoint conditions simultaneously. It requires a first-order form of the radial equations, boundary conditions at the finite numerical endpoints, and an initial guess for the profiles and unknown parameters. We develop these ingredients below before describing the nonlinear solve and mesh refinement.
+At fixed $a$, $\alpha$, and mode amplitudes $\mathbf A$, we solve the coupled radial boundary-value problem using fourth-order mono-implicit Runge–Kutta collocation, or MIRK4. This method determines the profiles and their slopes across a radial mesh, together with the unknown frequencies and free boundary coefficients, by imposing the discretized field equations and both endpoint conditions simultaneously. It requires a first-order form of the radial equations, boundary conditions at the finite numerical endpoints, and an initial guess for the profiles and unknown parameters. We develop these ingredients below before describing the nonlinear solve and mesh refinement.
 
 \subsection{First-order radial system}
 We wish to solve the system of radial equations \eqref{eq:radial} for $R_{l,\mathbf{q}}(r; \mathbf{A})$, for all $(l, \mathbf{q})$, at constant $a, \alpha, \mathbf{A}$ as described above. Before we can do so, we must reduce it to first order. For the numerical solve, we use the tortoise coordinate~\cite{Omiya_2022,witte2025,Baryakhtar_2021} to resolve the near-horizon wave behavior:
@@ -143,8 +144,11 @@ The tortoise coordinate stretches the near-horizon region, mapping $r = r_+$ to 
     \frac{dR_{l,\mathbf{q}}}{dr_*} &\equiv Q_{l,\mathbf{q}}, \\
     \frac{dQ_{l,\mathbf{q}}}{dr_*} &= -\frac{2r\Delta}{(r^2+a^2)^2} Q_{l,\mathbf{q}} - \frac{\Delta}{(r^2+a^2)^2} \left[B_{l,\mathbf{q}}R_{l,\mathbf{q}} + a^2 (\tilde{\omega}_\mathbf{q}^2-\alpha^2) \sum_{l'\in L_\mathbf{q}} C_{ll'}^{m_\mathbf{q}} R_{l',\mathbf{q}} + N_{l, \mathbf{q}}\right].
 \end{align}
-In the above, $\tilde{\omega}_i=\omega_i+i\gamma_i$, are the complex trial frequencies, with $\omega_i$ the real phase frequencies introduced above. The linear radial operators and asymptotic boundary data are evaluated using $\tilde{\omega}_{\mathbf q}
-=\mathbf q\cdot\widetilde{\boldsymbol{\omega}}$. 
+In the above, $\tilde{\omega}_i=\omega_i+i\gamma_i$ are the complex trial frequencies, with $\omega_i$ the real phase frequencies introduced above. The linear radial operators and asymptotic boundary data are evaluated using
+\begin{equation}
+    \tilde{\omega}_{\mathbf q} = \mathbf q\cdot\boldsymbol{\omega} + i\sum_i |q_i|\,\gamma_i ,
+\end{equation}
+since a component containing $\phi_i^*$ grows, rather than decays, with $\gamma_i$; for example $\phi_{211}^{\,2}\phi_{322}^{*}$ has complex frequency $2\tilde\omega_{211}-\tilde\omega_{322}^{*}$~\cite{Omiya_2022}. The $\gamma_i$ are the growth rates of a frozen snapshot, i.e.\ of the fixed-amplitude profiles multiplied by an exponential envelope. The time evolution of Section~\ref{sec:evolution} does not use them: it uses the boundary fluxes. Keeping $i\gamma$ in the driven components is a correction of relative order $\gamma/\omega$, the same order as the slow time derivatives $\dot F_{\mathbf q}$ that are dropped.
 
 \subsection{Boundary conditions}
 To specify the boundary conditions, we construct asymptotic expansions of the radial profiles near the horizon and at large radius. We separate the leading wave behavior from a regular factor, which we expand in $r-r_+$ near the horizon and in $1/r$ near infinity. The leading behavior selects the physical branch, while higher-order terms provide corrections needed to impose the conditions at finite numerical endpoints.
@@ -167,7 +171,7 @@ This has straightforward solutions
 \begin{equation}
     R_{l,\mathbf q} \propto e^{\pm i [(\omega_{\mathbf q}-m_{\mathbf q}\Omega_H)r_*]},
 \end{equation}
-and given our time convention $e^{-i\omega_{\mathbf q}t}$, the purely-ingoing boundary condition selects the \textit{negative} complex exponential. Integrating the tortoise coordinate near the horizon, we see
+and given our time convention $e^{-i\omega_{\mathbf q}t}$, the purely ingoing boundary condition selects the minus sign in the exponent. Integrating the tortoise coordinate near the horizon, we see
 \begin{equation}
     r_*=\frac{r_+^2+a^2}{r_+-r_-}\ln s+c_H+O(s),
 \end{equation}
@@ -227,25 +231,20 @@ The boundary condition selects the square-root branch of $k_{\mathbf q}$. For po
         \sqrt{\omega_{\mathbf q}^2-\alpha^2}, & \omega_{\mathbf q}>\alpha.
     \end{cases}
 \end{equation}
-These two choices apply to different Fourier components within the same solution. Components with $0<\omega_{\mathbf q}<\alpha$, including the fundamental clouds, have exponentially decaying outer profiles. Components with $\omega_{\mathbf q}>\alpha$ can propagate to infinity, so we select the outgoing branch. With our time convention, its leading phase is $k_{\mathbf q}r-\omega_{\mathbf q}t$, whose constant-phase surfaces move toward increasing $r$.\footnote{The threshold $k_{\mathbf q}=0$ requires a different asymptotic expansion.} 
+These two choices apply to different Fourier components within the same solution. Components with $0<\omega_{\mathbf q}<\alpha$, including the fundamental bound modes, have exponentially decaying outer profiles. Components with $\omega_{\mathbf q}>\alpha$ can propagate to infinity, so we select the outgoing branch. With our time convention, its leading phase is $k_{\mathbf q}r-\omega_{\mathbf q}t$, whose constant-phase surfaces move toward increasing $r$.\footnote{The threshold $k_{\mathbf q}=0$ requires a different asymptotic expansion.} 
 
-\subsection{Radial collocation solver*}
-With the first-order equations and endpoint conditions established, we can now formulate the numerical boundary-value problem on a radial mesh. The unknowns comprise the radial profiles $R_{l,\mathbf{q}}$, their tortoise-coordinate slopes $Q_{l,\mathbf{q}} \equiv dR_{l,\mathbf{q}}/dr_*$ on the numerical mesh, the two complex fundamental frequencies, all leading horizon coefficients $h_{l,\mathbf{q}}^{(0)}$, and the leading outer coefficients $b_{l,\mathbf{q}}^{(0)}$ not fixed by the prescribed amplitudes\footnote{In the current two-cloud setup, two leading outer coefficients are prescribed: $b^{(0)}_{1,(1,0)}=A_1$ and $b^{(0)}_{2,(0,1)}=A_2$.}. The discretized radial equations and asymptotic endpoint conditions are imposed simultaneously.
+On each interval, the unknowns comprise the radial profiles $R_{l,\mathbf{q}}$, their tortoise-coordinate slopes $Q_{l,\mathbf{q}} \equiv dR_{l,\mathbf{q}}/dr_*$ on the numerical mesh, the two complex fundamental frequencies, all leading horizon coefficients $h_{l,\mathbf{q}}^{(0)}$, and the leading outer coefficients $b_{l,\mathbf{q}}^{(0)}$ not fixed by the prescribed amplitudes\footnote{In the current two-bound-mode setup, two leading outer coefficients are prescribed: $b^{(0)}_{1,(1,0)}=A_1$ and $b^{(0)}_{2,(0,1)}=A_2$.}. The discretized radial equations and asymptotic endpoint conditions are imposed simultaneously.
 
 We discretize the radial domain into a mesh and treat the values of $R_{l,\mathbf q}$ and $Q_{l,\mathbf q}$ at its nodes as unknowns, together with the complex fundamental frequencies and free leading boundary coefficients. On each mesh interval, MIRK4 constructs algebraic relations between neighboring node values using the first-order radial equations and intermediate stage evaluations. At the inner and outer endpoints, additional equations require the mesh values of both $R_{l,\mathbf q}$ and $Q_{l,\mathbf q}$ to agree with the asymptotic expansions evaluated at the trial frequencies and boundary coefficients. The prescribed amplitudes $\mathbf A$ remain fixed.
 
-These interval relations and endpoint constraints form a coupled nonlinear algebraic system: the sources $N_{l,\mathbf q}$ depend nonlinearly on the profiles, while the radial coefficients and asymptotic boundary data depend on the unknown frequencies. Newton iterations adjust the mesh values, frequencies, and free boundary coefficients together to reduce the residuals of this system. In our implementation, the unknown parameters are appended to the radial state with zero radial derivatives, enforcing their constancy across the mesh.
+These interval relations and endpoint constraints form a coupled nonlinear algebraic system: the sources $N_{l,\mathbf q}$ depend nonlinearly on the profiles, while the radial coefficients and asymptotic boundary data depend on the unknown frequencies. We solve this system using Newton iterations with a sparse Jacobian computed by automatic differentiation and a backtracking line search, adjusting the mesh values, frequencies, and free boundary coefficients simultaneously. The frequencies and free boundary coefficients are appended to the radial state with zero radial derivatives, enforcing their constancy across the mesh.
 
-MIRK4 discretizes the first-order radial equations on each mesh interval, while the asymptotic expansions constrain the endpoint values of $R_{l,\mathbf q}$ and $Q_{l,\mathbf q}$. We solve the resulting nonlinear algebraic system using Newton iterations with a sparse Jacobian computed by automatic differentiation and a backtracking line search. The frequencies and free boundary coefficients are included as additional variables with zero radial derivatives, enforcing their constancy across the mesh.
+\section{Time evolution}\label{sec:evolution}
+To evolve the axion cloud--black hole system in time, we compute instantaneous fluxes, and then use the balance equations described below to update the amplitudes at each timestep.
 
-\section{Time evolution}
-In this adiabatic framework, time evolution works by enforcing the conservation of occupation numbers (more info below) at fixed time, updating the amplitudes, and repeating.
+\ON{each independent phase has a conserved charge, which is the occupation nubmer $N_i$ (or some equivalent which is roughly thought of as the occupation number). This changes only through fluxes out of the domain. When the BH slowly changes adiabatically, it shifts each quantum's frequency but not the number of quanta. You get $K$ equations for $K$ modes.}
 
-\subsection{Fixed-BH toy model}
-
-\ON{The toy evolution: with the BH held fixed, the cloud's energy and angular momentum change only through fluxes at horizon and at infinity. Two conservation laws gives two equations which fix $dA_{211}/dt$ and $dA_{322}/dt$. Each step uses a fresh snapshot solve plus derivatives, and this is integrated in the Runge Kutta scheme.}
-
-For a fixed black hole background --- that is, ignoring that the cloud saps mass from the BH and thus the metric needs to be updated over time --- we have the matrix equation
+In \cite{Omiya_2023}, time evolution is performed on a simplified version of our system using energy and angular momentum balance. Schematically, their evolution equations are
 \begin{equation}
     \begin{pmatrix}
     \partial_{A_1} E & \partial_{A_2} E \\
@@ -257,45 +256,44 @@ For a fixed black hole background --- that is, ignoring that the cloud saps mass
         L_E \\ L_J
     \end{pmatrix},
 \end{equation}
-where $E(\mathbf{A})$ and $J(\mathbf{A})$ are the phase-averaged energy and angular momentum of the full interacting field. The quantities $L_E$ and $L_J$ are the signed net losses through the inner and outer boundaries. The derivatives with respect to the amplitudes are tricky, since changing an amplitude changes the entire coupled solution—profiles, frequencies, and driven components. The derivatives \(\partial_{A_i}E\) and \(\partial_{A_i}J\) include that response. We advance the evolution using adaptive Tsit5 integration. Each evaluation of the evolution rates requires a corrected stationary profile and its associated charge derivatives and fluxes; the integrator adjusts the time step using an embedded error estimate.
+where $E(\mathbf{A})$ and $J(\mathbf{A})$ are the phase-averaged energy and angular momentum of the full interacting field, and $L_E$ and $L_J$ are the signed net losses through the inner and outer boundaries. However, this provides only two balance equations for arbitrarily many bound modes; to fully constrain the system, we need some other set of conserved quantities. We thus balance the occupations of the independent phases, following Whitham's averaged-Lagrangian method~\cite{Whitham_1965} in its multiphase form~\cite{Ablowitz_1970}\footnote{In these papers, the quantity in question is the \textit{wave action}, identical to our phase occupation.}.
 
-\subsection{Full time-evolution method}
-
-\ON{each independent phase has a conserved charge, which is the occupation nubmer $N_i$ (or some equivalent which is roughly thought of as the occupation number). This changes only through fluxes out of the domain. When the BH slowly changes adiabatically, it shifts each quantum's frequency but not the number of quanta. You get $K$ equations for $K$ modes.}
-
-\ON{ok, so note this doesn't account for the cloud's effect on taking mass away from the BH, which could be an important feature.}
-
-Once the black hole evolves, energy and angular momentum are no longer the most convenient balance variables: the changing metric does work on the cloud, and with more than two bound modes they provide too few equations. We instead balance the occupations of the independent phases, following Whitham's averaged-Lagrangian method~\cite{Whitham_1965} in its multiphase form~\cite{Ablowitz_1970}\footnote{In these papers, the quantity in question is the \textit{wave action}, identical to our phase occupation.}.
-
-Including the changing background, let $b=M_{\mathrm{BH}}/M_0$ and $j=J_{\mathrm{BH}}/M_0^2$ denote the black-hole mass and angular momentum relative to the initial mass $M_0$. Averaging the Lagrangian of the full field over $\boldsymbol{\xi}$ gives an averaged Lagrangian $\bar{\mathcal{L}}(\boldsymbol{\omega},\mathbf{A};b,j)$ that no longer depends on the phases. Each shift $\xi_i\to\xi_i+c$ is therefore a symmetry, and its Noether charge is the occupation of phase $i$,
+Including the changing background, let $b=M_{\mathrm{BH}}/M_0$ and $j=J_{\mathrm{BH}}/M_0^2$ denote the black-hole mass and angular momentum relative to the initial mass $M_0$. Averaging the Lagrangian of the full field over $\boldsymbol{\xi}$ gives us
+\begin{equation}
+    \bar{\mathcal L} = \int dr\,d\theta\,d\varphi\, \sqrt{-g}\, \left\langle -\frac12 g^{\mu\nu}\partial_\mu\Phi\,\partial_\nu\Phi -\alpha^2U(\Phi) \right\rangle_{\boldsymbol\xi}.
+\end{equation}
+In this approximation, each independent shift $\xi_i\to\xi_i+c$ is a symmetry of the system. Its Noether charge is the occupation of phase $i$:
 \begin{equation}
     \label{eq:wave_action}
     \mathcal{N}_i = \frac{\partial\bar{\mathcal{L}}}{\partial\omega_i} = \sum_{\mathbf{q}} q_i\, n_\mathbf{q},
     \qquad
-    n_\mathbf{q} = 4\pi\int dr\int_{-1}^{1}dx\;|F_\mathbf{q}|^2\,
-    \frac{\big[(r^2+a^2)^2-a^2\Delta(1-x^2)\big]\omega_\mathbf{q}-2a r\,m_\mathbf{q}}{\Delta},
+    n_\mathbf{q} = 4\pi\int dr\int_{-1}^{1}d\cos\theta\;|F_\mathbf{q}|^2\,
+    \frac{\big[(r^2+a^2)^2-a^2\Delta(1-\cos^2\theta)\big]\omega_\mathbf{q}-2a r\,m_\mathbf{q}}{\Delta},
 \end{equation}
-where $n_\mathbf{q}$ is the Klein--Gordon charge of component $\mathbf{q}$, integrated over the cloud as in~\cite{Hayes_1970}. It is helpful to consider the linear limit, in which $E=\omega\mathcal{N}$ and $J=m\mathcal{N}$ for each mode, and a component such as $(2,-1)$ contributes two quanta to $\mathcal{N}_{211}$ and minus one to $\mathcal{N}_{322}$. The phase-averaged source moves charge between components, but only with these weights, so the bulk transfer cancels and each $\mathcal{N}_i$ changes only through the radial current $F_{\mathcal{N}_i}=\sum_\mathbf{q} q_i\,4\pi(r^2+a^2)\sum_{l}\mathrm{Im}\big[R^*_{l,\mathbf{q}}Q_{l,\mathbf{q}}\big]$ at the boundaries. The actions are also adiabatic invariants of the slowly changing background, as the black hole changes the frequency of each quantum but not the number of quanta. With $L_{\mathcal{N}_i}=F_{\mathcal{N}_i}(\text{outer})-F_{\mathcal{N}_i}(\text{inner})$ (per unit $\tau$), each occupation obeys
+where $n_\mathbf{q}$ is the Klein--Gordon charge of component $\mathbf{q}$, integrated over the cloud as in~\cite{Hayes_1970}. To understand this picture it is helpful to consider the process $\ket{211} + \ket{211} \rightarrow \ket{322} + \text{BH}$, which corresponds to the $\mathbf{q} = (2, -1)$ field component. The weights $q_i$ reflect the participation of each bound mode in this process: two $211$ quanta are consumed and one $322$ quantum is produced. Accordingly, this component contributes $2n_{(2,-1)}$ to $\mathcal{N}_{211}$ and $-n_{(2,-1)}$ to $\mathcal{N}_{322}$. Thus $\mathcal{N}_i$ includes weighted contributions from the driven components; in the limit where only the linear fundamental components remain, $\mathcal{N}_i$ reduces to the occupation of the bound mode $i$.
+
+The nonlinear source redistributes charge among components, but its contribution to each phase-action balance vanishes because \(\langle h(\Phi)\,\partial_{\xi_i}\Phi\rangle_{\boldsymbol\xi}=\langle\partial_{\xi_i}[\Phi^2/2-U(\Phi)]\rangle_{\boldsymbol\xi}=0\) by phase periodicity. Thus, at leading adiabatic order, each \(\mathcal N_i\) changes only through the radial current at the boundaries:
+\begin{equation}
+    F_{\mathcal{N}_i}=\sum_\mathbf{q} q_i\,4\pi(r^2+a^2)\sum_{l}\mathrm{Im}\big[R^*_{l,\mathbf{q}}Q_{l,\mathbf{q}}\big].
+\end{equation}
+The actions are also adiabatic invariants of the slowly changing background, as the black hole changes the frequency of each quantum but not the number of quanta. With $L_{\mathcal{N}_i}=F_{\mathcal{N}_i}(\text{outer})-F_{\mathcal{N}_i}(\text{inner})$ (per unit $\tau \equiv t/M_0$), each occupation obeys
 \begin{equation}
     \label{eq:evolution_law}
-    \boxed{\frac{d\mathcal{N}_i}{d\tau} = -L_{\mathcal{N}_i}, \qquad i=1,\ldots,K.}
+    \frac{d\mathcal{N}_i}{d\tau} = -L_{\mathcal{N}_i}, \qquad i=1,\ldots,K.
 \end{equation}
-The amplitudes $A_i$ and the occupations $\mathcal{N}_i$ are two ways of specifying the same stationary cloud: $A_i$ is convenient for the radial solve and $\mathcal{N}_i$ for the dynamics. Since we solve at fixed $\mathbf{A}$, we integrate \eqref{eq:evolution_law} in the amplitudes:
+The amplitudes $\mathbf{A}$ and the occupations $\boldsymbol{\mathcal{N}}$ are two ways of specifying the same cloud configuration: $\mathbf{A}$ is convenient for the radial solve and $\boldsymbol{\mathcal{N}}$ for the dynamics. Since we solve at fixed $\mathbf{A}$, we integrate \eqref{eq:evolution_law} in the amplitudes:
 \begin{equation}
     \label{eq:action_balance}
     \sum_{k}\frac{\partial\mathcal{N}_i}{\partial A_k}\frac{dA_k}{d\tau} = -L_{\mathcal{N}_i} - \left(\frac{\partial\mathcal{N}_i}{\partial b}\frac{db}{d\tau} + \frac{\partial\mathcal{N}_i}{\partial j}\frac{dj}{d\tau}\right), \qquad i=1,\ldots,K.
 \end{equation}
-There is no metric-work term. The background-derivative terms appear only because $\mathbf{A}$ is held fixed while the background changes; the number of quanta itself does not change. The amplitude derivatives include the response of the entire coupled solution, and background derivatives hold the amplitudes, the other background variable, and the extraction coordinates fixed. All quantities use consistent fixed reference units.
+There is no metric-work term in the action balance equations. The background-derivative terms appear only because $\mathbf{A}$ is held fixed while the background changes; the number of quanta itself does not change. The amplitude derivatives include the response of the entire coupled solution, and background derivatives hold the amplitudes, the other background variable, and the extraction coordinates fixed. All quantities use consistent fixed reference units.
 
-
-The energy and angular momentum follow from the actions:
+The cloud energy, angular momentum, and their boundary fluxes are related to the actions by:
 \begin{align}
-    J &= \sum_i m_i\mathcal{N}_i \\
-    L_E &= \sum_i \omega_i L_{\mathcal{N}_i} \\
-    L_J &= \sum_i m_i L_{\mathcal{N}_i} \\
-    E &= \sum_i\omega_i\mathcal{N}_i-\bar{\mathcal{L}}
+    J &= \sum_i m_i\mathcal{N}_i, \quad E = \sum_i\omega_i\mathcal{N}_i-\bar{\mathcal{L}}, \\
+    L_E &= \sum_i \omega_i L_{\mathcal{N}_i}, \quad L_J = \sum_i m_i L_{\mathcal{N}_i}
 \end{align}
-Once the cloud is contained in the domain, the last of the above gives $dE=\sum_i\omega_i\,d\mathcal{N}_i+w$. Multiplying \eqref{eq:evolution_law} by the frequencies and azimuthal numbers then recovers the energy and angular-momentum balance
+Once the cloud is contained in the domain, the expression for $E$ gives $\frac{dE}{d\tau}=\sum_i\omega_i\,\frac{d\mathcal{N}_i}{d\tau}+w$. Multiplying \eqref{eq:evolution_law} by the frequencies and azimuthal numbers then recovers the energy and angular-momentum balance
 \begin{equation}
     \label{eq:evolving_background_balance}
     \begin{pmatrix}
@@ -310,26 +308,6 @@ with the rate of metric work on the cloud (positive when it adds energy)
 \end{equation}
 which reduces to $w=\sum_i\mathcal{N}_i\,d\omega_i/d\tau$ in the linear regime. For two modes the two formulations are equivalent; on a contained domain they agree to $10^{-7}$ in the amplitude rates.
 
-\section{Approximations and validation}
-
-\ON{could you reasonably recover the Baryakhtar et al. 2021 results? I know they are perturbative, so perhaps some differences, but could be close. }
-We make several assumptions and approximations in the construction of radial profiles. The most obvious one is the adiabatic approximation that undergirds the entire project. The 
-
-\textbf{Expansion truncation:} The boundary data in Eqs.~\eqref{eq:horizon_series} and~\eqref{eq:outer_series} use linear asymptotic expansions. The joint production settings cut the expansions off at $J_H=3$ and $J_B=7$. On the extended domain, orders $(J_H,J_B)=(5,9)$ and $(7,11)$ give secondary rates agreeing to about $10^{-7}$ relatively.
-
-\textbf{Angular quantum number set truncation:} In \eqref{eq:radial}, the $l' \in L_\mathbf{q}$ indicates that multiple angular quantum numbers can couple to a given mode $R_{l, \mathbf{q}}$. I briefly tested this, and found a second included $l$ changes the 211 growth rate by $2.55\times10^{-6}$ relatively at the weak-secondary test point, with negligible further change from a third, although the larger-secondary angular checks did not converge to the requested tolerance. The default still uses one $l$ per Fourier component, but we can add more for pretty cheap if we find a region of parameter space where it's necessary.
-
-\textbf{Domain endpoints:} Omiya's second paper~\cite{Omiya_2023} is quite vague about how they choose their endpoints, but at least at the single point they give us, it's $-100 < r_*/M < 100$. We initially used an outer endpoint of $r_*/M=80$, but moving it out to $180$ changed the tested late-state $\ket{322}$ growth rate by multiple orders of magnitude. At least at the point we tested, the growth rate converged by the time we reached this value, with a further increase to $r_*/M = 300$ having an $O(0.1\%)$ effect on the growth. We also had convergence issues at the horizon endpoint, and settled on $r_*/M = -80$ for now. \ON{this sounds tenuous -- with higher mode clouds, the radii are larger, the endpoint should perhaps scale with alpha or something if this is important.}
-
-\textbf{Linear boundary conditions:} We neglect nonlinear terms in the asymptotic boundary data. At the new outer endpoints, these nonlinear terms are sufficiently small to ignore. \CW{I know this is true, but I should get actual numbers}
-
-\textbf{Numerical resolution:} Halving the radial step from $0.1$ to $0.05$ changes the secondary rate by $0.016\%$ on the extended domain; the production step remains $0.4$. Polar and phase quadrature refinements change the tested rates by less than $10^{-9}$ relatively. Short-window midpoint tests show second-order time convergence.
-
-\section{Future work}
-\begin{itemize}
-    \item Currently the time evolution only works for two bound modes; [equation ref] relies on conservation of energy and angular momentum, giving us only two equations. \ON{do you have a plot of the spin-down predicted?}
-    \item More retained harmonics!
-\end{itemize}
 \vfill
 \pagebreak
 \bibliography{refs}

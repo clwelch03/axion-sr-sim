@@ -8,9 +8,12 @@
 # occupations, t ≤ 1.5e9) with the black hole absorbing the horizon fluxes: mass b = M/M₀ and angular momentum
 # j = J/M₀² evolve, coupled through (f_a/M_Pl)² (non-reduced Planck mass). Action balance (default), so no
 # metric-work term enters; the w column of the diagnostics is NaN unless AXION_RECORD_METRIC_WORK=1 (which also computes
-# E and J derivatives, a few percent more per right-hand-side evaluation). Reference units are the initial mass M₀.
+# E and J derivatives, a few percent more per right-hand-side evaluation). E and J themselves are written for the first
+# evaluation and the last evaluation of each accepted step, NaN in the other rows unless AXION_CHARGES_EVERY_EVALUATION=1.
+# Reference units are the initial mass M₀.
 # The mesh is built for the initial spin and reused, in units of the current mass, as the spin drops.
-# Potential: AXION_POTENTIAL=cosine (default) or free. With the free potential the two modes are uncoupled and f_a
+# Potential: AXION_POTENTIAL=cosine (default), chiral (the chiral QCD axion potential, ChiralPotential with its default
+# quark mass ratio; outputs get the prefix spindown_chiral_) or free. With the free potential the two modes are uncoupled and f_a
 # enters only through the initial cloud in physical units (κ𝒩₀ with κ = (f_a/M_Pl)²); outputs get the prefix spindown_free_.
 # Writes results/spindown_a<spin>_alpha0.3_fa<f_a/M_Pl>_{diagnostics,solution}.csv. The verbose log (one line per
 # rhs evaluation, including b and j) is the fallback record if the run stops early.
@@ -38,9 +41,10 @@ mass_coupling = 0.3
 mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
 mesh = RadialMesh(background, mass_coupling, mode_set)
 potential_name = get(ENV, "AXION_POTENTIAL", "cosine")
-potential = Dict("cosine" => CosinePotential(), "free" => FreePotential())[potential_name]
+potential = Dict("cosine" => CosinePotential(), "chiral" => ChiralPotential(), "free" => FreePotential())[potential_name]
 problem = RadialProblem(background, potential, mass_coupling, mode_set; mesh)
 record_metric_work = get(ENV, "AXION_RECORD_METRIC_WORK", "0") == "1"
+charges_every_evaluation = get(ENV, "AXION_CHARGES_EVERY_EVALUATION", "0") == "1"
 target_actions = [3e-6, 3e-6]
 probe = solve_radial(problem, [1e-6, 1e-6])
 amplitudes = probe.amplitudes .* sqrt.(target_actions ./ phase_actions(probe))
@@ -52,7 +56,7 @@ tolerance_options = haskey(ENV, "AXION_TOLERANCE") ?
     (reltol=parse(Float64, ENV["AXION_TOLERANCE"]), abstol=parse(Float64, ENV["AXION_TOLERANCE"])) : (;)
 checkpoint_minutes = parse(Float64, get(ENV, "AXION_CHECKPOINT_MINUTES", "Inf"))
 Threads.nthreads() > 1 && BLAS.set_num_threads(1)
-prefix = joinpath(@__DIR__, "..", "results", "spindown_$(potential_name == "free" ? "free_" : "")a$(spin_label)_alpha0.3_fa$(ARGS[1])" *
+prefix = joinpath(@__DIR__, "..", "results", "spindown_$(potential_name == "cosine" ? "" : potential_name * "_")a$(spin_label)_alpha0.3_fa$(ARGS[1])" *
                   (length(ARGS) ≥ 3 ? "_t$(ARGS[3])" : "") * (restart_path === nothing ? "" : "_restart") *
                   (algorithm_name == "tsit5" ? "" : "_$algorithm_name"))
 checkpoint_path = prefix * "_checkpoint.jls"
@@ -110,7 +114,8 @@ callback = isfinite(checkpoint_minutes) ?
     DiscreteCallback((state, time, integrator) -> true, write_checkpoint!; save_positions=(false, false)) : nothing
 
 t = @elapsed result = evolve_with_spindown(problem, amplitudes, span, decay_constant_ratio; initial_background, initial_guess,
-                                           algorithm, callback, verbose=true, record_metric_work, save_options..., tolerance_options...)
+                                           algorithm, callback, verbose=true, record_metric_work, charges_every_evaluation,
+                                           save_options..., tolerance_options...)
 counts = result.solve_counts
 println("done: $(length(result.diagnostics)) rhs evals in $(round(t, digits=1))s; radial solves: $(counts.stage) stage + " *
         "$(counts.jacobian) Jacobian + $(counts.accepted_state) accepted-state ($(counts.failed) failed); " *

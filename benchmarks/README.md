@@ -37,7 +37,14 @@ environment (`julia -t`, `OPENBLAS_NUM_THREADS`, set by `submit.sh` from its arg
 `regression.jl` and `timing.jl`: `--states linear,plateau,...`, `--skip-evolution`, `--reference PATH`
 (regression), `--repeats N` or `BENCH_REPEATS` and `--csv PATH` (timing).
 
-Do not use `--write-reference` on an optimised branch. The references belong to the baseline commit.
+Do not use `--write-reference` on an optimised branch. The references belong to a baseline commit: they were
+first written from b4c4100 and rewritten on 2026-11-14 from 6bec64a (the original solver with the
+conjugate-frequency rule of 41fc2e7, which changes the equations) by checking out that commit with this
+directory from `speedup/base` and running `regression.jl --write-reference`. The stored states are unchanged;
+they were converged under the earlier rule, so they are fixed evaluation points, not solutions of the present
+equations. When a later commit changes the equations again, rewrite the reference the same way, from the
+unoptimised code if it still exists and otherwise from the last commit before the change plus a separate
+argument for the change.
 To prove a speed-up, run `regression.jl` (must PASS) and `timing.jl` on the same node type as the
 baseline table below and compare the CSV rows.
 

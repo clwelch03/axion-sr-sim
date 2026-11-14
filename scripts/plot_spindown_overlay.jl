@@ -33,7 +33,7 @@ prefixes = Tuple(arguments[2index - 1] for index in 1:run_count)
 labels = Tuple(arguments[2index] for index in 1:run_count)
 output_path = isodd(length(arguments)) ? arguments[end] :
               joinpath(@__DIR__, "..", "plots", "spindown_overlay_$(join(labels, "_"))_" *
-                       replace(prefixes[1], r"^spindown_(free_)?" => "", r"_t[^_]+$" => "") * (compact ? "_compact" : "") * ".png")
+                       replace(prefixes[1], r"^spindown_((free|chiral)_)?" => "", r"_t[^_]+$" => "") * (compact ? "_compact" : "") * ".png")
 
 """Accepted states of one run as a named tuple of columns."""
 function read_run(prefix)
@@ -102,8 +102,9 @@ line_styles = [last_as_markers && index == run_count ? :markers : (:solid, :dash
 grid = (:black, 0.06)
 figure = compact ? Figure(size=(900, 850), fontsize=20, figure_padding=(16, 48, 16, 16)) : Figure(size=(1300, 1000), fontsize=15)
 line_width = compact ? 2.5 : 2
-title = compact ? "$(join(labels, " vs ")): a₀ = $spin_label, α₀ = $mass_coupling_label, f_a = $(scientific(decay_constant_gev)) GeV" :
-        "Spin-down, $(join(labels, " / ")): a₀ = $spin_label, α₀ = $mass_coupling_label, " *
+# the runs are named in the legend (display_label of each label), not in the title
+title = compact ? "a₀ = $spin_label, α₀ = $mass_coupling_label, f_a = $(scientific(decay_constant_gev)) GeV" :
+        "Spin-down: a₀ = $spin_label, α₀ = $mass_coupling_label, " *
         "f_a = $(scientific(decay_constant_gev)) GeV (f_a/M_Pl = $(scientific(decay_constant_ratio))), equal initial occupations"
 Label(figure[0, compact ? 1 : (1:2)], title; fontsize=compact ? 20 : 17, color=ink, halign=:left, tellwidth=false)
 
@@ -182,8 +183,8 @@ for (column_index, (time_min, time_max, log_axis, window_title)) in enumerate(wi
         run_entries = [line_styles[index] == :markers ?
                        MarkerElement(marker=:circle, markersize=7, strokewidth=1.2, color=:transparent, strokecolor=ink) :
                        LineElement(color=ink, linewidth=2, linestyle=line_styles[index]) for index in eachindex(runs)]
-        axislegend(axis_occupation, [level_entries, run_entries], [[L"|211\rangle", L"|322\rangle"], collect(labels)],
-                   ["level", "run"]; position=compact ? :lt : :rc, framevisible=false, orientation=:horizontal, nbanks=2)
+        axislegend(axis_occupation, [level_entries, run_entries], [[L"|211\rangle", L"|322\rangle"], collect(display_label.(labels))],
+                   ["level", "run"]; position=compact ? :lt : :rc, framevisible=false, orientation=:horizontal, nbanks=max(2, run_count))
         # compact (whole run on a log axis): the early part on the left is flat, so the legends go there
         axislegend(axis_spin, [LineElement(color=ink, linewidth=2), LineElement(color=(mode_211_color, 0.8), linewidth=1.5)],
                    ["spin a", L"|211\rangle threshold ($\omega_{211} = \Omega_H$)"]; position=compact ? :lb : :rt,

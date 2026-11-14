@@ -41,6 +41,10 @@ end
     # parity: (2,−1) has m = 0 and even parity so l = 0
     static = findfirst(component -> component.q == [2, -1], mode_set.components)
     @test mode_set.components[static].ls == [0]
+    # φ₁²φ₂* has complex frequency 2ω̃₁ − ω̃₂*: it grows with γ₂ as well as γ₁.
+    mode_frequencies = [0.29 + 1e-3im, 0.295 - 2e-4im]
+    @test AC.component_frequencies(mode_set, mode_frequencies)[static] ≈ 2mode_frequencies[1] - conj(mode_frequencies[2])
+    @test AC.component_frequencies(mode_set, real.(mode_frequencies))[static] ≈ 2 * 0.29 - 0.295
     with_angular = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]; n_angular=2)
     @test with_angular.components[1].ls == [1, 3]
     @test_throws ArgumentError BoundMode(1, 1, 0)
@@ -726,6 +730,31 @@ end
     @test AC._reuse_stored_jacobian(store, reuse_twice, [3.0, 0.0])    # age 2
     @test !AC._reuse_stored_jacobian(store, reuse_twice, [4.0, 0.0])   # age 3
     @test !AC._reuse_stored_jacobian(store, FiniteDifferenceJacobian(), [5.0, 0.0])
+end
+
+@testset "Spindown diagnostics: E and J once per accepted step" begin
+    background = KerrBackground(0.9)
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
+    mesh = RadialMesh(background; rstar_min=-60.0, rstar_max=250.0, step=0.8)
+    problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh)
+    amplitudes = [1e-6, 1e-7]
+    solution = solve_radial(problem, amplitudes)
+    final_time = 0.1 / growth_rates(solution)[1]
+    run(; options...) = evolve_with_spindown(problem, amplitudes, (0.0, final_time), 0.01; initial_guess=solution,
+                                             dt=final_time / 2, options...)
+    sparse, full = run(), run(charges_every_evaluation=true)
+    energies, full_energies = [entry.charges.energy for entry in sparse.diagnostics], [entry.charges.energy for entry in full.diagnostics]
+    filled = findall(!isnan, energies)
+    # The rates do not use E and J, so both runs take the same evaluations.
+    @test sparse.ode_solution.u == full.ode_solution.u && length(energies) == length(full_energies)
+    @test !any(isnan, full_energies)
+    @test first(filled) == 1 && last(filled) == length(energies)
+    @test length(filled) == 1 + sparse.ode_solution.stats.naccept
+    @test energies[filled] ≈ full_energies[filled] rtol=1e-12
+    @test [entry.charges.angular_momentum for entry in sparse.diagnostics[filled]] ≈
+          [entry.charges.angular_momentum for entry in full.diagnostics[filled]] rtol=1e-12
+    # Tsit5 evaluates at the accepted state last, so the filled rows are at the accepted times.
+    @test [entry.time for entry in sparse.diagnostics[filled]][2:end] ≈ sparse.ode_solution.t[2:end]
 end
 
 @testset "Evolution with stiff integrators" begin

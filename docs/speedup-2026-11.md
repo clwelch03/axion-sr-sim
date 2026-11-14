@@ -2,11 +2,16 @@
 
 This is the record of the speedup of the AxionCloud time evolution (`evolve_with_spindown`, `evolve_fixed_background`),
 done on 2026-11-12 and 2026-11-13. It is written for the code's owner and for whoever later cleans the code up. It
-says what changed, why, how each change was checked, and what is left.
+says what changed, why, how each change was checked, and what is left. It was first written on 2026-11-13 and brought
+up to date on 2026-11-14, after the pieces that were then unfinished had finished.
 
-All of the work is on one branch. Nothing has been merged into `rewrite/axioncloud` or pushed. Two pieces are still in
-progress and are marked as such: the comparison of time integrators on the final code, and the audit of numerical
-parameters.
+**Status on 2026-11-14.** The work was merged into `rewrite/axioncloud` on 2026-11-14 as pull request #1. Before the
+merge, the branch took in a change that the owner had meanwhile made on `rewrite/axioncloud`, the conjugate-frequency
+rule; section 4.1 says what that rule is and how the checks were redone for it. The comparison of time integrators is
+finished (section 5). The numerical-parameter audit and the study of scaling with the number of bound modes are
+finished and have their own documents, `docs/parameter-audit.md` and `docs/mode-scaling-study.md` (sections 7 and
+8). The owner has answered the open questions of the first version; section 8 records the decisions and what came of
+them.
 
 The work was done by several Claude agent sessions, each named after its task (assembly, linear solver, Newton,
 balance, integrator, and "polish" for the second round of cleanups), coordinated by one more session. Measurements are
@@ -18,49 +23,60 @@ the answer did not change. Each computing term is explained where it first appea
 italics, "For the cleanup pass", carries the branch names, commit hashes, job IDs and function names; you can skip
 those lines on a first reading.
 
-*For the cleanup pass: the branch is `speedup/integration-next` at commit `9e17100` (26 commits on top of
-`rewrite/axioncloud` at `b4c4100`). In progress: branch `speedup/methods` (integrator comparison) and the
-numerical-parameter audit. The coordinator's running record is `STATUS.md` in `axion-sr-sim-speedup/` (outside the
-repository); the rules given to every agent are in `AGENT_BRIEF.md` there. This document is built from those two
-files and from the code at `9e17100`.*
+*For the cleanup pass: merged as https://github.com/clwelch03/axion-sr-sim/pull/1, merge commit `6c0a9e6` on
+`rewrite/axioncloud`. The merged branch is `speedup/integration-next`: `9e17100` was the state described in the first
+version of this document, `057a167` its last commit before the merge with the target, `582b955` the merge with
+`rewrite/axioncloud` at `6bec64a`, and `86c4b62` the rewritten regression reference. The conjugate-frequency rule is
+commit `41fc2e7`. This document, the parameter audit and the scaling study are on `speedup/followup` (not merged, not
+pushed). The coordinator's running record is `STATUS.md` in `axion-sr-sim-speedup/` (outside the repository); the
+rules given to every agent are in `AGENT_BRIEF.md` there. This document is built from those two files, the agents'
+reports and the code on `speedup/followup`, which contains the merged code.*
 
 ## If you read only this
 
 **What was achieved.** The time evolution spends almost all its time computing the rates of change of the state
 (amplitudes, black-hole mass and spin) at the points the time integrator asks for. One such computation now costs
-0.19 s on one processor core instead of 2.99 s, a factor of about 15. On eight cores it costs 0.07 to 0.11 s, a
-factor of 28 to 43; the spread is between two runs on different nodes. A full rerun of your saved window
+0.19 to 0.22 s on one processor core instead of 2.99 s, a factor of about 15. On eight cores it costs about 0.07 s, a
+factor of about 42; one earlier run on another node gave 0.11 s. A full rerun of your saved window
 $t = 1.5\times10^9 \to 10^{11}$ took 295 s on eight cores. The original run took 13353 s, but on a different machine
-with a different core layout, so the factor of about 45 is not a like-for-like comparison.
+with a different core layout, so the factor of about 45 is not a like-for-like comparison. With the stiff integrator
+FBDF (section 5) the same window took 119 s.
 
 | | Before | Now, 1 core | Now, 8 cores |
 |---|---|---|---|
-| one rate computation (plateau state) | 2.99 s | 0.189 s | 0.069 to 0.106 s |
-| short evolution, 31 rate computations | 94.3 s | 6.4 s | 2.84 to 3.15 s |
-| window $1.5\times10^9 \to 10^{11}$, 2233 rate computations | 13353 s (other machine) | not measured | 295 s |
+| one rate computation (plateau state) | 2.99 s | 0.189 to 0.224 s | 0.068 to 0.106 s |
+| short evolution, 31 rate computations | 94.3 s | 6.2 to 7.7 s | 2.81 to 3.15 s |
+| window $1.5\times10^9 \to 10^{11}$, Tsit5 at tolerance $10^{-7}$, 2233 to 2300 rate computations | 13353 s (other machine) | not measured | 266 to 296 s |
+| same window, FBDF at tolerance $10^{-10}$, 1036 radial solves | | not measured | 119 s |
+
+The ranges are over runs on different nodes and commits (section 1); the 8-core figures vary more between nodes than
+the 1-core ones.
 
 **Two things about your existing results.**
 
 1. The old code computed the amplitude rates with a slightly out-of-date matrix. Individual rate evaluations were
    wrong by up to 1.1%. In the stored linear-growth window this left $A_{322}$ at $t = 1.5\times10^9$ off by
    $7.6\times10^{-5}$ relative. Every later window that was restarted from that state carries the same offset as its
-   initial condition. Whether that offset changes late-time results has not been tested (section 3.1).
+   initial condition. Whether that offset changes late-time results has not been tested (section 3.1). You are
+   rerunning everything with the new code (section 8).
 2. At $\alpha = 0.187$ the radial solve cannot reach its default convergence tolerance, because of roundoff. With the
    old code every solve there ran the maximum 30 Newton iterations, about 90 s. The new code stops early and reports
    the solve as not converged; to run at $\alpha = 0.187$ you pass one extra keyword (section 3.2).
 
-**More bound modes.** The speedup does not change how the cost grows with the number of bound modes $K$. Three modes
-are affordable and four are possible for single runs. Of order ten needs changes to the method: the phase average
-uses $16^K$ grid points, and the number of Fourier components grows like $K^3$, which makes the linear solve grow like
-$K^9$ (section 7).
+**Which integrator.** Tsit5 stays the default. On long stiff plateaus FBDF is much cheaper: use it at tolerance
+$10^{-9}$ for plateaus and $10^{-10}$ through a $|322\rangle$ takeover. Neither Rosenbrock method is recommended
+(section 5).
 
-**What is still pending.** The comparison of time integrators on the final code. The integrator numbers in section 5
-were measured on the old code and are preliminary.
+**More bound modes.** The speedup does not change how the cost grows with the number of bound modes $K$. Measured:
+one radial solve takes 0.10 s at $K = 2$, 1.5 s at $K = 3$ and, from measured pieces, about 47 s at $K = 4$ (eight
+cores). Of order ten fully nonlinear modes is out of reach even after every change the scaling study considered. Its
+recommendation is two to four modes treated as now plus tens of weak modes, each treated as a separate linear problem
+(section 7).
 
-**What you need to decide** (details in section 8): whether to merge and push the work; whether to rerun results
-computed with the old code; whether the metric-work diagnostic should be on or off by default; which integrator to
-use, once the comparison is in; whether to work further on the parts that stop the speedup from growing beyond
-eight cores; and how to approach of order ten bound modes (section 7).
+**Decisions** (section 8): the metric-work diagnostic stays off by default; the parameter audit was done and
+recommends a cheaper phase and polar quadrature and a check of the angular truncation, its largest error; FBDF on
+stiff runs, Tsit5 otherwise; you are rerunning old results; the remaining serial part of the computation was not
+worked on.
 
 ## Terms used throughout
 
@@ -93,23 +109,33 @@ amplitudes $(2.8077\times10^{-3},\,3.396\times10^{-9})$: it is the $|211\rangle$
 runs on lr7 with the matrix library restricted to one core (section 2.8). The baseline is the code before the project,
 on one core.
 
-| Piece | Baseline, 1 core | Final, 1 core | Final, 8 cores |
+| Piece | Baseline, 1 core | New, 1 core | New, 8 cores |
 |---|---|---|---|
 | spindown rhs call, `9e17100` (coordinator's harness run) | 2.99 s | 0.189 s | 0.106 s |
 | evolution $1.5\times10^9 \to 1.9\times10^9$ (4 steps, 31 calls), `9e17100` | 94.3 s | 6.4 s | 3.15 s |
 | spindown rhs call, `2246b4f` (polish agent's run) | 2.99 s | 0.206 s | 0.069 s |
 | evolution segment, `2246b4f` (polish agent's run) | 94.3 s | 7.00 s | 2.84 s |
+| spindown rhs call, `057a167` (last commit before the merge) | 2.99 s | 0.195 s | 0.071 s |
+| evolution segment, `057a167` | 94.3 s | 6.23 s | 2.87 s |
+| spindown rhs call, merged with the target (`582b955`) | not timed | not timed | 0.068 s |
+| evolution segment, merged with the target (`582b955`) | not timed | not timed | 2.81 s |
 | spindown rhs call, large mesh ($\alpha = 0.187$), `2246b4f` | 6.10 s | 0.402 s | 0.134 s |
-| memory allocated per rhs call (2.1, 2.6), `2246b4f` | 6.6 GB | 56 MB | 87 MB |
+| spindown rhs call, large mesh, `057a167` | 6.10 s | 0.381 s | 0.140 s |
+| memory allocated per rhs call (2.1, 2.6), `057a167` | 6.6 GB | 56 MB | 90 MB |
 
-At `2246b4f` the speedup per rhs call is 14.5 times on one core and 43 times on eight. The 8-core figures differ
-between nodes: 0.106 s and 3.15 s in the coordinator's run of the final code, 0.069 s and 2.84 s in the polish agent's
-run of `2246b4f`. Treat the 8-core numbers as good to a factor of about 1.5. The baseline and the 1-core numbers agree
-between runs much better.
+At `057a167`, the last commit before the merge, the speedup per rhs call is 15 times on one core and 42 times on
+eight. The 8-core figures differ between nodes: 0.106 s and 3.15 s in the coordinator's run of `9e17100`, 0.068 s to
+0.071 s and 2.81 s to 2.87 s in the later runs. The 1-core figures agree between runs much better, but not perfectly:
+a run at `ebf0ae9`, one commit before `057a167`, whose single-evaluation path does the same work, gave 0.224 s and
+7.74 s on another node, and the `057a167` run gave 0.195 s and 6.23 s. That spread of about 15% is node-to-node
+variation. The baseline of the merged code with the conjugate-frequency rule (`6bec64a`, the target before the merge)
+was not timed; the rule changes the imaginary parts of some component frequencies, not the amount of work per
+evaluation (my reading of the commit).
 
 The regression test (168 quantities compared with the baseline's values, section 4.1) passes at one and at eight
-cores on the final code. All 278 unit tests pass. The costs of the separate pieces (residual, Jacobian,
-factorisation, `balance_terms`) are in section 2 and in `benchmarks/README.md`.
+cores at `057a167`, and on the merged code against a reference rewritten from the target's own original solver
+(section 4.1). All 305 unit tests pass at `057a167`, and all 307 on the merged code. The costs of the separate pieces
+(residual, Jacobian, factorisation, `balance_terms`) are in section 2 and in `benchmarks/README.md`.
 
 End-to-end rerun of the saved restart window $t = 1.5\times10^9 \to 10^{11}$ at $f_a/M_{\mathrm{Pl}} = 0.0466873$
 ($f_a = 5.7\times10^{17}$ GeV), $a_0 = 0.9$, $\alpha = 0.3$, cosine potential, Tsit5. Every version took the same 2233
@@ -132,6 +158,11 @@ $A_{322}$. That is a comparison of the final state only, not of the 61 saved tim
 The end-to-end ratio, 13353 s / 295 s or about 45, is not like-for-like: the original ran on different hardware with a
 different thread layout. The harness numbers in the first table are like-for-like.
 
+The integrator comparison (section 5) timed the same window again on the code with FBDF support (`a84f712`, the
+`9e17100` solver plus the integrator fixes): Tsit5 at tolerance $10^{-7}$ took 266 s for 2300 radial solves (a few
+more than 2233, because that script forces steps to land on its output times), and FBDF at $10^{-10}$ took 119 s for
+1036. The end-to-end run was not repeated on the merged code with the conjugate-frequency rule.
+
 Most important caveats:
 
 1. **The old code's rates were wrong by up to about 1% in some evaluations** (section 3.1). The stored linear-window
@@ -140,16 +171,21 @@ Most important caveats:
 2. The speedup does not grow past about 8 cores (section 2.8). The factorisation, which runs on one core, and one
    boundary component set a floor.
 3. The checks establish that the new code reproduces the old code's numbers within measured noise floors on four
-   stored states and one short evolution, and that one full window reproduces. They do not establish discretisation
-   accuracy, other parameter points, other potentials, the energy balance (`balance=:energy`), or more than two bound
-   modes (section 4).
-4. The integrator comparison (section 5) is preliminary and was measured on the old radial code.
-5. Nothing is merged or pushed; that needs your sign-off.
+   stored states and one short evolution, and that one full window reproduces; after the merge, that it reproduces
+   the target's own solver, with the conjugate-frequency rule, on the same four states and short evolution. They do
+   not establish discretisation accuracy, other parameter points, other potentials, the energy balance
+   (`balance=:energy`), or more than two bound modes (section 4). The parameter audit addresses discretisation
+   accuracy separately (section 8, item 2).
+4. The full window was not rerun on the merged code.
 
 *For the cleanup pass: harness jobs at `9e17100`: regression 27821631 (1 thread) and 27821632 (8 threads), unit
-tests 27821630. Final-state comparison against the stored CSV: jobs 27821575/27821576, logs
-`review-work/rescale_ab/ab_window_*.out` under `axion-sr-sim-speedup/`. First-merge outputs in
-`review-work/e2e_01856b9/`.*
+tests 27821630. At `ebf0ae9`: 27823848, 27823849. At `057a167`: regression and timing 27824651 (1 thread) and
+27824652 (8 threads), logs in `integration-next/benchmarks/logs/` under `axion-sr-sim-speedup/`; unit tests 27824655.
+Merged code (`582b955`): regression against the new reference and timing 27846902 (8 threads, log in
+`pr-work/logs/`), unit tests 27846903. The 1-core and 8-core timings quoted are the plateau rows of these logs;
+STATUS.md quotes the linear-state rows (0.188 s and 0.227 s at 1 thread), which differ by a few percent. Final-state
+comparison against the stored CSV: jobs 27821575/27821576, logs `review-work/rescale_ab/ab_window_*.out`. First-merge
+outputs in `review-work/e2e_01856b9/`. Integrator re-timing: `methods-work/logs/retime_*`.*
 
 ## 2. How the time is spent and what changed
 
@@ -1122,7 +1158,10 @@ Validation scripts and scratch:
 
 ## 10. Branches and commits
 
-Nothing here is merged into `rewrite/axioncloud` or pushed. All branches start from `b4c4100`.
+The speedup was merged into `rewrite/axioncloud` on 2026-11-14 as pull request #1
+(https://github.com/clwelch03/axion-sr-sim/pull/1), merge commit `6c0a9e6`, whose second parent is
+`speedup/integration-next` at `86c4b62`. `speedup/integration-next` was pushed for the pull request; the other
+branches below were not. All speedup branches start from `b4c4100`.
 
 | Branch | Head | Contents |
 |---|---|---|
@@ -1134,32 +1173,35 @@ Nothing here is merged into `rewrite/axioncloud` or pushed. All branches start f
 | `speedup/integrator` | `1a6f91e` | `algorithm` keyword, `FiniteDifferenceJacobian`, `RadialSolveCounts`, script options, Rosenbrock dependency |
 | `speedup/integration` | `229b09f` | Coordinator's merge branch of the above; superseded by `integration-next` |
 | `speedup/polish` | `2246b4f` | Second round: workspaces, block LU from blocks, series, allocation, `solve_radial` split, `newton_floor_tol` in drivers, tests |
-| `speedup/integration-next` | `9e17100` | Everything above merged (26 commits on `b4c4100`), chord-step correction removed. The branch to review or merge |
-| `speedup/methods` | `2a1089a` | In progress, 2 commits beyond `9e17100`: OrdinaryDiffEqBDF dependency (`07287c0`), FBDF and QNDF, per-attempt failure record, solutions at accepted and final states (`2a1089a`). Work-precision comparison pending |
-| `speedup/docs` | this document's commit | This file only |
+| `speedup/methods` | `a84f712` | OrdinaryDiffEqBDF dependency (`07287c0`); FBDF and QNDF, per-attempt failure record, solutions at accepted and final states (`2a1089a`); merge of `9e17100` (`a84f712`). Fast-forwarded into `integration-next` |
+| `speedup/integration-next` | `86c4b62` | Everything above, then: trial states that are not a Kerr black hole fail the step attempt (`29d8a6f`); harness follows the renamed failure record (`ebf0ae9`); $E$ and $J$ once per accepted step (`057a167`); merge of `rewrite/axioncloud` at `6bec64a` (`582b955`); regression reference rewritten from `6bec64a` (`86c4b62`). Merged as PR #1 |
+| `speedup/audit` | `7896c56` | Numerical-parameter audit (`docs/parameter-audit.md`, `validation/parameter_audit*.jl`), the lattice phase rule cherry-picked from `speedup/scaling` (`b3bcdb4`), merge of `6c0a9e6` (`9ec31f6`) |
+| `speedup/scaling` | `e90db99` | Scaling study with the number of bound modes (`docs/mode-scaling-study.md`) and the library change `49ad331` (`PhaseGrid` from a point list, `rank1_lattice`, `phase_grid` keyword) |
+| `speedup/docs` | `af45ebf` | Earlier drafts of this document; superseded by `speedup/followup` |
+| `speedup/followup` | this document's commit | `speedup/audit` plus the scaling study and this document; candidate for a second pull request |
 
 The 26 commits of `git log --oneline b4c4100..9e17100` are: the harness (`b5b3d67`); the dependency commit
 (`b7e315e`); the four first-round merges and their commits (`80b496f`, `83e8bb3`, `05feccb`, `cf853b6`, `cea6095`,
 `7b6cafd`, `02fda5c`, `753d59a`, `c5e5125`, `e1fca6d`, `fcd98c7`, `1a6f91e`); merge commits (`9950e6d`, `35f6928`,
 `efd6772`, `229b09f`, `01856b9`); and the polish commits (`9ec3265`, `50ddeb9`, `a9754a4`, `5f8d0f6`, `eabe89e`,
-`2246b4f`) followed by `9e17100`.
+`2246b4f`) followed by `9e17100`. From `9e17100` to the merged head `86c4b62` the branch adds `07287c0`, `2a1089a`,
+`a84f712`, `29d8a6f`, `ebf0ae9`, `057a167`, `582b955` and `86c4b62`, plus the target's own commits brought in by the
+merge.
 
-## Unresolved while writing
+## Points that the sources leave open
 
 - **Which code the "new default run" in the linear-window table is.** STATUS.md's table and its quoted distances
   ($4\times10^{-7}$, $3.4\times10^{-7}$) are the run with the chord-step correction (job 27821573, code at `2246b4f`).
-  The final code is the run without it (job 27821574); I computed $5.2\times10^{-7}$ and $3.8\times10^{-7}$ from its
-  logged final state. The conclusion does not change.
+  The code without it is job 27821574; I computed $5.2\times10^{-7}$ and $3.8\times10^{-7}$ from its logged final
+  state. The conclusion does not change.
 - **Which code the 295 s end-to-end figure is.** STATUS.md calls it "9e17100-equivalent". The two runs are 294.6 s
   (with the correction, `2246b4f`) and 296.4 s (without, `9e17100`).
-- **8-thread timing spread** between the coordinator's run (0.106 s, 3.15 s) and the polish agent's (0.069 s, 2.84 s).
-  I give both and did not choose.
-- **Test count.** 278 at `9e17100`, 279 at `2246b4f`. I take the difference to be the removed correction's test, which
-  I could not confirm from the sources.
 - **"Serial block factorisation".** STATUS.md calls the factorisation serial (16 ms floor). In the code only the
   copying of blocks into the stage panels is threaded; I read the elimination stages as serial from the code but did
   not time them separately.
-- **Whether the harness regression was run against the original `b4c4100` references at `9e17100`.** STATUS.md says
-  "regression PASS"; the references are the baseline's by design.
 - **The review's docstring list and the outcome of the two chord and line-search weak spots** are not recorded in the
   sources.
+
+Settled since the first version: the harness logs at `9e17100` state that the reference was written at `b4c4100`;
+the one test removed between `2246b4f` (279 tests) and `9e17100` (278) is the chord-step correction's test; the
+8-core spread is resolved by later runs, which all gave 0.068 to 0.080 s (section 1).

@@ -802,17 +802,50 @@ background derivatives contained a central difference; the exact derivative of 2
 tolerances are of the order of the integrator's tolerance, so a flipped accept-or-reject decision shows up in the
 printed step count.
 
-**Result on the final code.** 168 of 168 pass at 1 and at 8 threads. The saved references belong to the baseline
-commit; writing new references on an optimised branch would defeat the test.
+**Result before the merge.** 168 of 168 pass at 1 and at 8 threads at `9e17100` and again at `057a167`, the last
+commit before the merge. The saved references belong to the baseline commit; writing new references on an optimised
+branch would defeat the test.
+
+**The merge with the conjugate-frequency rule, and a new reference.** While the speedup was in progress, the owner
+changed the equations on `rewrite/axioncloud`. The physics: the field is a sum of Fourier components, each labelled by
+an integer vector $q$ and oscillating at the combination $\sum_i q_i \omega_i$ of the bound-mode frequencies. A bound
+mode $i$ has complex frequency $\omega_i + i\gamma_i$, where $\gamma_i$ is its growth rate. A driven component such as
+$q = (2,-1)$ is produced by the product $\phi_1^2\phi_2^*$ of the mode fields, whose size grows like $A_1^2 A_2$, that
+is at the rate $2\gamma_1 + \gamma_2$. The old rule gave that component the complex frequency
+$\sum_i q_i(\omega_i + i\gamma_i)$, with imaginary part $2\gamma_1 - \gamma_2$, so a component containing a
+complex-conjugated mode ($q_i < 0$) was treated as partly decaying. The new rule gives it the imaginary part
+$\sum_i |q_i|\gamma_i$, so every driven component grows with the modes that produce it. Only components with a
+negative entry in $q$ are affected.
+
+The merge brought this rule into the optimised code in two places. In `rhs_derivatives!`, the function that computes
+the derivatives of the radial right-hand side, it merged as text without conflict. In `boundary_jacobian!`, which the
+speedup had rewritten by hand (2.1, item 3), the chain rule for the frequency derivative was changed by hand to
+match. Because the rule changes the equations, the old references no longer apply: against them the merged branch
+fails 23 of 168 quantities, as it should. So the references were rewritten from the target's own original solver.
+The target commit before the merge (`6bec64a`), which has the new rule and none of the speedup, was checked out
+together with the harness, and the harness wrote new references there. The merged branch passes 168 of 168 against
+those at 8 threads, and its 307 unit tests pass. This is the same test as before, against a baseline that solves the
+new equations.
+
+What this adds to the limits above: the stored states were converged under the old rule, so on the merged code they
+are fixed points at which to evaluate, not solutions of the present equations. The re-solve tier and the evolution
+segment converge to new solutions from them, and those are compared with what the original solver gives from the same
+starting points. On the merged code the regression was run at 8 threads only.
 
 *For the cleanup pass: `benchmarks/`, branch `speedup/base`, commit `b5b3d67`; states in `benchmarks/states/*.bin`;
-references in `reference.toml`, written at `b4c4100`; do not use `--write-reference` on an optimised branch.*
+references in `reference.toml`, first written at `b4c4100`, rewritten on 2026-11-14 from `6bec64a` (commit
+`86c4b62`; procedure in `benchmarks/README.md`); do not use `--write-reference` on an optimised branch. Merge commit
+`582b955`; reference job 27846901 (`pr-work/reference_6bec64a.toml` under `axion-sr-sim-speedup/`), comparison
+27846902, unit tests 27846903. In `boundary_jacobian!` the port is `abs(weight)` on the imaginary-part column.*
 
 ### 4.2 Unit tests
 
 A **unit test** is a small automated check of one function, usually against an independent calculation or against the
-function it replaces. 278 tests pass on the final code (run with 4 threads); 279 passed at `2246b4f`, before the
-chord-step correction of 2.3.5 was removed. There were 119 before the project.
+function it replaces. 307 tests pass on the merged code and 305 passed at `057a167` (both run with 4 threads); 278
+passed at `9e17100`, and 279 at `2246b4f`, before the chord-step correction of 2.3.5 and its test were removed. There
+were 119 before the project. The tests added after `9e17100` cover FBDF, the per-attempt failure record and the
+solution at the accepted state (4.4), the recording of $E$ and $J$ (section 8, item 7), and the conjugate-frequency
+rule (from the target).
 
 New tests cover: field kernels against the complex formulas; the dual-number source against finite differences; the
 structured Jacobian against automatic differentiation; in-place assembly and boundary derivatives; the block
@@ -825,7 +858,8 @@ are exercised even if the suite itself runs on one thread.
 Does not establish: physical correctness. Most tests compare an optimised function with its reference, so they check
 that the two agree, not that either is right.
 
-*For the cleanup pass: `test/runtests.jl`, job 27821630; threaded-path subprocess `test/threads_check.jl`.*
+*For the cleanup pass: `test/runtests.jl`; jobs 27821630 (`9e17100`), 27824655 (`057a167`), 27846903 (merged);
+threaded-path subprocess `test/threads_check.jl`.*
 
 ### 4.3 Independence of the thread count
 
@@ -841,29 +875,29 @@ Rosenbrock23 and Rodas5P paths; the pivoting of the block LU; concurrent evaluat
 dual-number source partials. Findings and what happened to them:
 
 - A flag that marks a failed solve can stay set with integrators that run their own nonlinear solve (FBDF, SDIRK), and
-  with fixed steps (`adaptive=false`) a failure freezes the evolution. Assigned to the integrator-comparison work; not
-  in the final code.
+  with fixed steps (`adaptive=false`) a failure freezes the evolution. **Fixed** in the merged code; see section 8,
+  item 6.
 - For integrators without the FSAL property (2.7), the radial solution stored as "accepted", the checkpoint's solution
-  and the final radial solution are a stage, not the accepted state, contrary to the documentation. Assigned to the
-  integrator-comparison work, whose branch has an unmerged commit on this. The docstring of `evolve_with_spindown` in
-  the final code still says the stored accepted solution is the radial solution at the integrator's current state.
+  and the final radial solution are a stage, not the accepted state, contrary to the documentation. **Fixed** in the
+  merged code, docstring included; see section 8, item 6.
 - Test gaps (threaded paths, the dual-number source against an independent check, control flow, block LU shapes).
   Addressed in the second round.
 - Small code items. Several were fixed in the second round; the rest are in section 9.
 
 Establishes: the combined code on the three integrator paths has no wrong-number defect that the review's experiments
-could expose. Does not establish: absence of defects on paths not run (FBDF, other states or potentials).
+could expose. Does not establish: absence of defects on paths not run (other states or potentials). FBDF was not part
+of the review; it was run in the integrator comparison (section 5) and has a unit test, but no independent review.
 
-*For the cleanup pass: review of `01856b9`, scripts in `review-work/claude-review/`. Failure flag: `solve_failed`.
-Accepted-state fields: `accepted_solution` (docstring refers to `integrator.p.accepted_solution` at `integrator.u`),
-`final_radial_solution`. Fix on `speedup/methods`: `2a1089a`. Test gaps addressed in `eabe89e`.*
+*For the cleanup pass: review of `01856b9`, scripts in `review-work/claude-review/`. The failure flag `solve_failed`
+is now `failed_attempt`; the accepted-state solution comes from `accepted_radial_solution!`; both in `2a1089a`. Test
+gaps addressed in `eabe89e`.*
 
 ### 4.5 End-to-end comparison
 
 See section 1: same steps and the same trajectory within tolerance for one run ($f_a/M_{\mathrm{Pl}} = 0.0466873$,
-$a_0 = 0.9$, $\alpha = 0.3$, cosine, window $1.5\times10^9 \to 10^{11}$), and the final code's final state agrees with
-the stored final row. Does not establish: other $f_a$, other $\alpha$, other potentials. The original ran on different
-hardware.
+$a_0 = 0.9$, $\alpha = 0.3$, cosine, window $1.5\times10^9 \to 10^{11}$), and the final state of the code at `9e17100`
+agrees with the stored final row to $1.4\times10^{-8}$. Does not establish: other $f_a$, other $\alpha$, other potentials, or the merged code with the
+conjugate-frequency rule, on which the window was not rerun. The original ran on different hardware.
 
 ## 5. Time integrators
 
@@ -938,11 +972,12 @@ variables:
 
 | Variable | Effect |
 |---|---|
-| `AXION_ALGORITHM` | `tsit5` (default), `rosenbrock23` or `rodas5p`. Stiff integrators get the finite-difference Jacobian; output files get the suffix `_<algorithm>`. |
+| `AXION_ALGORITHM` | `tsit5` (default), `rosenbrock23`, `rodas5p` or `fbdf`. Stiff integrators get the finite-difference Jacobian; output files get the suffix `_<algorithm>`. For long stiff plateaus use `fbdf` with `AXION_TOLERANCE=1e-9`, through a $|322\rangle$ takeover `1e-10` (section 5). |
 | `AXION_TOLERANCE` | Sets reltol = abstol. Default is the library's $10^{-7}$. |
 | `AXION_CHECKPOINT_MINUTES` | Writes `<prefix>_checkpoint.jls` after the first accepted step at least that many minutes after the last. If the file exists, the same command resumes from it. A resumed run agrees with an uninterrupted run to the tolerance, not bit for bit. |
 | `AXION_RECORD_METRIC_WORK` | `1` computes $E$, $J$ and the metric work for the diagnostics (`w` column); otherwise `w` is `NaN`. Rates are unchanged. |
-| `AXION_POTENTIAL` | `cosine` (default) or `free` (existing). |
+| `AXION_CHARGES_EVERY_EVALUATION` | `1` writes $E$ and $J$ in every diagnostics row. Otherwise they are written for the first evaluation and the last evaluation of each accepted step and are `NaN` in the other rows (section 8, item 7). Rates are unchanged. |
+| `AXION_POTENTIAL` | `cosine` (default), `chiral` or `free` (from the owner's branch, unchanged by this work). |
 
 New keywords on `evolve_with_spindown` (and, where it applies, `evolve_fixed_background`; both also take
 `EvolutionCache` options):
@@ -952,8 +987,14 @@ New keywords on `evolve_with_spindown` (and, where it applies, `evolve_fixed_bac
 | `tangent_predictor=true` | Start solves from the first-order prediction (2.3.2). `false` is the reference path. |
 | `record_metric_work=false` | Also compute $E$, $J$ and metric work under the action balance (diagnostic only). |
 | `newton_floor_tol=newton_tol` | `floor_tol` of each radial solve; raise it only at a known residual floor (3.2). |
-| `algorithm=Tsit5()` | Integrator; `Rosenbrock23()` and `Rodas5P()` are re-exported from the library. |
+| `charges_every_evaluation=false` | `true` computes $E$ and $J$ at every evaluation; otherwise only at the first and the last evaluation of each accepted step (spindown driver only). |
+| `algorithm=Tsit5()` | Integrator; `Rosenbrock23()`, `Rodas5P()`, `FBDF()` and `QNDF()` are re-exported from the library. |
 | `jacobian_settings=FiniteDifferenceJacobian()` | The rates Jacobian $\Lambda$ for implicit and Rosenbrock integrators (2.7). |
+
+For a callback of your own (for example one that writes checkpoints), `accepted_radial_solution!(integrator)` returns
+the radial solution at the accepted state; it costs one extra radial solve for an integrator that is not
+first-same-as-last (FBDF, Rodas5P). `result.final_radial_solution` is the solution at the final state for every
+integrator.
 
 Benchmark harness (Slurm, lr7):
 
@@ -969,19 +1010,18 @@ Output goes to `benchmarks/logs/`. Do not write new references on an optimised b
 Tests:
 
 ```
-julia --project=. -e 'using Pkg; Pkg.test()'                    # default threads, about 3 min in a Slurm job
-JULIA_NUM_THREADS=4 julia --project=. -e 'using Pkg; Pkg.test()'    # with 4 threads
+OPENBLAS_NUM_THREADS=1 julia -t 4 --project=. -e 'using Pkg; Pkg.test()'    # about 6 min in a Slurm job
 ```
 
-The 4-thread line reflects how the coordinator ran the suite ("tests at 4 threads"). I did not find the exact command
-line in the sources, so check how the thread count reaches the test process on your Julia version. The threaded-path
-test starts its own 1-thread and 4-thread processes either way.
+This is the command of the coordinator's test jobs. The threaded-path test starts its own 1-thread and 4-thread
+processes whatever the thread count of the suite.
 
 Manifest. `Manifest.toml` is now written by Julia 1.13.0 (`julia_version = "1.13.0"`); before, it was written by
-1.11.7. The README still gives Perlmutter instructions with `julia/1.11.7`. The dependency change is in its own commit
-(`b7e315e`, adding OrdinaryDiffEqRosenbrock 2.7.5 with 35 Manifest entries), so it can be redone on the other cluster
-by adding the package there and regenerating the Manifest with that cluster's Julia. Using the 1.13 Manifest with Julia
-1.11.7 was not tested.
+1.11.7. The README still gives Perlmutter instructions with `julia/1.11.7`. The two dependency changes are in their own
+commits (`b7e315e`, adding OrdinaryDiffEqRosenbrock 2.7.5 with 35 Manifest entries; `07287c0`, adding
+OrdinaryDiffEqBDF 2.4.14 with 14 new Manifest entries and no change to existing ones), so they can be redone on the
+other cluster by adding the packages there and regenerating the Manifest with that cluster's Julia. Using the 1.13
+Manifest with Julia 1.11.7 was not tested.
 
 ## 7. Scaling to more bound modes
 

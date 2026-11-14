@@ -7,7 +7,7 @@ one evaluation costs at each setting, and a recommendation.
 **Code version.** All numbers below were computed on `speedup/integration-next` at ebf0ae9 (plus the lattice commit
 b3bcdb4), that is, *before* the conjugate-frequency rule of commit 41fc2e7 on `rewrite/axioncloud`. That commit gives
 a driven component $q$ the complex frequency $\sum_i q_i \omega_i + i \sum_i |q_i| \gamma_i$ (with
-$	ilde\omega_i = \omega_i + i\gamma_i$ the complex frequency of bound mode $i$) instead of $q\cdot	ilde\omega$, so
+$\tilde\omega_i = \omega_i + i\gamma_i$ the complex frequency of bound mode $i$) instead of $q\cdot\tilde\omega$, so
 components that contain a conjugated mode ($q_i < 0$, such as $(2,-1)$ and $(-1,2)$) now grow with the modes instead
 of partly decaying. It changes only the imaginary parts of those components' frequencies, which are of the order of
 the growth rates. I expect it to leave the quadrature conclusions (Sections 1, 2), the radial-step and stretch
@@ -44,7 +44,7 @@ The two quadrature changes together were run as one setting at all seven states 
 with `n_polar` = 8 agrees with a 32 x 32 tensor grid with 24 polar nodes to $1.8\times10^{-13}$ and costs 0.51 of
 production at 1 thread and 0.80 at 8 threads.
 
-Three findings matter more than any saving:
+Four findings matter more than any saving:
 
 1. **The angular truncation is the largest error.** Allowing a second polar index per Fourier component changes
    $d\ln A_{322}/dt$ by 2% at the strong $|211\rangle$ peak, 1.3% at the strong takeover, $7\times10^{-4}$ on the

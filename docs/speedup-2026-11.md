@@ -99,7 +99,7 @@ worked on.
 - **Chord (modified Newton) step**, **line search**, **implicit-function theorem for sensitivities**, **predictor**
   (2.3).
 - **Stiffness**, **explicit, implicit, Rosenbrock and multistep methods**, **order**, **W-method**, **L-stable**
-  (2.7 and 5).
+  (2.7 and 5); **work-precision comparison** (5).
 - **Regression test**, **noise floor**, **unit test** (4.1, 4.2).
 
 ## 1. Summary
@@ -145,13 +145,13 @@ rhs evaluations.
 |---|---|---|
 | original (Perlmutter job 61110567) | 13353 s | Perlmutter, 1 Julia thread, 4 BLAS threads |
 | `01856b9`, first full merge (job 27820263) | 572 s | lr7, 8 Julia threads |
-| final code (A/B runs, jobs 27821575 and 27821576) | 295 s | lr7, 8 Julia threads |
+| `9e17100` (A/B runs, jobs 27821575 and 27821576) | 295 s | lr7, 8 Julia threads |
 
 The 295 s figure is two runs: 294.6 s with a since-removed correction to chord steps (2.3.5) and 296.4 s without it
-(the final code). Both had 2233 calls, 371 accepted and 1 rejected step, and no failed solve. The first-merge run's
+(`9e17100`). Both had 2233 calls, 371 accepted and 1 rejected step, and no failed solve. The first-merge run's
 trajectory (61 saved times) agrees with the stored CSV to $1.4\times10^{-8}$ relative in $A_{211}$,
 $7.4\times10^{-9}$ in $A_{322}$, $3\times10^{-11}$ in $b$ and $7\times10^{-11}$ in $j$. The integrator tolerance was
-$10^{-7}$. The two final-code runs agree with each other in final state to $10^{-7}$ or better. The final code's state
+$10^{-7}$. The two A/B runs agree with each other in final state to $10^{-7}$ or better. The `9e17100` state
 at $t = 10^{11}$ agrees with the stored final row to $1.4\times10^{-8}$ in $A_{211}$ and $1.2\times10^{-9}$ in
 $A_{322}$. That is a comparison of the final state only, not of the 61 saved times.
 
@@ -547,8 +547,8 @@ $\delta = 10^{-6}$, which needs extra evaluations and has an error from both tru
    depend on the number of threads (2.1). Later they were made allocation-free.
 4. The metric-work term $w$ is needed only by the energy balance and for diagnostics. Under the action balance it is
    now opt-in, off by default. When it is off, `w` is `NaN` in the diagnostics and in the spindown CSV. Requesting it
-   also computes $E$ and $J$. After the one-pass change the opt-in saves little, so the default is an open decision
-   (section 8).
+   also computes $E$ and $J$. After the one-pass change the opt-in saves little; the owner decided to keep it off by
+   default, because the action balance has no metric-work term (section 8, item 1).
 
 **What it bought.** On its branch alone, `balance_terms` went from 1.07 s to 0.51 s. The remaining cost was then the
 derivative of the residual with respect to $b$ and $j$, which was handed to the assembly work (2.1, item 4). With
@@ -661,12 +661,12 @@ of the radial solve.
    the accepted new state and reused as the first stage of the next step, so the radial solution at the accepted state
    is a by-product. A method without this property, such as Rodas5P, never evaluates at the accepted state, so the code
    needs a separate solve there.
-4. A new package dependency for the Rosenbrock methods.
+4. New package dependencies for the Rosenbrock methods and, later, for FBDF (section 5).
 
 **What it bought.** The ability to use a stiff integrator; the solve counts per method are in section 5. The parallel
 forward-difference Jacobian took 9.8 s on one thread and about 5.2 s on 2 to 8 threads, on the old radial code. It was
-limited by the slowest column, by garbage collection and by a lock inside UMFPACK solves. It has not been re-measured
-on the final code.
+limited by the slowest column, by garbage collection and by a lock inside UMFPACK solves. On the merged solver it
+takes 0.16 to 0.23 s on 8 threads (section 5).
 
 **How we know the answer did not change.** With the default Tsit5 the sequence of rhs calls is the same as before. The
 independent review found no wrong-number defect on the Tsit5, Rosenbrock23 and Rodas5P paths (section 4.4). The unit
@@ -701,9 +701,9 @@ has more than one. BLAS with more than one thread inside the threaded assembly w
 The old code computed the amplitude rates with a factorisation that could be up to $10^{-5}$ away from the converged
 solution, and individual rate evaluations were wrong by up to 1.1%. In your stored linear-growth window this left
 $A_{322}$ at $t = 1.5\times10^9$ off by $7.6\times10^{-5}$ relative (and $A_{211}$ by $8.5\times10^{-8}$); every
-later window restarted from that state starts with the same offset. Nothing needs to change to use the new code;
-whether to rerun old results is your decision (section 8, item 4), and the test that would show whether the offset
-matters at late times is to restart a late window from a state produced by the new code.
+later window restarted from that state starts with the same offset. Nothing needs to change to use the new code.
+You are rerunning old results with the new code (section 8, item 4); the test that would show whether the offset
+matters at late times is to compare a late window restarted from a state produced by the new code with the old one.
 
 The mechanism is in 2.3.4: the rates use $du/dp = -J^{-1}\,\partial F/\partial p$ with the returned factorisation,
 and the old code returned one accepted within $\sqrt{\mathrm{tol}}$ (about $10^{-5}$) of the converged point. Errors in
@@ -721,7 +721,7 @@ Linear-window check, from $t = 0$ to $1.5\times10^9$ at $f_a/M_{\mathrm{Pl}} = 0
 
 The tight run is the reference. The new default run is within $4\times10^{-7}$ relative of it in $A_{211}$ and
 $3.4\times10^{-7}$ in $A_{322}$. The stored $A_{322}$ is $7.6\times10^{-5}$ away (and $A_{211}$ $8.5\times10^{-8}$).
-For the final code, the default run (job 27821574, final state in its log) gives $A_{211} = 2.807734301\times10^{-3}$
+For the code at `9e17100`, the default run (job 27821574, final state in its log) gives $A_{211} = 2.807734301\times10^{-3}$
 and $A_{322} = 3.396388873\times10^{-9}$. From those logged values I computed differences from the tight run of
 $5.2\times10^{-7}$ and $3.8\times10^{-7}$. That calculation is mine, not STATUS.md's.
 
@@ -747,8 +747,12 @@ Implications:
 
 On the large mesh used at $\alpha = 0.187$ (1355 nodes), the scaled Newton residual cannot go below about
 $5\times10^{-10}$, so the default tolerance of $10^{-10}$ is never met. With the old code every solve there ran the
-maximum 30 iterations, about 90 s. To run at $\alpha = 0.187$ with the new code, pass for example
-`newton_floor_tol=1e-9` to `evolve_with_spindown`.
+maximum 30 iterations, about 90 s. To run at $\alpha = 0.187$ with the new code, pass `newton_tol=1e-8`, or keep
+the default `newton_tol` and pass `newton_floor_tol=3e-9` or larger, to `evolve_with_spindown`. The first version of
+this document suggested `newton_floor_tol=1e-9`; the parameter audit found that this is not enough, because after a
+small change of state the residual there stops at about $1.7\times10^{-9}$, above the $5\times10^{-10}$ of the stored
+state, and every perturbed solve then fails. With `newton_tol=1e-8` the solve takes 4 instead of 7 iterations and
+gives the same rates (`docs/parameter-audit.md`, section 5.1).
 
 Why the floor exists. Each bound mode's amplitude is imposed at the outer end of the mesh, where its profile has
 decayed like $r^\nu e^{-\kappa r}$ and can be many orders of magnitude below its peak. To keep that row from being

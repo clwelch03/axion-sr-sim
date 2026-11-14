@@ -1,9 +1,21 @@
-# Numerical-parameter audit of AxionCloud.jl (2026-11-13)
+# Numerical-parameter audit of AxionCloud.jl (2026-11-13, completed 2026-11-14)
 
 Written for the owner before the production runs are repeated with the sped-up code. For each numerical parameter
 this document says what it controls, how much the quantities that drive an evolution change when it is refined, what
-one evaluation costs at each setting, and a recommendation. Status: complete for the stored states; the rows marked
-*pending* are filled in as the last Slurm jobs finish.
+one evaluation costs at each setting, and a recommendation.
+
+**Code version.** All numbers below were computed on `speedup/integration-next` at ebf0ae9 (plus the lattice commit
+b3bcdb4), that is, *before* the conjugate-frequency rule of commit 41fc2e7 on `rewrite/axioncloud`. That commit gives
+a driven component $q$ the complex frequency $\sum_i q_i \omega_i + i \sum_i |q_i| \gamma_i$ (with
+$	ilde\omega_i = \omega_i + i\gamma_i$ the complex frequency of bound mode $i$) instead of $q\cdot	ilde\omega$, so
+components that contain a conjugated mode ($q_i < 0$, such as $(2,-1)$ and $(-1,2)$) now grow with the modes instead
+of partly decaying. It changes only the imaginary parts of those components' frequencies, which are of the order of
+the growth rates. I expect it to leave the quadrature conclusions (Sections 1, 2), the radial-step and stretch
+conclusions (3.1, 3.4) and the tolerance conclusions (5) unchanged, since those concern how accurately the same
+field is averaged and integrated. The conclusions that involve the $(2,-1)$ and $(-1,2)$ components directly should
+be rechecked: the endpoint dependence at the strong states (3.2, 3.3), which comes from exactly those components'
+waves in transit, and the size of the polar-truncation error at the strong states (4). Section 7 gives a spot check
+on the merged code.
 
 ## If you read only this
 
@@ -12,7 +24,9 @@ one evaluation costs at each setting, and a recommendation. Status: complete for
 | `n_phase` (tensor phase grid) | 16 | $3\times10^{-15}$ | loosen to 12 | $-26\%$ / $-15\%$ |
 | rank-1 lattice instead of the tensor grid | (not used) | 85 points: $2\times10^{-13}$ | adopt the 85-point lattice if the new code path is accepted (replaces the line above) | $-42\%$ / $-19\%$ |
 | `n_polar` | 12 | $2\times10^{-15}$ | loosen to 8 | $-22\%$ / $0\%$ |
-| radial `step` | 0.4 | $2.5\times10^{-6}$ | keep | |
+| **85-point lattice and `n_polar` 8 together (measured)** | | $1.8\times10^{-13}$ | **the recommended quadrature** | $-49\%$ / $-20\%$ |
+| radial `step` | 0.4 | $2.5\times10^{-6}$ (about $10^{-6}$ from the uniform step, the rest from the tail cap) | keep | |
+| cap on stretched intervals (`max_step`) | 1.86 | about $3\times10^{-6}$ (weaker states) | keep, unless the polar truncation is raised; 0.8 removes it | $+45\%$ at 8 threads (1 thread not measured) |
 | outer endpoint (`containment`) | $10^{-4}$ | $6\times10^{-4}$ (strong takeover), $4\times10^{-6}$ elsewhere; **does not converge** | not a parameter fix: see Section 3.2 | |
 | inner endpoint (`horizon_offset_ratio`) | $10^{-6}$ | $\le 3\times10^{-8}$ on the weaker states, $2\times10^{-5}$ on the strong ones; **does not converge** (same cause as the outer endpoint) | keep; see Section 3.3 | |
 | `stretch_factor` | 1.03 | $3\times10^{-7}$ | keep | |
@@ -21,9 +35,9 @@ one evaluation costs at each setting, and a recommendation. Status: complete for
 | `newton_tol` | $10^{-10}$ | $\le 2\times10^{-9}$ even at $10^{-7}$ | keep on the $\alpha = 0.3$ meshes; use $10^{-8}$ on the $\alpha = 0.187$ mesh | $0$ to $-14\%$; $-28\%$ at $\alpha = 0.187$ |
 | integrator `reltol`/`abstol` | $10^{-7}$ | see the methods report | keep $10^{-7}$ (Tsit5) or FBDF at $10^{-9}$-$10^{-10}$ on stiff plateaus | |
 
-The two quadrature changes together (lattice or `n_phase` = 12, plus `n_polar` = 8) should save roughly a third to
-half of an evaluation at 1 thread and 15-20% at 8 threads; the combination has not been run as one setting, so it
-needs one confirmation run before production.
+The two quadrature changes together were run as one setting at all seven states (Section 1.3): the 85-point lattice
+with `n_polar` = 8 agrees with a 32 x 32 tensor grid with 24 polar nodes to $1.8\times10^{-13}$ and costs 0.51 of
+production at 1 thread and 0.80 at 8 threads.
 
 Three findings matter more than any saving:
 
@@ -37,7 +51,9 @@ Three findings matter more than any saving:
    passing through, outgoing radiation near the outer endpoint (component $q = (-1,2)$) and waves falling into the
    horizon near the inner endpoint (component $q = (2,-1)$ and the $|211\rangle$ mode itself). That part grows
    linearly with the domain. It is a question of definition in the action balance, not of resolution.
-3. **The integrator tolerance is already tighter than the discretisation.** The radial step alone gives relative rate
+3. **On the weaker states the outer-endpoint drift is a resolution error of the mesh tail.** Capping the stretched
+   intervals at 0.8 instead of 1.86 reduces it about 30-fold, as expected for a fourth-order scheme (Section 3.2).
+4. **The integrator tolerance is already tighter than the discretisation.** The radial step alone gives relative rate
    errors of about $2\times10^{-6}$. Tightening `reltol` below $10^{-7}$ does not make the result more accurate.
 
 ## How the audit was done
@@ -103,8 +119,9 @@ equations are right. One $\alpha$ (0.3, plus one linear state at 0.187), one spi
 `validation/` so that the owner can rerun it on the final code), `validation/parameter_audit_submit.sh` (one lr7 job
 per group of studies), `validation/parameter_audit_tables.jl` (these tables). Results: CSV files and logs in
 `../audit-work/run1` (all studies, five states), `run2_large` (the $\alpha = 0.187$ state with the corrected floor
-tolerance), `run4_strong` (strong states), `run5_lattice`, `run6_tail`. Slurm jobs 27824736-27824738, 27824847,
-27824972, 27825063, 27825217. The library defaults are unchanged. The branch also carries commit b3bcdb4 (the
+tolerance), `run4_strong` (strong states), `run5_lattice`, `run6_tail` (finer tail cap), `run7_recommended`
+(recommended quadrature); `radiation_in_box.jl` and `horizon_waves_in_box.jl` there compute the per-component charges
+used in 3.2 and 3.3. Slurm jobs 27824736-27824738, 27824847, 27824972, 27825063, 27825217, 27825310. The library defaults are unchanged. The branch also carries commit b3bcdb4 (the
 `phase_grid` keyword and `rank1_lattice`, cherry-picked from `speedup/scaling`), which the lattice rows need.
 
 ## 1. Phase quadrature
@@ -170,6 +187,22 @@ accepts the `phase_grid` code path for production, use `phase_grid = PhaseGrid(r
 mode_set)`; otherwise use `n_phase` = 12. At $K = 2$ the gain over `n_phase` = 12 is modest (about 20% at 1 thread,
 little at 8, because at 8 threads the phase average is no longer the largest cost); its real value is that it keeps
 working when $K > 2$.
+
+### 1.3 The recommended quadrature as one setting
+
+The 85-point lattice and `n_polar` = 8 were run together at all seven states (study `recommended`, job 27825310),
+against a reference that is finer in both (32 x 32 tensor grid, 24 polar nodes):
+
+| setting | rate error / fastest rate | $db/dt$, $dj/dt$ | cost 1 thr | cost 8 thr |
+|---|---|---|---|---|
+| lattice 85, `n_polar` 8 | $1.8\times10^{-13}$ | $4.2\times10^{-15}$ | 0.51 | 0.80 |
+| production | $5.5\times10^{-15}$ | $1.3\times10^{-15}$ | 1.00 | 1.00 |
+| tensor 32, `n_polar` 24 (reference) | 0 | 0 | 5.63 | 3.16 |
+
+The largest change is at strong_peak; every other state is below $4\times10^{-14}$. The plateau segment ends within
+$4\times10^{-14}$ of the reference in $\ln A_{322}$, with the same 31 calls. The savings of the two changes nearly add
+at 1 thread ($-49\%$ against $-42\%$ and $-22\%$ separately); at 8 threads the combination saves 20%, about what the
+lattice alone saves, because the polar average is not a significant cost there.
 
 ## 2. `n_polar`: polar quadrature nodes
 
@@ -257,17 +290,36 @@ rates depend on how much radiation the box happens to contain. This is a definit
 numerical one: the radiation should probably be left out of the cloud actions (its flux through the outer boundary
 is already in the loss terms). The owner should decide that before rerunning strongly nonlinear cases.
 
-*At the weaker states the cause is not identified.* On the plateau the propagating components hold only $10^{-12}$ of
-the actions, so radiation in the box is ruled out there; instead $n_{(1,0)}$ itself drifts down linearly, by
-$5\times10^{-9}$ (relative) per unit of $r_{*,\max}$. A candidate is the discretisation error of the exponential
-decay on the coarse stretched intervals (1.86 wide), which accumulates linearly with the length of the tail. The
-decisive test, the same endpoint study with the stretched intervals capped at 0.8 (`outer_fine_tail`, job 27825217),
-is *pending*: if the slope drops by about $(0.8/1.86)^4 \approx 0.03$, the tail discretisation is the cause and
-`max_step` is the parameter to tighten.
+*At the weaker states the cause is the resolution of the mesh tail (checked).* On the plateau the propagating
+components hold only $10^{-12}$ of the actions, so radiation in the box is ruled out there; instead $n_{(1,0)}$
+itself drifts down linearly, by $5\times10^{-9}$ (relative) per unit of $r_{*,\max}$. The candidate was the
+discretisation error of the exponential decay on the coarse stretched intervals (1.86 wide), which accumulates
+linearly with the length of the tail. The decisive test repeats the endpoint study with the stretched intervals
+capped at `max_step` = 0.8 (study `outer_fine_tail`, job 27825217); for a fourth-order scheme the drift should fall by
+about $(0.8/1.86)^4 \approx 0.03$. Rate error at `containment` = $10^{-4}$ against $10^{-8}$:
 
-**Recommendation:** keep `containment` = $10^{-4}$ for now, and report the rates with this endpoint error in mind:
-about $4\times10^{-6}$ relative on the $f_a/M_\mathrm{Pl} = 0.047$ run and up to $10^{-3}$ at strong takeovers. Fix
-the radiation accounting before relying on strongly nonlinear runs.
+| state | default cap 1.86 | cap 0.8 | ratio |
+|---|---|---|---|
+| plateau | $3.6\times10^{-6}$ | $1.2\times10^{-7}$ | 0.033 |
+| takeover | $3.7\times10^{-6}$ | $8.7\times10^{-8}$ | 0.024 |
+| strong_peak | $4.2\times10^{-6}$ | $2.9\times10^{-7}$ | 0.07 |
+| strong_takeover | $6.3\times10^{-4}$ | $8.6\times10^{-4}$ | (radiation, unchanged) |
+| large_mesh | $8.6\times10^{-6}$ | $8.6\times10^{-6}$ | (unchanged, not explained) |
+
+On the plateau and the takeover the drift falls by the predicted factor, so it is tail resolution. At the same
+endpoint the cap itself changes $d\ln A_{322}/dt$ by $2.8\times10^{-6}$ (plateau), $2.9\times10^{-6}$ (takeover) and
+$3.1\times10^{-6}$ (strong_peak): this is the part of the step study's error that did not follow $h^4$ (3.1). With the
+finer cap the mesh has 941 nodes instead of 690, and one evaluation took 0.20-0.22 s at 8 threads against about 0.15 s
+for production in the other jobs (about $+45\%$; different jobs and nodes, and no 1-thread timing). The strong
+takeover is unchanged because its drift is the radiation counted in the box (above). The large_mesh drift
+($\alpha = 0.187$, a linear state, measured on $d\ln A_{211}/dt$) is also unchanged, so it is neither tail resolution
+nor nonlinear radiation; I have not found its cause.
+
+**Recommendation:** keep `containment` = $10^{-4}$. Keep the default cap for now: with it the weaker states carry
+about $3\times10^{-6}$ (cap) plus $4\times10^{-6}$ (endpoint) in the rates, and `max_step` = 0.8 would remove both
+for about $+45\%$ per evaluation. That is worth paying only together with `n_angular` = 2, since the polar
+truncation error ($7\times10^{-4}$) is 100 times larger. Fix the radiation accounting before relying on strongly
+nonlinear runs.
 
 ### 3.3 Inner endpoint (`horizon_offset_ratio`)
 
@@ -397,11 +449,12 @@ convergence study, and it does not include the truncation.
 ## Appendix: full tables
 
 Generated with `julia validation/parameter_audit_tables.jl <study> ../audit-work/run1 ../audit-work/run2_large
-../audit-work/run4_strong ../audit-work/run5_lattice` (later directories replace a state's rows from earlier ones).
+../audit-work/run4_strong ../audit-work/run5_lattice ../audit-work/run6_tail ../audit-work/run7_recommended` (later
+directories replace a state's rows from earlier ones; each study lives in one directory or is split by state).
 Settings are labelled by what differs from production: `np` `n_phase`, `npol` `n_polar`, `h` step, `sf`
 stretch_factor, `c` containment, `hr` horizon_offset_ratio, `mo` max_order, `na` n_angular, `lat` lattice points,
-`ms` max_step. "NaN" in a cost column: that timing was not taken (the 1-thread pass of the strong-state job had not
-run when the table was made).
+`ms` max_step. "NaN" in a cost column: that timing was not taken (the `outer_fine_tail` job ran no 1-thread pass, and
+its 8-thread cost ratio is NaN because that job did not time the production setting).
 
 
 ### Study `n_phase`
@@ -436,13 +489,13 @@ run when the table was made).
 | strong_peak | np8 | 690 | 1.5e-11 | 4.2e-08 | 2.8e-07 | 1.9e-08 | 2.8e-07 | 1.2e-08 | 4.3e-09 | 2.8e-07 | 0.209 | 0.125 | 0.60 / 0.82 |
 | strong_peak | np12 | 690 | 0 | 9.4e-13 | 2.6e-13 | 7.1e-15 | 1.5e-14 | 1.8e-16 | 2.0e-16 | 1.5e-14 | 0.251 | 0.127 | 0.72 / 0.83 |
 | strong_peak | production | 690 | 0 | 2.8e-13 | 4.8e-15 | 5.9e-16 | 9.7e-16 | 0 | 2.0e-16 | 9.7e-16 | 0.347 | 0.152 | 1.00 / 1.00 |
-| strong_peak | np24 | 690 | 0 | 4.6e-13 | 1.3e-13 | 1.2e-15 | 2.7e-14 | 5.3e-16 | 2.0e-16 | 2.7e-14 | NaN | 0.230 | NaN / 1.51 |
-| strong_peak | np32 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.322 | NaN / 2.11 |
+| strong_peak | np24 | 690 | 0 | 4.6e-13 | 1.3e-13 | 1.2e-15 | 2.7e-14 | 5.3e-16 | 2.0e-16 | 2.7e-14 | 0.615 | 0.230 | 1.77 / 1.51 |
+| strong_peak | np32 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.008 | 0.322 | 2.90 / 2.11 |
 | strong_takeover | np8 | 690 | 3.4e-12 | 1.2e-07 | 1.5e-07 | 1.3e-07 | 1.6e-07 | 1.3e-07 | 1.0e-09 | 1.3e-07 | 0.196 | 0.144 | 0.53 / 0.85 |
 | strong_takeover | np12 | 690 | 0 | 1.2e-13 | 2.0e-14 | 1.8e-15 | 4.1e-15 | 1.3e-15 | 7.7e-16 | 3.0e-15 | 0.268 | 0.144 | 0.72 / 0.85 |
 | strong_takeover | production | 690 | 0 | 1.4e-14 | 2.6e-15 | 9.7e-16 | 3.5e-15 | 6.7e-16 | 0 | 2.5e-15 | 0.370 | 0.170 | 1.00 / 1.00 |
-| strong_takeover | np24 | 690 | 0 | 5.2e-14 | 2.4e-14 | 8.5e-16 | 1.6e-16 | 1.2e-15 | 0 | 8.5e-16 | NaN | 0.234 | NaN / 1.38 |
-| strong_takeover | np32 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.335 | NaN / 1.97 |
+| strong_takeover | np24 | 690 | 0 | 5.2e-14 | 2.4e-14 | 8.5e-16 | 1.6e-16 | 1.2e-15 | 0 | 8.5e-16 | 0.717 | 0.234 | 1.93 / 1.38 |
+| strong_takeover | np32 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.072 | 0.335 | 2.89 / 1.97 |
 
 Summary over states (largest change over the states listed; cost ratio to production, mean over those states):
 
@@ -451,8 +504,8 @@ Summary over states (largest change over the states listed; cost ratio to produc
 | np8 | 7 | 2.8e-07 | 1.3e-07 | 0.54 | 0.85 |
 | np12 | 7 | 1.5e-14 | 1.3e-15 | 0.74 | 0.85 |
 | production | 7 | 2.5e-15 | 6.7e-16 | 1.00 | 1.00 |
-| np24 | 7 | 2.7e-14 | 1.2e-15 | 1.78 | 1.40 |
-| np32 | 7 | 0 | 0 | 2.86 | 1.97 |
+| np24 | 7 | 2.7e-14 | 1.2e-15 | 1.80 | 1.40 |
+| np32 | 7 | 0 | 0 | 2.87 | 1.97 |
 
 Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final state from the reference setting):
 
@@ -542,6 +595,48 @@ Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final sta
 | production | 31 | 0.0e+00 | 1.1e-14 | 0.0e+00 | 0.0e+00 | 3.31 |
 | np32 | 31 | 0.0e+00 | 0.0e+00 | 0.0e+00 | 0.0e+00 | 6.33 |
 
+### Study `recommended`
+
+| state | setting | nodes | Re ω (max) | Im ω₂₁₁ | Im ω₃₂₂ | d ln A₂₁₁/dt | d ln A₃₂₂/dt | db/dt | dj/dt | amplitude-rate error / fastest rate | t(1 thr) s | t(8 thr) s | cost vs prod (1/8 thr) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| linear | npol8 lat85 | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.193 | 0.155 | 0.51 / 0.88 |
+| linear | production | 690 | 0 | 0 | 0 | 6.7e-16 | 0 | 0 | 0 | 6.7e-16 | 0.379 | 0.177 | 1.00 / 1.00 |
+| linear | np32 npol24 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.163 | 0.556 | 5.70 / 3.14 |
+| plateau | npol8 lat85 | 690 | 0 | 0 | 0 | 8.5e-16 | 4.4e-16 | 0 | 0 | 4.4e-16 | 0.181 | 0.128 | 0.50 / 0.84 |
+| plateau | production | 690 | 0 | 0 | 0 | 8.5e-16 | 4.4e-16 | 0 | 0 | 4.4e-16 | 0.358 | 0.153 | 1.00 / 1.00 |
+| plateau | np32 npol24 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.933 | 0.513 | 5.40 / 3.35 |
+| takeover | npol8 lat85 | 690 | 0 | 7.2e-13 | 4.4e-13 | 2.6e-15 | 1.2e-15 | 5.1e-16 | 6.0e-16 | 1.2e-15 | 0.191 | 0.127 | 0.50 / 0.73 |
+| takeover | production | 690 | 0 | 1.2e-12 | 2.8e-14 | 2.8e-15 | 6.8e-16 | 1.3e-16 | 0 | 6.8e-16 | 0.379 | 0.174 | 1.00 / 1.00 |
+| takeover | np32 npol24 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.235 | 0.540 | 5.90 / 3.11 |
+| nonlinear | npol8 lat85 | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.195 | 0.120 | 0.51 / 0.70 |
+| nonlinear | production | 690 | 0 | 0 | 0 | 0 | 8.2e-16 | 0 | 0 | 6.5e-18 | 0.385 | 0.171 | 1.00 / 1.00 |
+| nonlinear | np32 npol24 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.109 | 0.556 | 5.48 / 3.26 |
+| large_mesh | npol8 lat85 | 1355 | 0 | 0 | 0 | 0 | 1.7e-16 | 0 | 0 | 7.5e-22 | 0.594 | 0.390 | 0.51 / 0.72 |
+| large_mesh | production | 1355 | 0 | 0 | 0 | 0 | 1.7e-16 | 0 | 0 | 7.5e-22 | 1.168 | 0.541 | 1.00 / 1.00 |
+| large_mesh | np32 npol24 (ref) | 1355 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 6.526 | 1.556 | 5.59 / 2.87 |
+| strong_peak | npol8 lat85 | 690 | 0 | 1.0e-13 | 6.4e-14 | 8.3e-15 | 1.8e-13 | 4.2e-15 | 2.0e-16 | 1.8e-13 | 0.180 | 0.132 | 0.52 / 0.86 |
+| strong_peak | production | 690 | 0 | 2.9e-13 | 4.6e-14 | 5.9e-16 | 5.5e-15 | 1.8e-16 | 2.0e-16 | 5.5e-15 | 0.348 | 0.154 | 1.00 / 1.00 |
+| strong_peak | np32 npol24 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.957 | 0.480 | 5.63 / 3.11 |
+| strong_takeover | npol8 lat85 | 690 | 0 | 6.8e-15 | 6.4e-14 | 1.0e-14 | 5.1e-14 | 1.3e-15 | 7.7e-16 | 3.7e-14 | 0.186 | 0.141 | 0.50 / 0.85 |
+| strong_takeover | production | 690 | 0 | 1.6e-14 | 1.5e-16 | 9.7e-16 | 2.1e-15 | 1.3e-15 | 7.7e-16 | 1.6e-15 | 0.369 | 0.166 | 1.00 / 1.00 |
+| strong_takeover | np32 npol24 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.114 | 0.539 | 5.72 / 3.25 |
+
+Summary over states (largest change over the states listed; cost ratio to production, mean over those states):
+
+| setting | states | amplitude-rate error / fastest rate | db/dt, dj/dt (relative) | cost 1 thr | cost 8 thr |
+|---|---|---|---|---|---|
+| npol8 lat85 | 7 | 1.8e-13 | 4.2e-15 | 0.51 | 0.80 |
+| production | 7 | 5.5e-15 | 1.3e-15 | 1.00 | 1.00 |
+| np32 npol24 | 7 | 0 | 0 | 5.63 | 3.16 |
+
+Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final state from the reference setting):
+
+| setting | rhs calls | ln A₂₁₁ (abs) | ln A₃₂₂ (abs) | b (rel) | j (rel) | wall s (8 thr) |
+|---|---|---|---|---|---|---|
+| npol8 lat85 | 31 | 0.0e+00 | 3.9e-14 | 0.0e+00 | 0.0e+00 | 9.03 |
+| production | 31 | 0.0e+00 | 1.1e-14 | 0.0e+00 | 0.0e+00 | 3.36 |
+| np32 npol24 | 31 | 0.0e+00 | 0.0e+00 | 0.0e+00 | 0.0e+00 | 10.36 |
+
 ### Study `n_polar`
 
 | state | setting | nodes | Re ω (max) | Im ω₂₁₁ | Im ω₃₂₂ | d ln A₂₁₁/dt | d ln A₃₂₂/dt | db/dt | dj/dt | amplitude-rate error / fastest rate | t(1 thr) s | t(8 thr) s | cost vs prod (1/8 thr) |
@@ -571,26 +666,26 @@ Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final sta
 | large_mesh | production | 1355 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.272 | 0.494 | 1.00 / 1.00 |
 | large_mesh | npol16 | 1355 | 0 | 0 | 0 | 0 | 3.5e-16 | 0 | 0 | 1.5e-21 | 1.458 | 0.562 | 1.15 / 1.14 |
 | large_mesh | npol24 (ref) | 1355 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.059 | 0.638 | 1.62 / 1.29 |
-| strong_peak | npol8 | 690 | 0 | 4.2e-13 | 1.9e-13 | 1.2e-15 | 1.7e-14 | 3.5e-16 | 2.0e-16 | 1.7e-14 | NaN | 0.120 | NaN / 0.92 |
-| strong_peak | npol10 | 690 | 0 | 4.0e-13 | 1.9e-13 | 5.9e-16 | 4.4e-15 | 3.5e-16 | 0 | 4.4e-15 | NaN | 0.130 | NaN / 0.99 |
-| strong_peak | production | 690 | 0 | 2.3e-13 | 6.3e-14 | 5.9e-16 | 1.7e-15 | 1.8e-16 | 0 | 1.7e-15 | NaN | 0.131 | NaN / 1.00 |
-| strong_peak | npol16 | 690 | 0 | 9.0e-14 | 1.3e-13 | 5.9e-16 | 1.2e-15 | 1.8e-16 | 0 | 1.2e-15 | NaN | 0.166 | NaN / 1.27 |
-| strong_peak | npol24 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.189 | NaN / 1.44 |
-| strong_takeover | npol8 | 690 | 0 | 8.3e-15 | 2.9e-14 | 8.2e-15 | 4.8e-14 | 0 | 7.7e-16 | 3.6e-14 | NaN | 0.123 | NaN / 0.83 |
-| strong_takeover | npol10 | 690 | 0 | 1.2e-14 | 5.0e-15 | 2.8e-15 | 1.6e-16 | 6.7e-16 | 7.7e-16 | 2.8e-15 | NaN | 0.137 | NaN / 0.93 |
-| strong_takeover | production | 690 | 0 | 8.0e-15 | 2.0e-15 | 0 | 8.2e-16 | 6.7e-16 | 7.7e-16 | 6.0e-16 | NaN | 0.148 | NaN / 1.00 |
-| strong_takeover | npol16 | 690 | 0 | 5.8e-15 | 8.7e-15 | 9.7e-16 | 9.9e-16 | 6.7e-16 | 7.7e-16 | 9.7e-16 | NaN | 0.173 | NaN / 1.17 |
-| strong_takeover | npol24 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.211 | NaN / 1.43 |
+| strong_peak | npol8 | 690 | 0 | 4.2e-13 | 1.9e-13 | 1.2e-15 | 1.7e-14 | 3.5e-16 | 2.0e-16 | 1.7e-14 | 0.290 | 0.120 | 0.84 / 0.92 |
+| strong_peak | npol10 | 690 | 0 | 4.0e-13 | 1.9e-13 | 5.9e-16 | 4.4e-15 | 3.5e-16 | 0 | 4.4e-15 | 0.312 | 0.130 | 0.90 / 0.99 |
+| strong_peak | production | 690 | 0 | 2.3e-13 | 6.3e-14 | 5.9e-16 | 1.7e-15 | 1.8e-16 | 0 | 1.7e-15 | 0.347 | 0.131 | 1.00 / 1.00 |
+| strong_peak | npol16 | 690 | 0 | 9.0e-14 | 1.3e-13 | 5.9e-16 | 1.2e-15 | 1.8e-16 | 0 | 1.2e-15 | 0.432 | 0.166 | 1.25 / 1.27 |
+| strong_peak | npol24 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.621 | 0.189 | 1.79 / 1.44 |
+| strong_takeover | npol8 | 690 | 0 | 8.3e-15 | 2.9e-14 | 8.2e-15 | 4.8e-14 | 0 | 7.7e-16 | 3.6e-14 | 0.282 | 0.123 | 0.77 / 0.83 |
+| strong_takeover | npol10 | 690 | 0 | 1.2e-14 | 5.0e-15 | 2.8e-15 | 1.6e-16 | 6.7e-16 | 7.7e-16 | 2.8e-15 | 0.330 | 0.137 | 0.90 / 0.93 |
+| strong_takeover | production | 690 | 0 | 8.0e-15 | 2.0e-15 | 0 | 8.2e-16 | 6.7e-16 | 7.7e-16 | 6.0e-16 | 0.365 | 0.148 | 1.00 / 1.00 |
+| strong_takeover | npol16 | 690 | 0 | 5.8e-15 | 8.7e-15 | 9.7e-16 | 9.9e-16 | 6.7e-16 | 7.7e-16 | 9.7e-16 | 0.460 | 0.173 | 1.26 / 1.17 |
+| strong_takeover | npol24 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.635 | 0.211 | 1.74 / 1.43 |
 
 Summary over states (largest change over the states listed; cost ratio to production, mean over those states):
 
 | setting | states | amplitude-rate error / fastest rate | db/dt, dj/dt (relative) | cost 1 thr | cost 8 thr |
 |---|---|---|---|---|---|
-| npol8 | 7 | 3.6e-14 | 1.8e-15 | 0.78 | 1.00 |
-| npol10 | 7 | 4.4e-15 | 7.7e-16 | 0.86 | 0.98 |
+| npol8 | 7 | 3.6e-14 | 1.8e-15 | 0.79 | 1.00 |
+| npol10 | 7 | 4.4e-15 | 7.7e-16 | 0.87 | 0.98 |
 | production | 7 | 1.7e-15 | 7.7e-16 | 1.00 | 1.00 |
-| npol16 | 7 | 1.2e-15 | 7.7e-16 | 1.21 | 1.18 |
-| npol24 | 7 | 0 | 0 | 1.69 | 1.43 |
+| npol16 | 7 | 1.2e-15 | 7.7e-16 | 1.22 | 1.18 |
+| npol24 | 7 | 0 | 0 | 1.71 | 1.43 |
 
 Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final state from the reference setting):
 
@@ -631,16 +726,16 @@ Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final sta
 | large_mesh | production | 1355 | 3.0e-13 | 2.0e-06 | 1.8e-05 | 1.1e-07 | 1.1e-06 | 1.9e-06 | 2.0e-06 | 1.1e-07 | 1.190 | 0.520 | 1.00 / 1.00 |
 | large_mesh | h0.3 | 1765 | 7.9e-14 | 5.3e-07 | 4.9e-06 | 2.9e-08 | 3.1e-07 | 5.1e-07 | 5.6e-07 | 2.9e-08 | 1.655 | 0.630 | 1.39 / 1.21 |
 | large_mesh | h0.2 (ref) | 2626 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.600 | 0.972 | 2.18 / 1.87 |
-| strong_peak | h0.8 | 444 | 1.1e-10 | 2.4e-05 | 1.1e-06 | 5.8e-07 | 1.8e-05 | 1.7e-06 | 2.1e-06 | 1.8e-05 | NaN | 0.097 | NaN / 0.62 |
-| strong_peak | h0.6 | 526 | 2.3e-10 | 7.4e-06 | 1.4e-06 | 2.7e-07 | 6.8e-06 | 1.0e-06 | 1.2e-06 | 6.8e-06 | NaN | 0.106 | NaN / 0.68 |
-| strong_peak | production | 690 | 2.7e-10 | 1.4e-06 | 1.5e-06 | 1.6e-07 | 2.5e-06 | 7.7e-07 | 8.1e-07 | 2.5e-06 | NaN | 0.155 | NaN / 1.00 |
-| strong_peak | h0.3 | 851 | 2.7e-10 | 3.5e-07 | 1.5e-06 | 1.3e-07 | 1.7e-06 | 7.2e-07 | 7.4e-07 | 1.7e-06 | NaN | 0.168 | NaN / 1.08 |
-| strong_peak | h0.2 (ref) | 1197 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.228 | NaN / 1.47 |
-| strong_takeover | h0.8 | 444 | 4.9e-11 | 3.1e-06 | 1.3e-06 | 2.1e-05 | 2.7e-05 | 2.2e-05 | 2.1e-06 | 2.1e-05 | NaN | 0.096 | NaN / 0.62 |
-| strong_takeover | h0.6 | 526 | 1.2e-10 | 1.6e-06 | 1.7e-06 | 7.3e-06 | 1.0e-05 | 8.2e-06 | 1.2e-06 | 7.3e-06 | NaN | 0.122 | NaN / 0.79 |
-| strong_takeover | production | 690 | 1.7e-10 | 1.0e-06 | 1.9e-06 | 2.1e-06 | 3.5e-06 | 2.9e-06 | 8.4e-07 | 2.5e-06 | NaN | 0.154 | NaN / 1.00 |
-| strong_takeover | h0.3 | 851 | 1.7e-10 | 9.2e-07 | 1.9e-06 | 1.3e-06 | 2.4e-06 | 1.9e-06 | 7.7e-07 | 1.7e-06 | NaN | 0.179 | NaN / 1.16 |
-| strong_takeover | h0.2 (ref) | 1197 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.265 | NaN / 1.71 |
+| strong_peak | h0.8 | 444 | 1.1e-10 | 2.4e-05 | 1.1e-06 | 5.8e-07 | 1.8e-05 | 1.7e-06 | 2.1e-06 | 1.8e-05 | 0.238 | 0.097 | 0.68 / 0.62 |
+| strong_peak | h0.6 | 526 | 2.3e-10 | 7.4e-06 | 1.4e-06 | 2.7e-07 | 6.8e-06 | 1.0e-06 | 1.2e-06 | 6.8e-06 | 0.270 | 0.106 | 0.77 / 0.68 |
+| strong_peak | production | 690 | 2.7e-10 | 1.4e-06 | 1.5e-06 | 1.6e-07 | 2.5e-06 | 7.7e-07 | 8.1e-07 | 2.5e-06 | 0.349 | 0.155 | 1.00 / 1.00 |
+| strong_peak | h0.3 | 851 | 2.7e-10 | 3.5e-07 | 1.5e-06 | 1.3e-07 | 1.7e-06 | 7.2e-07 | 7.4e-07 | 1.7e-06 | 0.427 | 0.168 | 1.22 / 1.08 |
+| strong_peak | h0.2 (ref) | 1197 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.590 | 0.228 | 1.69 / 1.47 |
+| strong_takeover | h0.8 | 444 | 4.9e-11 | 3.1e-06 | 1.3e-06 | 2.1e-05 | 2.7e-05 | 2.2e-05 | 2.1e-06 | 2.1e-05 | 0.245 | 0.096 | 0.60 / 0.62 |
+| strong_takeover | h0.6 | 526 | 1.2e-10 | 1.6e-06 | 1.7e-06 | 7.3e-06 | 1.0e-05 | 8.2e-06 | 1.2e-06 | 7.3e-06 | 0.296 | 0.122 | 0.72 / 0.79 |
+| strong_takeover | production | 690 | 1.7e-10 | 1.0e-06 | 1.9e-06 | 2.1e-06 | 3.5e-06 | 2.9e-06 | 8.4e-07 | 2.5e-06 | 0.411 | 0.154 | 1.00 / 1.00 |
+| strong_takeover | h0.3 | 851 | 1.7e-10 | 9.2e-07 | 1.9e-06 | 1.3e-06 | 2.4e-06 | 1.9e-06 | 7.7e-07 | 1.7e-06 | 0.457 | 0.179 | 1.11 / 1.16 |
+| strong_takeover | h0.2 (ref) | 1197 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.628 | 0.265 | 1.53 / 1.71 |
 
 Summary over states (largest change over the states listed; cost ratio to production, mean over those states):
 
@@ -649,8 +744,8 @@ Summary over states (largest change over the states listed; cost ratio to produc
 | h0.8 | 7 | 2.1e-05 | 3.4e-02 | 0.64 | 0.64 |
 | h0.6 | 7 | 7.3e-06 | 9.9e-03 | 0.74 | 0.79 |
 | production | 7 | 2.5e-06 | 7.6e-04 | 1.00 | 1.00 |
-| h0.3 | 7 | 1.7e-06 | 7.5e-04 | 1.26 | 1.22 |
-| h0.2 | 7 | 0 | 0 | 1.81 | 1.76 |
+| h0.3 | 7 | 1.7e-06 | 7.5e-04 | 1.23 | 1.22 |
+| h0.2 | 7 | 0 | 0 | 1.75 | 1.76 |
 
 Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final state from the reference setting):
 
@@ -691,26 +786,26 @@ Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final sta
 | large_mesh | c1e-05 | 1430 | 4.1e-14 | 4.0e-09 | 1.4e-08 | 6.5e-06 | 5.6e-06 | 5.4e-08 | 3.8e-08 | 6.5e-06 | 1.437 | 0.503 | 1.06 / 0.99 |
 | large_mesh | c1e-06 | 1504 | 2.8e-14 | 2.8e-09 | 1.1e-08 | 4.3e-06 | 3.7e-06 | 4.1e-08 | 2.8e-08 | 4.3e-06 | 1.125 | 0.419 | 0.83 / 0.83 |
 | large_mesh | c1e-08 (ref) | 1650 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.640 | 0.596 | 1.21 / 1.17 |
-| strong_peak | c0.001 | 642 | 9.5e-10 | 7.1e-08 | 5.0e-06 | 4.5e-07 | 5.1e-06 | 2.4e-06 | 2.5e-06 | 5.1e-06 | NaN | 0.149 | NaN / 1.00 |
-| strong_peak | production | 690 | 7.6e-10 | 5.7e-08 | 4.0e-06 | 3.7e-07 | 4.2e-06 | 1.9e-06 | 2.0e-06 | 4.2e-06 | NaN | 0.149 | NaN / 1.00 |
-| strong_peak | c1e-05 | 737 | 5.7e-10 | 4.2e-08 | 3.0e-06 | 2.8e-07 | 3.1e-06 | 1.5e-06 | 1.5e-06 | 3.1e-06 | NaN | 0.157 | NaN / 1.06 |
-| strong_peak | c1e-06 | 783 | 3.9e-10 | 2.8e-08 | 2.0e-06 | 1.8e-07 | 2.1e-06 | 9.8e-07 | 1.0e-06 | 2.1e-06 | NaN | 0.172 | NaN / 1.15 |
-| strong_peak | c1e-08 (ref) | 873 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.192 | NaN / 1.29 |
-| strong_takeover | c0.001 | 642 | 1.5e-09 | 7.5e-06 | 1.6e-05 | 1.6e-04 | 1.1e-03 | 1.4e-05 | 6.3e-06 | 7.7e-04 | NaN | 0.142 | NaN / 0.89 |
-| strong_takeover | production | 690 | 2.1e-10 | 1.3e-06 | 2.1e-06 | 1.4e-04 | 8.6e-04 | 2.2e-06 | 8.8e-07 | 6.3e-04 | NaN | 0.159 | NaN / 1.00 |
-| strong_takeover | c1e-05 | 737 | 3.6e-10 | 1.9e-06 | 3.8e-06 | 1.1e-04 | 6.4e-04 | 3.5e-06 | 1.6e-06 | 4.7e-04 | NaN | 0.167 | NaN / 1.05 |
-| strong_takeover | c1e-06 | 783 | 3.0e-10 | 1.6e-06 | 3.2e-06 | 7.0e-05 | 4.3e-04 | 2.9e-06 | 1.3e-06 | 3.1e-04 | NaN | 0.172 | NaN / 1.08 |
-| strong_takeover | c1e-08 (ref) | 873 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.210 | NaN / 1.32 |
+| strong_peak | c0.001 | 642 | 9.5e-10 | 7.1e-08 | 5.0e-06 | 4.5e-07 | 5.1e-06 | 2.4e-06 | 2.5e-06 | 5.1e-06 | 0.355 | 0.149 | 0.96 / 1.00 |
+| strong_peak | production | 690 | 7.6e-10 | 5.7e-08 | 4.0e-06 | 3.7e-07 | 4.2e-06 | 1.9e-06 | 2.0e-06 | 4.2e-06 | 0.371 | 0.149 | 1.00 / 1.00 |
+| strong_peak | c1e-05 | 737 | 5.7e-10 | 4.2e-08 | 3.0e-06 | 2.8e-07 | 3.1e-06 | 1.5e-06 | 1.5e-06 | 3.1e-06 | 0.381 | 0.157 | 1.03 / 1.06 |
+| strong_peak | c1e-06 | 783 | 3.9e-10 | 2.8e-08 | 2.0e-06 | 1.8e-07 | 2.1e-06 | 9.8e-07 | 1.0e-06 | 2.1e-06 | 0.397 | 0.172 | 1.07 / 1.15 |
+| strong_peak | c1e-08 (ref) | 873 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.430 | 0.192 | 1.16 / 1.29 |
+| strong_takeover | c0.001 | 642 | 1.5e-09 | 7.5e-06 | 1.6e-05 | 1.6e-04 | 1.1e-03 | 1.4e-05 | 6.3e-06 | 7.7e-04 | 0.359 | 0.142 | 0.94 / 0.89 |
+| strong_takeover | production | 690 | 2.1e-10 | 1.3e-06 | 2.1e-06 | 1.4e-04 | 8.6e-04 | 2.2e-06 | 8.8e-07 | 6.3e-04 | 0.383 | 0.159 | 1.00 / 1.00 |
+| strong_takeover | c1e-05 | 737 | 3.6e-10 | 1.9e-06 | 3.8e-06 | 1.1e-04 | 6.4e-04 | 3.5e-06 | 1.6e-06 | 4.7e-04 | 0.418 | 0.167 | 1.09 / 1.05 |
+| strong_takeover | c1e-06 | 783 | 3.0e-10 | 1.6e-06 | 3.2e-06 | 7.0e-05 | 4.3e-04 | 2.9e-06 | 1.3e-06 | 3.1e-04 | 0.466 | 0.172 | 1.22 / 1.08 |
+| strong_takeover | c1e-08 (ref) | 873 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.497 | 0.210 | 1.30 / 1.32 |
 
 Summary over states (largest change over the states listed; cost ratio to production, mean over those states):
 
 | setting | states | amplitude-rate error / fastest rate | db/dt, dj/dt (relative) | cost 1 thr | cost 8 thr |
 |---|---|---|---|---|---|
-| c0.001 | 7 | 7.7e-04 | 4.6e-03 | 0.90 | 0.92 |
+| c0.001 | 7 | 7.7e-04 | 4.6e-03 | 0.91 | 0.92 |
 | production | 7 | 6.3e-04 | 3.7e-03 | 1.00 | 1.00 |
-| c1e-05 | 7 | 4.7e-04 | 2.8e-03 | 1.07 | 1.06 |
-| c1e-06 | 7 | 3.1e-04 | 1.9e-03 | 1.09 | 1.09 |
-| c1e-08 | 7 | 0 | 0 | 1.25 | 1.28 |
+| c1e-05 | 7 | 4.7e-04 | 2.8e-03 | 1.06 | 1.06 |
+| c1e-06 | 7 | 3.1e-04 | 1.9e-03 | 1.11 | 1.09 |
+| c1e-08 | 7 | 0 | 0 | 1.24 | 1.28 |
 
 Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final state from the reference setting):
 
@@ -721,6 +816,42 @@ Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final sta
 | c1e-05 | 31 | 3.5e-10 | 2.6e-07 | 1.6e-11 | 6.2e-11 | 3.69 |
 | c1e-06 | 31 | 2.3e-10 | 1.7e-07 | 1.1e-11 | 4.2e-11 | 3.87 |
 | c1e-08 | 31 | 0.0e+00 | 0.0e+00 | 0.0e+00 | 0.0e+00 | 4.21 |
+
+### Study `outer_fine_tail`
+
+| state | setting | nodes | Re ω (max) | Im ω₂₁₁ | Im ω₃₂₂ | d ln A₂₁₁/dt | d ln A₃₂₂/dt | db/dt | dj/dt | amplitude-rate error / fastest rate | t(1 thr) s | t(8 thr) s | cost vs prod (1/8 thr) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| plateau | ms0.8 | 941 | 6.2e-13 | 1.3e-04 | 1.2e-07 | 1.3e-04 | 1.2e-07 | 1.3e-04 | 1.2e-04 | 1.2e-07 | NaN | 0.216 | NaN / NaN |
+| plateau | c1e-06 ms0.8 | 1158 | 3.1e-13 | 6.5e-05 | 6.2e-08 | 6.5e-05 | 6.2e-08 | 6.3e-05 | 6.2e-05 | 6.2e-08 | NaN | 0.240 | NaN / NaN |
+| plateau | c1e-08 ms0.8 (ref) | 1368 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.290 | NaN / NaN |
+| takeover | ms0.8 | 941 | 5.3e-13 | 3.3e-08 | 1.3e-07 | 3.2e-08 | 8.7e-08 | 8.4e-08 | 5.5e-08 | 8.7e-08 | NaN | 0.224 | NaN / NaN |
+| takeover | c1e-06 ms0.8 | 1158 | 2.7e-13 | 1.7e-08 | 6.5e-08 | 1.6e-08 | 5.1e-08 | 4.2e-08 | 2.8e-08 | 5.1e-08 | NaN | 0.274 | NaN / NaN |
+| takeover | c1e-08 ms0.8 (ref) | 1368 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.300 | NaN / NaN |
+| large_mesh | ms0.8 | 2209 | 5.9e-16 | 4.2e-12 | 7.2e-10 | 8.6e-06 | 8.2e-06 | 2.3e-09 | 1.3e-09 | 8.6e-06 | NaN | 0.616 | NaN / NaN |
+| large_mesh | c1e-06 ms0.8 | 2766 | 4.5e-16 | 1.5e-11 | 5.5e-10 | 4.3e-06 | 3.8e-06 | 1.8e-09 | 1.0e-09 | 4.3e-06 | NaN | 1.060 | NaN / NaN |
+| large_mesh | c1e-08 ms0.8 (ref) | 3308 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 1.223 | NaN / NaN |
+| strong_peak | ms0.8 | 941 | 2.6e-11 | 1.9e-09 | 1.4e-07 | 1.2e-08 | 2.9e-07 | 6.6e-08 | 6.7e-08 | 2.9e-07 | NaN | 0.223 | NaN / NaN |
+| strong_peak | c1e-06 ms0.8 | 1158 | 1.3e-11 | 9.6e-10 | 6.9e-08 | 5.3e-09 | 1.4e-07 | 3.3e-08 | 3.4e-08 | 1.4e-07 | NaN | 0.254 | NaN / NaN |
+| strong_peak | c1e-08 ms0.8 (ref) | 1368 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.293 | NaN / NaN |
+| strong_takeover | ms0.8 | 941 | 2.6e-10 | 1.2e-06 | 2.9e-06 | 1.5e-04 | 8.6e-04 | 2.2e-06 | 1.1e-06 | 6.3e-04 | NaN | 0.204 | NaN / NaN |
+| strong_takeover | c1e-06 ms0.8 | 1158 | 6.8e-11 | 3.6e-07 | 7.1e-07 | 7.1e-05 | 4.3e-04 | 6.4e-07 | 2.9e-07 | 3.2e-04 | NaN | 0.264 | NaN / NaN |
+| strong_takeover | c1e-08 ms0.8 (ref) | 1368 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.310 | NaN / NaN |
+
+Summary over states (largest change over the states listed; cost ratio to production, mean over those states):
+
+| setting | states | amplitude-rate error / fastest rate | db/dt, dj/dt (relative) | cost 1 thr | cost 8 thr |
+|---|---|---|---|---|---|
+| ms0.8 | 5 | 6.3e-04 | 1.3e-04 | NaN | NaN |
+| c1e-06 ms0.8 | 5 | 3.2e-04 | 6.3e-05 | NaN | NaN |
+| c1e-08 ms0.8 | 5 | 0 | 0 | NaN | NaN |
+
+Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final state from the reference setting):
+
+| setting | rhs calls | ln A₂₁₁ (abs) | ln A₃₂₂ (abs) | b (rel) | j (rel) | wall s (8 thr) |
+|---|---|---|---|---|---|---|
+| ms0.8 | 31 | 1.6e-11 | 1.2e-08 | 7.0e-13 | 2.8e-12 | 9.78 |
+| c1e-06 ms0.8 | 31 | 7.8e-12 | 5.9e-09 | 3.5e-13 | 1.4e-12 | 5.26 |
+| c1e-08 ms0.8 | 31 | 0.0e+00 | 0.0e+00 | 0.0e+00 | 0.0e+00 | 5.88 |
 
 ### Study `inner`
 
@@ -746,23 +877,23 @@ Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final sta
 | large_mesh | hr1e-05 | 1336 | 0 | 9.0e-10 | 8.2e-09 | 9.5e-12 | 2.4e-08 | 9.2e-09 | 4.9e-09 | 9.5e-12 | 1.434 | 0.638 | 1.15 / 1.22 |
 | large_mesh | production | 1355 | 0 | 5.9e-10 | 5.3e-09 | 3.1e-11 | 1.6e-08 | 5.9e-09 | 3.0e-09 | 3.1e-11 | 1.250 | 0.524 | 1.00 / 1.00 |
 | large_mesh | hr1e-08 (ref) | 1393 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.558 | 0.603 | 1.25 / 1.15 |
-| strong_peak | hr0.0001 | 652 | 8.9e-14 | 1.5e-08 | 1.9e-10 | 2.4e-06 | 4.6e-05 | 1.4e-06 | 7.9e-07 | 4.6e-05 | NaN | 0.146 | NaN / 0.97 |
-| strong_peak | hr1e-05 | 671 | 9.1e-14 | 1.2e-08 | 2.3e-10 | 1.8e-06 | 3.4e-05 | 1.0e-06 | 6.0e-07 | 3.4e-05 | NaN | 0.137 | NaN / 0.91 |
-| strong_peak | production | 690 | 9.3e-14 | 1.2e-08 | 2.1e-10 | 1.2e-06 | 2.3e-05 | 6.8e-07 | 4.0e-07 | 2.3e-05 | NaN | 0.151 | NaN / 1.00 |
-| strong_peak | hr1e-08 (ref) | 727 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.135 | NaN / 0.89 |
-| strong_takeover | hr0.0001 | 652 | 9.0e-14 | 1.4e-09 | 3.1e-10 | 1.3e-05 | 1.6e-05 | 2.0e-05 | 5.8e-06 | 1.3e-05 | NaN | 0.141 | NaN / 0.95 |
-| strong_takeover | hr1e-05 | 671 | 9.2e-14 | 1.1e-09 | 3.5e-10 | 9.5e-06 | 1.2e-05 | 1.5e-05 | 4.4e-06 | 9.5e-06 | NaN | 0.143 | NaN / 0.96 |
-| strong_takeover | production | 690 | 9.4e-14 | 1.0e-09 | 3.4e-10 | 6.3e-06 | 7.9e-06 | 1.0e-05 | 2.9e-06 | 6.3e-06 | NaN | 0.149 | NaN / 1.00 |
-| strong_takeover | hr1e-08 (ref) | 727 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.140 | NaN / 0.94 |
+| strong_peak | hr0.0001 | 652 | 8.9e-14 | 1.5e-08 | 1.9e-10 | 2.4e-06 | 4.6e-05 | 1.4e-06 | 7.9e-07 | 4.6e-05 | 0.376 | 0.146 | 1.09 / 0.97 |
+| strong_peak | hr1e-05 | 671 | 9.1e-14 | 1.2e-08 | 2.3e-10 | 1.8e-06 | 3.4e-05 | 1.0e-06 | 6.0e-07 | 3.4e-05 | 0.339 | 0.137 | 0.98 / 0.91 |
+| strong_peak | production | 690 | 9.3e-14 | 1.2e-08 | 2.1e-10 | 1.2e-06 | 2.3e-05 | 6.8e-07 | 4.0e-07 | 2.3e-05 | 0.345 | 0.151 | 1.00 / 1.00 |
+| strong_peak | hr1e-08 (ref) | 727 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.364 | 0.135 | 1.05 / 0.89 |
+| strong_takeover | hr0.0001 | 652 | 9.0e-14 | 1.4e-09 | 3.1e-10 | 1.3e-05 | 1.6e-05 | 2.0e-05 | 5.8e-06 | 1.3e-05 | 0.353 | 0.141 | 0.95 / 0.95 |
+| strong_takeover | hr1e-05 | 671 | 9.2e-14 | 1.1e-09 | 3.5e-10 | 9.5e-06 | 1.2e-05 | 1.5e-05 | 4.4e-06 | 9.5e-06 | 0.361 | 0.143 | 0.97 / 0.96 |
+| strong_takeover | production | 690 | 9.4e-14 | 1.0e-09 | 3.4e-10 | 6.3e-06 | 7.9e-06 | 1.0e-05 | 2.9e-06 | 6.3e-06 | 0.371 | 0.149 | 1.00 / 1.00 |
+| strong_takeover | hr1e-08 (ref) | 727 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.383 | 0.140 | 1.03 / 0.94 |
 
 Summary over states (largest change over the states listed; cost ratio to production, mean over those states):
 
 | setting | states | amplitude-rate error / fastest rate | db/dt, dj/dt (relative) | cost 1 thr | cost 8 thr |
 |---|---|---|---|---|---|
 | hr0.0001 | 7 | 4.6e-05 | 2.0e-05 | 1.03 | 1.01 |
-| hr1e-05 | 7 | 3.4e-05 | 1.7e-05 | 1.01 | 1.00 |
+| hr1e-05 | 7 | 3.4e-05 | 1.7e-05 | 1.00 | 1.00 |
 | production | 7 | 2.3e-05 | 1.7e-05 | 1.00 | 1.00 |
-| hr1e-08 | 7 | 0 | 0 | 1.08 | 0.99 |
+| hr1e-08 | 7 | 0 | 0 | 1.07 | 0.99 |
 
 Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final state from the reference setting):
 
@@ -792,20 +923,20 @@ Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final sta
 | large_mesh | sf1.06 | 1336 | 3.6e-14 | 8.6e-11 | 8.6e-10 | 1.0e-09 | 6.4e-09 | 2.9e-09 | 1.5e-09 | 1.0e-09 | 1.580 | 0.648 | 1.23 / 1.34 |
 | large_mesh | production | 1355 | 2.1e-14 | 4.7e-11 | 6.0e-10 | 5.3e-10 | 4.6e-09 | 2.1e-09 | 1.1e-09 | 5.3e-10 | 1.288 | 0.482 | 1.00 / 1.00 |
 | large_mesh | sf1.015 (ref) | 1393 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.022 | 0.396 | 0.79 / 0.82 |
-| strong_peak | sf1.06 | 677 | 7.0e-11 | 6.1e-09 | 3.7e-07 | 2.7e-08 | 3.7e-07 | 1.8e-07 | 1.8e-07 | 3.7e-07 | NaN | 0.149 | NaN / 1.11 |
-| strong_peak | production | 690 | 4.9e-11 | 4.3e-09 | 2.6e-07 | 2.0e-08 | 2.6e-07 | 1.3e-07 | 1.3e-07 | 2.6e-07 | NaN | 0.135 | NaN / 1.00 |
-| strong_peak | sf1.015 (ref) | 715 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.143 | NaN / 1.06 |
-| strong_takeover | sf1.06 | 677 | 4.3e-11 | 2.1e-07 | 4.7e-07 | 2.2e-07 | 5.2e-07 | 3.9e-07 | 1.9e-07 | 3.8e-07 | NaN | 0.166 | NaN / 1.04 |
-| strong_takeover | production | 690 | 3.1e-11 | 1.5e-07 | 3.3e-07 | 1.6e-07 | 3.6e-07 | 2.8e-07 | 1.3e-07 | 2.6e-07 | NaN | 0.160 | NaN / 1.00 |
-| strong_takeover | sf1.015 (ref) | 715 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.160 | NaN / 1.00 |
+| strong_peak | sf1.06 | 677 | 7.0e-11 | 6.1e-09 | 3.7e-07 | 2.7e-08 | 3.7e-07 | 1.8e-07 | 1.8e-07 | 3.7e-07 | 0.387 | 0.149 | 1.12 / 1.11 |
+| strong_peak | production | 690 | 4.9e-11 | 4.3e-09 | 2.6e-07 | 2.0e-08 | 2.6e-07 | 1.3e-07 | 1.3e-07 | 2.6e-07 | 0.347 | 0.135 | 1.00 / 1.00 |
+| strong_peak | sf1.015 (ref) | 715 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.364 | 0.143 | 1.05 / 1.06 |
+| strong_takeover | sf1.06 | 677 | 4.3e-11 | 2.1e-07 | 4.7e-07 | 2.2e-07 | 5.2e-07 | 3.9e-07 | 1.9e-07 | 3.8e-07 | 0.370 | 0.166 | 0.99 / 1.04 |
+| strong_takeover | production | 690 | 3.1e-11 | 1.5e-07 | 3.3e-07 | 1.6e-07 | 3.6e-07 | 2.8e-07 | 1.3e-07 | 2.6e-07 | 0.375 | 0.160 | 1.00 / 1.00 |
+| strong_takeover | sf1.015 (ref) | 715 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.401 | 0.160 | 1.07 / 1.00 |
 
 Summary over states (largest change over the states listed; cost ratio to production, mean over those states):
 
 | setting | states | amplitude-rate error / fastest rate | db/dt, dj/dt (relative) | cost 1 thr | cost 8 thr |
 |---|---|---|---|---|---|
-| sf1.06 | 7 | 3.8e-07 | 2.9e-04 | 1.08 | 1.08 |
+| sf1.06 | 7 | 3.8e-07 | 2.9e-04 | 1.07 | 1.08 |
 | production | 7 | 2.6e-07 | 2.2e-04 | 1.00 | 1.00 |
-| sf1.015 | 7 | 0 | 0 | 1.03 | 1.06 |
+| sf1.015 | 7 | 0 | 0 | 1.04 | 1.06 |
 
 Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final state from the reference setting):
 
@@ -834,20 +965,20 @@ Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final sta
 | large_mesh | production | 1355 | 2.1e-10 | 9.0e-05 | 5.4e-05 | 9.0e-05 | 7.4e-05 | 7.4e-07 | 7.1e-07 | 9.0e-05 | 1.401 | 0.546 | 1.00 / 1.00 |
 | large_mesh | mo5 | 1578 | 2.1e-10 | 9.0e-05 | 5.4e-05 | 9.0e-05 | 7.4e-05 | 7.9e-07 | 7.4e-07 | 9.0e-05 | 3.095 | 1.547 | 2.21 / 2.83 |
 | large_mesh | na2 (ref) | 1355 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2.017 | 1.134 | 1.44 / 2.08 |
-| strong_peak | production | 690 | 7.1e-07 | 9.8e-04 | 2.0e-02 | 2.4e-05 | 2.0e-02 | 9.3e-04 | 4.1e-04 | 2.0e-02 | NaN | 0.160 | NaN / 1.00 |
-| strong_peak | mo5 | 826 | 7.1e-07 | 9.8e-04 | 2.0e-02 | 2.3e-05 | 2.0e-02 | 9.3e-04 | 4.1e-04 | 2.0e-02 | NaN | 0.602 | NaN / 3.76 |
-| strong_peak | na2 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.395 | NaN / 2.46 |
-| strong_takeover | production | 690 | 4.1e-07 | 1.5e-02 | 1.5e-02 | 1.5e-02 | 1.3e-02 | 1.6e-02 | 2.9e-04 | 1.5e-02 | NaN | 0.138 | NaN / 1.00 |
-| strong_takeover | mo5 | 826 | 4.1e-07 | 1.5e-02 | 1.5e-02 | 1.5e-02 | 1.3e-02 | 1.6e-02 | 2.9e-04 | 1.5e-02 | NaN | 0.605 | NaN / 4.37 |
-| strong_takeover | na2 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.401 | NaN / 2.90 |
+| strong_peak | production | 690 | 7.1e-07 | 9.8e-04 | 2.0e-02 | 2.4e-05 | 2.0e-02 | 9.3e-04 | 4.1e-04 | 2.0e-02 | 0.394 | 0.160 | 1.00 / 1.00 |
+| strong_peak | mo5 | 826 | 7.1e-07 | 9.8e-04 | 2.0e-02 | 2.3e-05 | 2.0e-02 | 9.3e-04 | 4.1e-04 | 2.0e-02 | 1.179 | 0.602 | 2.99 / 3.76 |
+| strong_peak | na2 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.703 | 0.395 | 1.78 / 2.46 |
+| strong_takeover | production | 690 | 4.1e-07 | 1.5e-02 | 1.5e-02 | 1.5e-02 | 1.3e-02 | 1.6e-02 | 2.9e-04 | 1.5e-02 | 0.373 | 0.138 | 1.00 / 1.00 |
+| strong_takeover | mo5 | 826 | 4.1e-07 | 1.5e-02 | 1.5e-02 | 1.5e-02 | 1.3e-02 | 1.6e-02 | 2.9e-04 | 1.5e-02 | 1.061 | 0.605 | 2.85 / 4.37 |
+| strong_takeover | na2 (ref) | 690 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.683 | 0.401 | 1.83 / 2.90 |
 
 Summary over states (largest change over the states listed; cost ratio to production, mean over those states):
 
 | setting | states | amplitude-rate error / fastest rate | db/dt, dj/dt (relative) | cost 1 thr | cost 8 thr |
 |---|---|---|---|---|---|
 | production | 7 | 2.0e-02 | 1.7e-01 | 1.00 | 1.00 |
-| mo5 | 7 | 2.0e-02 | 1.6e-01 | 2.75 | 3.53 |
-| na2 | 7 | 0 | 0 | 1.82 | 2.54 |
+| mo5 | 7 | 2.0e-02 | 1.6e-01 | 2.80 | 3.53 |
+| na2 | 7 | 0 | 0 | 1.81 | 2.54 |
 
 Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final state from the reference setting):
 
@@ -871,17 +1002,17 @@ Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final sta
 | nonlinear | np24 npol16 h0.3 sf1.015 c1e-06 hr1e-08 (ref) | 1027 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.328 | 0.304 | 3.37 / 2.20 |
 | large_mesh | production | 1355 | 2.3e-13 | 1.4e-06 | 1.3e-05 | 4.3e-06 | 5.1e-06 | 1.3e-06 | 1.5e-06 | 4.3e-06 | 1.332 | 0.521 | 1.00 / 1.00 |
 | large_mesh | np24 npol16 h0.3 sf1.015 c1e-06 hr1e-08 (ref) | 2041 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4.250 | 1.125 | 3.19 / 2.16 |
-| strong_peak | production | 690 | 3.3e-10 | 1.0e-06 | 1.7e-06 | 1.3e-06 | 2.2e-05 | 1.5e-06 | 1.2e-06 | 2.2e-05 | NaN | 0.153 | NaN / 1.00 |
-| strong_peak | np24 npol16 h0.3 sf1.015 c1e-06 hr1e-08 (ref) | 1027 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.354 | NaN / 2.32 |
-| strong_takeover | production | 690 | 1.2e-10 | 6.1e-07 | 1.5e-06 | 8.2e-05 | 4.4e-04 | 1.2e-05 | 3.5e-06 | 3.2e-04 | NaN | 0.151 | NaN / 1.00 |
-| strong_takeover | np24 npol16 h0.3 sf1.015 c1e-06 hr1e-08 (ref) | 1027 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | NaN | 0.393 | NaN / 2.60 |
+| strong_peak | production | 690 | 3.3e-10 | 1.0e-06 | 1.7e-06 | 1.3e-06 | 2.2e-05 | 1.5e-06 | 1.2e-06 | 2.2e-05 | 0.356 | 0.153 | 1.00 / 1.00 |
+| strong_peak | np24 npol16 h0.3 sf1.015 c1e-06 hr1e-08 (ref) | 1027 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.211 | 0.354 | 3.40 / 2.32 |
+| strong_takeover | production | 690 | 1.2e-10 | 6.1e-07 | 1.5e-06 | 8.2e-05 | 4.4e-04 | 1.2e-05 | 3.5e-06 | 3.2e-04 | 0.368 | 0.151 | 1.00 / 1.00 |
+| strong_takeover | np24 npol16 h0.3 sf1.015 c1e-06 hr1e-08 (ref) | 1027 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1.287 | 0.393 | 3.50 / 2.60 |
 
 Summary over states (largest change over the states listed; cost ratio to production, mean over those states):
 
 | setting | states | amplitude-rate error / fastest rate | db/dt, dj/dt (relative) | cost 1 thr | cost 8 thr |
 |---|---|---|---|---|---|
 | production | 7 | 3.2e-04 | 3.1e-03 | 1.00 | 1.00 |
-| np24 npol16 h0.3 sf1.015 c1e-06 hr1e-08 | 7 | 0 | 0 | 3.36 | 2.20 |
+| np24 npol16 h0.3 sf1.015 c1e-06 hr1e-08 | 7 | 0 | 0 | 3.39 | 2.20 |
 
 Segment 1.5e9 → 1.9e9 from the plateau state (relative change of the final state from the reference setting):
 

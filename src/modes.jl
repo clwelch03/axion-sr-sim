@@ -129,9 +129,19 @@ function fundamental_channels(mode_set::ModeSet)
     end
 end
 
-"""Complex frequency `ω̃_q = q·ω̃` of each component, given per-mode frequencies."""
-component_frequencies(mode_set::ModeSet, mode_frequencies) =
+"""
+    component_frequencies(mode_set, mode_frequencies)
+
+Complex frequency of each component, `ω̃_q = q·ω + i Σ_i |q_i| γ_i` with
+`ω̃_i = ω_i + iγ_i`. A component containing `conj(φ_i)` (`q_i < 0`) carries
+`ω̃_i*`, so it grows with `γ_i` rather than decaying: `φ₁²φ₂*` has `2ω̃₁ − ω̃₂*`.
+Real per-mode frequencies give the real `q·ω`.
+"""
+component_frequencies(mode_set::ModeSet, mode_frequencies::AbstractVector{<:Real}) =
     [sum(component.q .* mode_frequencies) for component in mode_set.components]
+component_frequencies(mode_set::ModeSet, mode_frequencies::AbstractVector) =
+    [complex(sum(component.q .* real.(mode_frequencies)), sum(abs.(component.q) .* imag.(mode_frequencies)))
+     for component in mode_set.components]
 
 Base.show(io::IO, mode::BoundMode) = print(io, "|", mode.n, mode.l, mode.m, "⟩")
 function Base.show(io::IO, mode_set::ModeSet)

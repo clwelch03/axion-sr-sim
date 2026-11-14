@@ -41,6 +41,10 @@ end
     # parity: (2,−1) has m = 0 and even parity so l = 0
     static = findfirst(component -> component.q == [2, -1], mode_set.components)
     @test mode_set.components[static].ls == [0]
+    # φ₁²φ₂* has complex frequency 2ω̃₁ − ω̃₂*: it grows with γ₂ as well as γ₁.
+    mode_frequencies = [0.29 + 1e-3im, 0.295 - 2e-4im]
+    @test AC.component_frequencies(mode_set, mode_frequencies)[static] ≈ 2mode_frequencies[1] - conj(mode_frequencies[2])
+    @test AC.component_frequencies(mode_set, real.(mode_frequencies))[static] ≈ 2 * 0.29 - 0.295
     with_angular = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]; n_angular=2)
     @test with_angular.components[1].ls == [1, 3]
     @test_throws ArgumentError BoundMode(1, 1, 0)

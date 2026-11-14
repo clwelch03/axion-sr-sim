@@ -109,12 +109,12 @@ grid = (:black, 0.06)
 figure = compact ? Figure(size=(900, 850), fontsize=20, figure_padding=(16, 48, 16, 16)) :   # right room for the last tick label
           Figure(size=(1300, 1000), fontsize=15)
 line_width = compact ? 2.5 : 2
-potential_label = occursin("spindown_free_", prefix) ? "free" : "cosine"
+potential_label = display_label(potential_name(prefix))
 title = compact ?
         "a₀ = $spin_label, α₀ = $mass_coupling_label, f_a = $(scientific(decay_constant_ratio * planck_mass_gev)) GeV, $potential_label" *
         (from_log ? " (from Slurm log; amplitudes)" : "") :
         "Spin-down: a₀ = $spin_label, α₀ = $mass_coupling_label, f_a = $(scientific(decay_constant_ratio * planck_mass_gev)) GeV " *
-        "(f_a/M_Pl = $(scientific(decay_constant_ratio))), $potential_label potential, equal initial occupations" *
+        "(f_a/M_Pl = $(scientific(decay_constant_ratio))), $potential_label, equal initial occupations" *
         (!from_log && parent_prefix != prefix ? "\nrun to t = $(scientific(restart_time; digits=3)) M₀ joined with its restart" : "") *
         (from_log ? "\nin progress: Slurm log to t = $(scientific(times[end]; digits=3)) M₀ (amplitudes, not occupations)" : "")
 Label(figure[0, compact ? 1 : (1:2)], title; fontsize=compact ? 20 : 17, color=ink, halign=:left, tellwidth=false)

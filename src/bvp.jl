@@ -479,12 +479,13 @@ function rhs_derivatives!(wrt_state::AbstractMatrix, wrt_frequencies::AbstractMa
                 other_channel == channel && (factor += delta_B)
                 _add_complex_block!(wrt_state, 4channel - 1, 4other_channel - 3, -factor / sum_r2a2^2)
             end
-            # ∂(forcing)/∂ω̃_q, then chain through ω̃_q = Σ_i q_i ω̃_i.
+            # ∂(forcing)/∂ω̃_q, then chain through ω̃_q = Σ_i q_i ω_i + i Σ_i |q_i| γ_i.
             forcing_wrt_frequency = (2sum_r2a2 * (sum_r2a2 * frequency - a * m) + horizon_function * (2a * m - 2a^2 * frequency)) *
                                     profiles[channel] + horizon_function * 2a^2 * frequency * coupled
             for mode_index in eachindex(component.q)
-                wrt_real_part = -forcing_wrt_frequency * component.q[mode_index] / sum_r2a2^2
-                wrt_imag_part = im * wrt_real_part
+                wrt_component_frequency = -forcing_wrt_frequency / sum_r2a2^2
+                wrt_real_part = wrt_component_frequency * component.q[mode_index]
+                wrt_imag_part = im * wrt_component_frequency * abs(component.q[mode_index])
                 wrt_frequencies[4channel - 1, 2mode_index - 1] = real(wrt_real_part)
                 wrt_frequencies[4channel, 2mode_index - 1] = imag(wrt_real_part)
                 wrt_frequencies[4channel - 1, 2mode_index] = real(wrt_imag_part)
@@ -584,7 +585,7 @@ end
 Derivative of `boundary_residual` with respect to the parameter block, written
 into `wrt_parameters` (`4 n_channels × n_parameters`); the derivative with
 respect to the endpoint node block is the identity. Each component's expected
-values depend only on its frequency `ω̃_q = q·ω̃` and its own leading
+values depend only on its frequency `ω̃_q` (see `component_frequencies`) and its own leading
 coefficients, so they are differentiated one component at a time (in parallel
 tasks) with ForwardDiff over `(Re ω̃_q, Im ω̃_q)` and the real and imaginary
 parts of those coefficients, and chained to the parameter columns. The
@@ -615,7 +616,7 @@ function boundary_jacobian!(wrt_parameters::AbstractMatrix, problem::RadialProbl
         rows = 4first(channels) - 3:4last(channels)
         for (mode_index, weight) in enumerate(mode_set.components[component_index].q)
             wrt_parameters[rows, 2mode_index - 1] .-= weight .* view(derivatives, :, 1)
-            wrt_parameters[rows, 2mode_index] .-= weight .* view(derivatives, :, 2)
+            wrt_parameters[rows, 2mode_index] .-= abs(weight) .* view(derivatives, :, 2)   # Im ω̃_q = Σ_i |q_i| γ_i
         end
         for (local_index, channel) in enumerate(channels)
             leading_index[channel] == 0 && continue

@@ -27,3 +27,26 @@ function log_axis_resample(times, series...; logarithmic, time_min, time_max, po
     end
     new_times, resampled...
 end
+
+"""
+    potential_name(prefix)
+
+Short name of the potential of a spin-down run, from its results/ prefix or Slurm log path: scripts/evolution_spindown.jl
+writes spindown_free_… and spindown_chiral_… for those potentials and plain spindown_… for the cosine.
+"""
+potential_name(prefix) = occursin("spindown_free_", prefix) ? "free" : occursin("spindown_chiral_", prefix) ? "chiral" : "cosine"
+
+"""
+    display_label(run_name)
+
+Text shown on a figure for a run. The short run names used in file names and on the command line stay as they are.
+Runs are described by what is in the equations: the free-field runs are "linear", and the linear benchmarks say where
+their rates come from. A name not listed here is shown unchanged.
+"""
+display_label(run_name) = get(Dict("free" => "linear (no self-interaction)",
+                                   "cosine" => "self-interacting (cosine)",
+                                   "chiral" => "self-interacting (QCD potential)",
+                                   "two-level cosine" => "perturbative two-level model (cosine)",
+                                   "Leaver" => "linear, exact rates (Leaver)",
+                                   "free (Leaver)" => "linear, exact rates (Leaver)",
+                                   "hydrogenic" => "linear, small-α rates"), run_name, run_name)

@@ -12,7 +12,8 @@
 # evaluation and the last evaluation of each accepted step, NaN in the other rows unless AXION_CHARGES_EVERY_EVALUATION=1.
 # Reference units are the initial mass M₀.
 # The mesh is built for the initial spin and reused, in units of the current mass, as the spin drops.
-# Potential: AXION_POTENTIAL=cosine (default) or free. With the free potential the two modes are uncoupled and f_a
+# Potential: AXION_POTENTIAL=cosine (default), chiral (the chiral QCD axion potential, ChiralPotential with its default
+# quark mass ratio; outputs get the prefix spindown_chiral_) or free. With the free potential the two modes are uncoupled and f_a
 # enters only through the initial cloud in physical units (κ𝒩₀ with κ = (f_a/M_Pl)²); outputs get the prefix spindown_free_.
 # Writes results/spindown_a<spin>_alpha0.3_fa<f_a/M_Pl>_{diagnostics,solution}.csv. The verbose log (one line per
 # rhs evaluation, including b and j) is the fallback record if the run stops early.
@@ -40,7 +41,7 @@ mass_coupling = 0.3
 mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
 mesh = RadialMesh(background, mass_coupling, mode_set)
 potential_name = get(ENV, "AXION_POTENTIAL", "cosine")
-potential = Dict("cosine" => CosinePotential(), "free" => FreePotential())[potential_name]
+potential = Dict("cosine" => CosinePotential(), "chiral" => ChiralPotential(), "free" => FreePotential())[potential_name]
 problem = RadialProblem(background, potential, mass_coupling, mode_set; mesh)
 record_metric_work = get(ENV, "AXION_RECORD_METRIC_WORK", "0") == "1"
 charges_every_evaluation = get(ENV, "AXION_CHARGES_EVERY_EVALUATION", "0") == "1"
@@ -55,7 +56,7 @@ tolerance_options = haskey(ENV, "AXION_TOLERANCE") ?
     (reltol=parse(Float64, ENV["AXION_TOLERANCE"]), abstol=parse(Float64, ENV["AXION_TOLERANCE"])) : (;)
 checkpoint_minutes = parse(Float64, get(ENV, "AXION_CHECKPOINT_MINUTES", "Inf"))
 Threads.nthreads() > 1 && BLAS.set_num_threads(1)
-prefix = joinpath(@__DIR__, "..", "results", "spindown_$(potential_name == "free" ? "free_" : "")a$(spin_label)_alpha0.3_fa$(ARGS[1])" *
+prefix = joinpath(@__DIR__, "..", "results", "spindown_$(potential_name == "cosine" ? "" : potential_name * "_")a$(spin_label)_alpha0.3_fa$(ARGS[1])" *
                   (length(ARGS) ≥ 3 ? "_t$(ARGS[3])" : "") * (restart_path === nothing ? "" : "_restart") *
                   (algorithm_name == "tsit5" ? "" : "_$algorithm_name"))
 checkpoint_path = prefix * "_checkpoint.jls"

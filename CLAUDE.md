@@ -70,6 +70,23 @@ Plain statements. Avoid mannered prose, overly flowerly language, and metaphor
 for the sake of metaphor. Instead of "this point earns its keep", write "this point
 still matters"; instead of "a dial worth turning", write "a parameter worth varying".
 
+## Plot style
+
+Catherine's default for matplotlib figures is [scripts/matplotlib_style.py](scripts/matplotlib_style.py): import it
+before plotting and the rcParams are set. In short: Computer Modern serif text (LaTeX rendering when `latex` is on
+PATH), 2 pt lines, colour cycle cornflowerblue / forestgreen / maroon / goldenrod / firebrick / mediumorchid, 30 pt axis
+labels and 24 pt tick labels, ticks on all four sides pointing inward with minor ticks, framed legend at 18 pt, 7 × 7
+inch figures with a tight bounding box. New matplotlib scripts use it instead of setting their own rcParams.
+
+Not yet decided: the Julia figures (`scripts/plot_*.jl`, CairoMakie) and the older Python plot scripts under `runs/`
+use the repo palette (`#3DAE2B` green for |211⟩, `#00A0DF` blue for |322⟩) and Makie's default fonts, not this style.
+Do not restyle existing figures to match without being asked; ask which palette should win when a figure needs both.
+
+Text on figures describes runs by what is in the equations, not by internal names: `scripts/plot_helpers.jl`
+(`display_label`) maps run names to figure text, for example free → "linear (no self-interaction)", cosine →
+"self-interacting (cosine)", chiral → "self-interacting (QCD potential)". File names and command-line labels keep the
+short names.
+
 ## Building from-scratch reproductions
 
 This rule governs the whole repo. The user is a physicist and a relative novice

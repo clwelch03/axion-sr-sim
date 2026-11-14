@@ -145,7 +145,7 @@ the Jacobian 28 times, the factorisation 10 times, a warm solve 25 times. Eight 
 warm solve from 7.7 s to 1.5 s (5.2 times). An evolution like the production one (2233 right-hand-side
 calls for the window $1.5\times10^9 \to 10^{11}$, 295 s on 8 threads at $K = 2$) would take about an hour
 at $K = 3$ on the same mesh (2233 times 1.5 s), and about a week at $K = 4$ on its 4256-node mesh (a warm
-solve there is about five residuals and two Jacobians with factorisations, $5 	imes 19.6 + 2 	imes 89 pprox
+solve there is about five residuals and two Jacobians with factorisations, $5 \times 19.6 + 2 \times 89 \approx
 275$ s; extrapolated, not measured).
 
 ### Against the cost model

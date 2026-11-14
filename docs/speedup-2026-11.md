@@ -36,7 +36,7 @@ reports and the code on `speedup/followup`, which contains the merged code.*
 
 **What was achieved.** The time evolution spends almost all its time computing the rates of change of the state
 (amplitudes, black-hole mass and spin) at the points the time integrator asks for. One such computation now costs
-0.19 to 0.22 s on one processor core instead of 2.99 s, a factor of about 15. On eight cores it costs about 0.07 s, a
+0.19 to 0.22 s on one processor core instead of 2.99 s, a factor of 13 to 16. On eight cores it costs about 0.07 s, a
 factor of about 42; one earlier run on another node gave 0.11 s. A full rerun of your saved window
 $t = 1.5\times10^9 \to 10^{11}$ took 295 s on eight cores. The original run took 13353 s, but on a different machine
 with a different core layout, so the factor of about 45 is not a like-for-like comparison. With the stiff integrator
@@ -76,7 +76,7 @@ recommendation is two to four modes treated as now plus tens of weak modes, each
 **Decisions** (section 8): the metric-work diagnostic stays off by default; the parameter audit was done and
 recommends a cheaper phase and polar quadrature and a check of the angular truncation, its largest error; FBDF on
 stiff runs, Tsit5 otherwise; you are rerunning old results; the remaining serial part of the computation was not
-worked on.
+worked on; the work was merged into `rewrite/axioncloud` on 2026-11-14 (section 10).
 
 ## Terms used throughout
 
@@ -688,7 +688,8 @@ Work that runs on one thread takes the same time however many threads are availa
 Scaling stops at about 8 threads: the evolution segment took 2.95 s at 8 threads and 2.91 s at 16 (polish agent). The
 floor is the factorisation (16 ms per factorisation, its elimination stages being sequential) and one boundary
 component (8 to 9 ms), and garbage collection is 16 to 20% of wall time at 8 to 16 threads. The agent reports this as
-the remaining serial floor; I did not find a measurement of how much each part would give if removed.
+the remaining serial floor; I did not find a measurement of how much each part would give if removed. The
+coordinator's estimate of the total gain is in section 8, item 5.
 
 The matrix routines (LAPACK) run on top of a library called BLAS, which can itself use several threads. Two layers of
 threading competing for the same cores usually slows both down. The script therefore sets BLAS to one thread when Julia

@@ -283,12 +283,13 @@ function rhs_derivatives(problem::RadialProblem, s, block::AbstractVector, frequ
                 other_channel == channel && (factor += delta_B)
                 _add_complex_block!(wrt_state, 4channel - 1, 4other_channel - 3, -factor / sum_r2a2^2)
             end
-            # ∂(forcing)/∂ω̃_q, then chain through ω̃_q = Σ_i q_i ω̃_i.
+            # ∂(forcing)/∂ω̃_q, then chain through ω̃_q = Σ_i q_i ω_i + i Σ_i |q_i| γ_i.
             forcing_wrt_frequency = (2sum_r2a2 * (sum_r2a2 * frequency - a * m) + horizon_function * (2a * m - 2a^2 * frequency)) *
                                     state.profiles[channel] + horizon_function * 2a^2 * frequency * coupled[local_index]
             for mode_index in eachindex(component.q)
-                wrt_real_part = -forcing_wrt_frequency * component.q[mode_index] / sum_r2a2^2
-                wrt_imag_part = im * wrt_real_part
+                wrt_component_frequency = -forcing_wrt_frequency / sum_r2a2^2
+                wrt_real_part = wrt_component_frequency * component.q[mode_index]
+                wrt_imag_part = im * wrt_component_frequency * abs(component.q[mode_index])
                 wrt_frequencies[4channel - 1, 2mode_index - 1] = real(wrt_real_part)
                 wrt_frequencies[4channel, 2mode_index - 1] = imag(wrt_real_part)
                 wrt_frequencies[4channel - 1, 2mode_index] = real(wrt_imag_part)

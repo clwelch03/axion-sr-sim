@@ -901,36 +901,140 @@ conjugate-frequency rule, on which the window was not rerun. The original ran on
 
 ## 5. Time integrators
 
-**Preliminary.** This section reports the integrator agent's measurements on the **old radial code**, at one parameter
-point ($a = 0.9$, $\alpha = 0.3$, $f_a = 5.7\times10^{17}$ GeV), with tolerance $10^{-7}$. The quantity compared is
-the number of radial solves, which does not depend on how fast one solve is.
+**What was compared.** The integrator agent ran four integrators, Tsit5, Rosenbrock23, Rodas5P and FBDF, at
+tolerances from $10^{-6}$ to $10^{-10}$, and measured for each run its cost and its error. This is a
+**work-precision comparison**: for each method, how much work buys how much accuracy. Work is counted in radial
+solves. Every right-hand-side evaluation, every column of the rates Jacobian $\Lambda$ (2.7) and every solve at an
+accepted state is one radial solve of similar cost, so the count measures cost independently of how fast one solve
+is. Error is measured against a reference run at a much tighter tolerance. All runs are at $\alpha = 0.3$,
+$a_0 = 0.9$, cosine potential, action balance, 8 threads:
 
-**Finding.** The problem is stiff only on the $|211\rangle$ plateau, with fast eigenvalue $-3.27\times10^{-8}$ against
-slow ones of absolute value below $5\times10^{-13}$ (see 2.7 for what this means and why it caps Tsit5's step).
-Elsewhere Tsit5 is efficient.
+- the **main window**, $f_a = 5.7\times10^{17}$ GeV ($f_a/M_{\mathrm{Pl}} = 0.0467$), $t = 1.5\times10^9 \to 10^{11}$:
+  the $|211\rangle$ plateau, the $|322\rangle$ takeover and the decay of $|211\rangle$;
+- a **long plateau**, $f_a = 5.7\times10^{18}$ GeV ($f_a/M_{\mathrm{Pl}} = 0.467$), $t = 1.5\times10^9 \to 10^{12}$;
+- a **small $f_a$**, $3.7\times10^{16}$ GeV ($f_a/M_{\mathrm{Pl}} = 3\times10^{-3}$), $t = 10^{10} \to 2\times10^{11}$.
 
-Radial solves per segment ("-" means not run):
+The solve counts and errors were measured on the code at `2a1089a`, which has the radial solver from before the
+second round of cleanups (2.6) plus FBDF support. They do not depend on how fast a solve is, so they carry over to the
+merged code. Wall times were measured again on the merged solver for the main window (below).
 
-| Segment | Tsit5 | Rosenbrock23 | Rodas5P | FBDF |
+**Tolerance requested versus error achieved.** The integrator applies the requested tolerance to its own estimate of
+the error made in each step, and chooses the step size to keep that estimate small. The error at the end of a run
+accumulates over many steps and depends on how good the estimate is, so it can be much larger than the request; the
+stiff methods below show this. The only reliable measure is a comparison with a tighter reference run.
+
+**How the error is measured.** At every saved output time of a run (checkpoint), the agent took the largest of
+$|\Delta \ln A_{211}|$, $|\Delta \ln A_{322}|$, $|\Delta b|$ and $|\Delta j|$ against the reference, and reports the
+largest over all checkpoints. A difference in $\ln A$ is a relative error of the amplitude. Taking the largest over
+the run, not the error at the end, is the conservative choice: at the end of the main window $A_{211}$ is decaying
+fast, so a small error in timing appears as a large relative amplitude error. For example, FBDF at $10^{-9}$ ends
+with an error of $4\times10^{-6}$ in $\ln A_{211}$, which is a shift of about $4\times10^4$ in $t$ (units of $M_0$).
+The reference for the main window is Tsit5 at $10^{-11}$. It agrees with FBDF at $10^{-10}$ to $8\times10^{-8}$ and
+with Rodas5P at $10^{-10}$ to $1.5\times10^{-9}$, so it is good to about $10^{-9}$.
+
+**Where the problem is stiff.** In the main window only on the $|211\rangle$ plateau, with fast eigenvalue
+$-3.27\times10^{-8}$ against slow ones of absolute value below $5\times10^{-13}$ (see 2.7 for what this means and why
+it caps Tsit5's step). Tsit5 takes about 800 solves on the plateau segment whatever the tolerance, because its step is
+held at $\Delta t \approx 1.1\times10^8 \approx 3.5/|\lambda|$. The long-plateau run is stiff for the same reason; the
+small-$f_a$ run is not. The agent's reading is that the fast rate is set by the ratio of cloud mass to black-hole mass
+on the plateau. Direct eigenvalue measurements made after its report fit this: $-3.26\times10^{-8}$ on the plateau of
+the long-plateau run, the same as in the main window (the plateau amplitudes of the two runs, in units of $f_a$,
+differ by the factor of 10 that compensates the factor of 10 in $f_a$, so, by my reading, the cloud masses are
+equal), and nothing
+faster than about $1.4\times10^{-10}$ in absolute value at the two times sampled on the small-$f_a$ run. So "small
+$f_a$ means long stiff plateaus" did not hold here.
+
+**Main window.** Total radial solves / largest error over all checkpoints:
+
+| tolerance | Tsit5 | Rosenbrock23 | Rodas5P | FBDF |
 |---|---|---|---|---|
-| plateau, $1.5\times10^9$ to $1.5\times10^{10}$ | 758 | 82 | 171 | 60 |
-| takeover, $1.5\times10^{10}$ to $4.3\times10^{10}$ | 1141 | 640 | 500 | - |
-| $|211\rangle$ decay, $4.3\times10^{10}$ to $10^{11}$ | 334 | 630 | 2700 | - |
-| whole window $1.5\times10^9$ to $10^{11}$ | 2233 | 1354 | 3372 | 638 (about 510 with the final callback) |
+| $10^{-6}$ | 2168 / $1.5\times10^{-5}$ | 682 / $1.4\times10^{-3}$ | 775 / $3.5\times10^{-5}$ | 334 / $1.3\times10^{-3}$ |
+| $10^{-7}$ | 2300 / $2.3\times10^{-7}$ | 1332 / $3.5\times10^{-4}$ | 1195 / $5.8\times10^{-7}$ | 466 / $1.2\times10^{-4}$ |
+| $10^{-8}$ | 2498 / $5.9\times10^{-8}$ | 2692 / $8.6\times10^{-5}$ | 2969 / $1.2\times10^{-7}$ | 687 / $8.8\times10^{-6}$ |
+| $10^{-9}$ | 3062 / $3.1\times10^{-9}$ | 5544 / $1.3\times10^{-5}$ | 8031 / $2.0\times10^{-8}$ | 881 / $4.1\times10^{-6}$ |
+| $10^{-10}$ | 4022 / $1.5\times10^{-9}$ | 11922 / $1.5\times10^{-6}$ | 24809 / $1.5\times10^{-9}$ | 1144 / $7.7\times10^{-8}$ |
 
-Final-state error in $A_{211}$ against a tight reference: Tsit5 $2\times10^{-7}$, Rosenbrock23 $1.5\times10^{-4}$,
-Rodas5P $9\times10^{-6}$, FBDF $1.1\times10^{-4}$.
+Compared at equal achieved accuracy:
 
-**Tolerance requested versus error achieved.** All four runs requested $10^{-7}$. The integrator applies that
-tolerance to its own estimate of the error made in each step, and chooses the step size to keep that estimate small.
-The error at the end of a run accumulates over many steps and depends on how good the estimate is, so it can be much
-larger than the request, as it is here for the stiff methods. The only reliable measure is a comparison with a tighter
-reference run.
+- about $10^{-6}$: Rodas5P at $10^{-7}$ or FBDF at $10^{-9}$ cost about half of Tsit5;
+- about $10^{-7}$: FBDF at $10^{-10}$ (1144 solves) costs about half of Tsit5 at $10^{-8}$ (2498) and 0.4 times
+  Rodas5P at $10^{-8}$;
+- about $10^{-9}$: Tsit5 is cheapest; Rodas5P needs about 25000 solves;
+- Rosenbrock23 is never competitive.
+
+By segment: on the plateau ($1.5\times10^9 \to 1.5\times10^{10}$) FBDF at $10^{-10}$ takes 85 solves with error
+$2\times10^{-9}$, about 10 times fewer than Tsit5. Through the takeover and decay ($1.5\times10^{10} \to 10^{11}$)
+FBDF at $10^{-10}$ takes 1058 solves (error $7.7\times10^{-8}$), Tsit5 1536 at $10^{-7}$ ($2.3\times10^{-7}$) and
+1728 at $10^{-8}$ ($6\times10^{-8}$). FBDF's error does not follow its tolerance closely: at $10^{-8}$ and at
+$10^{-9}$ it ends near $4\times10^{-6}$ both times.
+
+**Long plateau** ($f_a = 5.7\times10^{18}$ GeV). The reference is Rodas5P at $10^{-11}$; it agrees with FBDF at
+$10^{-11}$ to $2\times10^{-10}$.
+
+| run | solves | largest error |
+|---|---|---|
+| FBDF $10^{-8}$ | 52 | $1.2\times10^{-7}$ |
+| FBDF $10^{-9}$ | 77 | $4.5\times10^{-9}$ |
+| FBDF $10^{-11}$ | 167 | $1.7\times10^{-10}$ |
+| Rosenbrock23 $10^{-9}$ | 180 | $1.0\times10^{-7}$ |
+| Rodas5P $10^{-9}$ | 777 | $1.2\times10^{-10}$ |
+
+Tsit5 first failed on this run: the library's rule for the first step chose a step so large that a stage landed at
+negative spin, and constructing the Kerr background there threw an error instead of the step being rejected. The
+merged code now treats such a trial state as a failed step attempt, so the integrator retries with a smaller step
+(`29d8a6f`). Reruns with an explicit first step reached $t = 10^{11}$, not $10^{12}$: 5516 solves at tolerance
+$10^{-7}$ and 5546 at $10^{-9}$, against 57 for FBDF at $10^{-9}$ over the same interval, about 100 times fewer. Their
+errors were not analysed. Over the whole run to $10^{12}$ the agent estimated, from the production log, about
+$6\times10^4$ Tsit5 solves, which would make FBDF 500 to 800 times cheaper; that is an extrapolation.
+
+**Small $f_a$** ($3.7\times10^{16}$ GeV), not stiff. The reference is Rodas5P at $10^{-11}$; it agrees with FBDF at
+$10^{-11}$ to $5\times10^{-8}$.
+
+| run | solves | largest error |
+|---|---|---|
+| Tsit5 $10^{-7}$ | 248 | $2.2\times10^{-8}$ |
+| Tsit5 $10^{-9}$ | 500 | $6.7\times10^{-10}$ |
+| FBDF $10^{-9}$ | 542 | $1.6\times10^{-6}$ |
+| FBDF $10^{-11}$ | 756 | $5.2\times10^{-8}$ |
+| Rodas5P $10^{-7}$ | 599 | $2.6\times10^{-6}$ |
+
+Tsit5 is the best method here.
+
+**Other candidates on the main window.** QNDF, a close relative of FBDF, behaves like it (781 solves, error
+$7.8\times10^{-6}$ at $10^{-9}$). The library's automatic-switching composites start with Tsit5 and switch to a stiff
+method when they detect stiffness: AutoTsit5(Rodas5P) behaves like Rodas5P and AutoTsit5(Rosenbrock23) like
+Rosenbrock23, and AutoTsit5(FBDF) fails at $10^{-9}$ (3830 solves, error $1.6\times10^{-2}$). KenCarp4, an implicit
+Runge-Kutta method, was only smoke-tested: 474 solves where FBDF needed 23.
+
+**Wall time on the merged solver code.** The main window was timed again on `a84f712`, the merge of the speedup
+(`9e17100`) into the integrator branch, which has the solver of section 2 and FBDF support but not yet the
+conjugate-frequency rule. Eight threads, lr7, one run each. The last column is the relative difference of the final
+$A_{211}$ from the Tsit5 run at $10^{-8}$; I recomputed it from the logged final states.
+
+| run | wall time | radial solves | final $A_{211}$ against Tsit5 $10^{-8}$ |
+|---|---|---|---|
+| Tsit5 $10^{-7}$ | 266 s | 2300 | $2.2\times10^{-7}$ |
+| Tsit5 $10^{-8}$ | 275 s | 2492 | reference |
+| FBDF $10^{-10}$ | 119 s | 1036 | $4.5\times10^{-7}$ |
+| FBDF $10^{-8}$ | 77 s | 595 | $1.0\times10^{-5}$ |
+| Rodas5P $10^{-8}$ | 306 s | 3225 | $1.9\times10^{-8}$ |
+| Rosenbrock23 $10^{-8}$ | 209 s | 2692 | $8.6\times10^{-5}$ |
+
+One radial solve costs about 0.1 s for every method, so wall time follows the solve count. FBDF at $10^{-10}$ takes
+less than half of Tsit5's time. Reading the last column: the final state lies in the fast decay of $|211\rangle$,
+the least favourable point for this measure; and the Tsit5 run at $10^{-8}$ is itself off the converged answer by
+about $6\times10^{-8}$ (main-window table), so differences below that are not resolved. The FBDF error at
+$10^{-10}$, $4.5\times10^{-7}$ at the final time, is larger than the $7.7\times10^{-8}$ (largest over all
+checkpoints) that the same setting gave on `2a1089a`, and the solve count changed from 1144 to 1036. The two codes
+give the same rates within the regression tolerances, but differences at the level of the Newton tolerance change
+FBDF's sequence of steps, and at fixed tolerance its error moved by a factor of a few. The other methods hardly moved:
+Tsit5 at $10^{-7}$ and Rosenbrock23 took the same number of solves on both codes, Tsit5 at $10^{-8}$ 2492 instead of
+2498, and Rodas5P 3225 instead of 2969.
 
 **Vocabulary for the methods.**
 
 - The **order** $p$ of a method: the error after a fixed time scales as $h^p$, so halving the step reduces it by
-  $2^p$.
+  $2^p$. High-order methods reach small errors in fewer steps.
 - A **multistep** method builds $y_{n+1}$ from several previous states instead of from stages within one step. The
   backward differentiation formulas (**BDF**) are implicit multistep methods made for stiff problems.
 - A **W-method** is a Rosenbrock method whose accuracy does not require the exact $\Lambda$; any reasonable
@@ -938,25 +1042,69 @@ reference run.
 - **L-stable**: as $h\lambda \to -\infty$ the method's amplification factor goes to zero, so a fast relaxation is
   damped out in one step instead of persisting as a slowly decaying oscillation.
 
-**The four methods.**
+**The four methods, and why they performed as they did.**
 
-- **Tsit5**: explicit, order 5. No $\Lambda$ needed, but its step is held at the stability limit on the plateau.
-- **Rosenbrock23**: order 2, linearly implicit. It is a W-method, so a finite-difference $\Lambda$ is acceptable. About
-  6 radial solves per step. Low accuracy per step. (Its documentation describes it as L-stable.)
-- **Rodas5P**: order 5, about 13 radial solves per step. Its accuracy degrades if $\Lambda$ is out of date.
-- **FBDF**: a variable-order BDF method. It reuses $\Lambda$ over many steps by design. It had the fewest solves in
-  every window it ran. It needs a new dependency (tested in scratch only) and a check at tighter tolerance, since its
-  final error here is $1.1\times10^{-4}$.
+- **Tsit5**: explicit, order 5. It needs no $\Lambda$, but on a stiff plateau its step is held at the stability
+  limit, whatever the tolerance.
+- **Rosenbrock23**: order 2, linearly implicit, a W-method, so a finite-difference $\Lambda$ does not spoil it. Order
+  2 is too low: it needs many steps for a small error, and each step needs a new $\Lambda$ (4 perturbed solves).
+- **Rodas5P**: order 5, linearly implicit, not a W-method. Its accuracy depends on $\Lambda$ being accurate. Ours is
+  a finite-difference approximation, so at tight tolerances it loses order and takes many small steps. It also
+  computes a new $\Lambda$ at every step (245 in the re-timed run).
+- **FBDF**: variable-order BDF (orders 1 to 5). It solves its implicit equation for $y_{n+1}$ by Newton's method, in
+  which $\Lambda$ only steers the iteration: an inaccurate or old $\Lambda$ costs a few extra iterations, not
+  accuracy. FBDF asks for a new $\Lambda$ only when its Newton iteration converges slowly or the step size changes a
+  lot, so it computed 3 to 6 per run (3 in the re-timed runs). Each costs 4 perturbed solves plus one solve at the
+  accepted state, because FBDF never evaluates the right-hand side there itself.
 
-**Agent's recommendation (preliminary).** A stiff method on plateaus and Tsit5 elsewhere; Rodas5P rather than
-Rosenbrock23 when accuracy matters; FBDF is the best overall candidate. Reusing $\Lambda$ gave erratic errors away
-from the plateau and stays off. On the final code the cost of one solve has changed but the number of solves per method
-has not. The cost of one $\Lambda$ ($K + 2$ extra solves) now scales with the faster solve and with threads.
+Settings of $\Lambda$ for FBDF were varied on the main window at $10^{-8}$: central differences, other step sizes, and
+reuse of $\Lambda$ over 3 steps. They took 579 to 724 solves (default 687) with errors $8.8\times10^{-6}$ to
+$2.8\times10^{-5}$ (default $8.8\times10^{-6}$). Only 12 to 32 of the roughly 700 solves are for $\Lambda$. So the
+defaults stay: forward differences, the default steps, and no reuse, since FBDF already reuses $\Lambda$ itself.
 
-The work-precision comparison on the final code is pending. A work-precision comparison measures, for each
-integrator, the cost (here radial solves) needed to reach a given error against a reference solution.
+Cost of one $\Lambda$ on the merged solver (8 threads, plateau and later states of the three runs): 0.16 to 0.23 s
+with the four perturbed solves running concurrently (central differences 0.29 to 0.39 s), against 0.49 s on the old
+code. One perturbed solve takes 0.08 to 0.11 s, about the cost of an ordinary solve one step away.
 
-*For the cleanup pass: comparison on branch `speedup/methods`; FBDF dependency OrdinaryDiffEqBDF.*
+**Conclusion.**
+
+- **Neither Rosenbrock method.** Rosenbrock23 lost at every accuracy. Rodas5P is competitive only at about $10^{-6}$
+  and is slower than Tsit5 at $10^{-8}$.
+- **FBDF for stiff runs.** On runs dominated by long stiff plateaus (here $f_a \gtrsim 6\times10^{17}$ GeV at this
+  $\alpha$ and spin), FBDF at tolerance $10^{-9}$. Through a $|322\rangle$ takeover, FBDF at $10^{-10}$; expect errors
+  of a few times $10^{-7}$, at less than half of Tsit5's cost. FBDF's error at fixed tolerance moves by a factor of a
+  few with small changes in the sequence of solves, so treat its tolerance as a rough setting and check a new kind of
+  run once against a tighter one.
+- **Tsit5 stays the default.** It is safe when the problem is not stiff and is then the best method (the
+  $f_a = 3.7\times10^{16}$ GeV run). It is also the choice when errors well below $10^{-8}$ are wanted.
+- Making FBDF the default of `scripts/evolution_spindown.jl` is the owner's choice; the script accepts
+  `AXION_ALGORITHM=fbdf` (section 6). The parameter audit adds a point (section 8, item 2): the right-hand side itself
+  carries discretisation errors of a few times $10^{-6}$ relative in the rates, so tolerances much tighter than $10^{-7}$
+  buy agreement with the same discrete equations, not physical accuracy.
+
+**Limits of the evidence.**
+
+- One $\alpha$ (0.3) and one spin ($a_0 = 0.9$); three values of $f_a$; cosine potential only.
+- The linear-growth window ($t = 0 \to 1.5\times10^9$) was never compared: its jobs were held in the queue and never
+  ran.
+- Solve counts and errors are from `2a1089a`; wall times from `a84f712`, one run each on shared nodes. Neither code
+  has the conjugate-frequency rule. Nothing was re-run on the merged code.
+- FBDF's error does not always fall as its tolerance is tightened, and it moved by a factor of a few between two
+  nearly identical codes.
+- The Tsit5 cost of the full long plateau is extrapolated; the Tsit5 reruns there were not compared with the
+  reference.
+- Switching method by regime (Tsit5 off the plateau, FBDF on it) was not run end to end. At accuracy of $10^{-7}$ or
+  looser FBDF beats Tsit5 in every segment of the stiff runs, so a switch could pay only below $10^{-8}$. A possible
+  criterion, $|\lambda_{\mathrm{fast}}|\,\Delta t$ from the $\Lambda$ that FBDF already computes, is untested.
+
+*For the cleanup pass: branch `speedup/methods` (`07287c0`, `2a1089a`, `a84f712`), merged through
+`integration-next`. Report: `methods-work/REPORT_2026-11-13_1115.md` under `axion-sr-sim-speedup/`; scripts
+`run_case.jl` (it places `tstops` at the checkpoints, which is why its Tsit5 runs take 2300 solves rather than 2233),
+`analyze.jl`, `plot_wp.jl`, `jacobian_cost.jl`; tables in `methods-work/data/analysis_*.txt`. Re-timing:
+`methods-work/logs/retime_*` (jobs 27823322 to 27823328). Cost of $\Lambda$ and eigenvalues: jobs 27823319 to 27823321
+(`jaccost-*`). Long-plateau Tsit5 reruns: 27823295, 27823296. Linear-window jobs `wp_linear_*` (27820490 to
+27820508): held, never ran. Trial-state fix: `29d8a6f` (`is_kerr_black_hole` in `_spindown_rhs!`). FBDF dependency
+OrdinaryDiffEqBDF 2.4.14.*
 
 ## 6. How to run it now
 

@@ -33,7 +33,7 @@ prefixes = Tuple(arguments[2index - 1] for index in 1:run_count)
 labels = Tuple(arguments[2index] for index in 1:run_count)
 output_path = isodd(length(arguments)) ? arguments[end] :
               joinpath(@__DIR__, "..", "plots", "spindown_overlay_$(join(labels, "_"))_" *
-                       replace(prefixes[1], r"^spindown_(free_)?" => "", r"_t[^_]+$" => "") * (compact ? "_compact" : "") * ".png")
+                       replace(prefixes[1], r"^spindown_((free|chiral)_)?" => "", r"_t[^_]+$" => "") * (compact ? "_compact" : "") * ".png")
 
 """Accepted states of one run as a named tuple of columns."""
 function read_run(prefix)

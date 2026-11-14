@@ -9,7 +9,8 @@
 # j = J/M₀² evolve, coupled through (f_a/M_Pl)² (non-reduced Planck mass). Action balance (default), so no
 # metric-work term enters; w is still recorded. Reference units are the initial mass M₀.
 # The mesh is built for the initial spin and reused, in units of the current mass, as the spin drops.
-# Potential: AXION_POTENTIAL=cosine (default) or free. With the free potential the two modes are uncoupled and f_a
+# Potential: AXION_POTENTIAL=cosine (default), chiral (the chiral QCD axion potential, ChiralPotential with its default
+# quark mass ratio; outputs get the prefix spindown_chiral_) or free. With the free potential the two modes are uncoupled and f_a
 # enters only through the initial cloud in physical units (κ𝒩₀ with κ = (f_a/M_Pl)²); outputs get the prefix spindown_free_.
 # Writes results/spindown_a<spin>_alpha0.3_fa<f_a/M_Pl>_{diagnostics,solution}.csv. The verbose log (one line per
 # rhs evaluation, including b and j) is the fallback record if the run stops early.
@@ -28,7 +29,7 @@ mass_coupling = 0.3
 mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
 mesh = RadialMesh(background, mass_coupling, mode_set)
 potential_name = get(ENV, "AXION_POTENTIAL", "cosine")
-potential = Dict("cosine" => CosinePotential(), "free" => FreePotential())[potential_name]
+potential = Dict("cosine" => CosinePotential(), "chiral" => ChiralPotential(), "free" => FreePotential())[potential_name]
 problem = RadialProblem(background, potential, mass_coupling, mode_set; mesh)
 target_actions = [3e-6, 3e-6]
 probe = solve_radial(problem, [1e-6, 1e-6])
@@ -51,7 +52,7 @@ if restart_path !== nothing
 end
 start_time < final_time || error("restart time $start_time is not before the final time $final_time")
 span = (start_time, final_time)
-prefix = joinpath(@__DIR__, "..", "results", "spindown_$(potential_name == "free" ? "free_" : "")a$(spin_label)_alpha0.3_fa$(ARGS[1])" *
+prefix = joinpath(@__DIR__, "..", "results", "spindown_$(potential_name == "cosine" ? "" : potential_name * "_")a$(spin_label)_alpha0.3_fa$(ARGS[1])" *
                   (length(ARGS) ≥ 3 ? "_t$(ARGS[3])" : "") * (restart_path === nothing ? "" : "_restart"))
 println("potential: $potential_name")
 @printf("a₀ = %.4f; mesh: %d nodes, r* ∈ [%.2f, %.2f]; balance = :action; f_a/M_Pl = %.3e (f_a = %.3e GeV)\n",

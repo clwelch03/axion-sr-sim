@@ -109,7 +109,7 @@ grid = (:black, 0.06)
 figure = compact ? Figure(size=(900, 850), fontsize=20, figure_padding=(16, 48, 16, 16)) :   # right room for the last tick label
           Figure(size=(1300, 1000), fontsize=15)
 line_width = compact ? 2.5 : 2
-potential_label = display_label(occursin("spindown_free_", prefix) ? "free" : "cosine")
+potential_label = display_label(potential_name(prefix))
 title = compact ?
         "a₀ = $spin_label, α₀ = $mass_coupling_label, f_a = $(scientific(decay_constant_ratio * planck_mass_gev)) GeV, $potential_label" *
         (from_log ? " (from Slurm log; amplitudes)" : "") :

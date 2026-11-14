@@ -9,7 +9,7 @@ problem = RadialProblem(background, CosinePotential(), 0.3, mode_set)
 state = BackgroundState(1.0, background.a)
 for amplitudes in ([1e-6, 1e-7], [1e-2, 1e-4])
     solution = solve_radial(problem, amplitudes)
-    cache = EvolutionCache(problem; decay_constant_ratio=1e-2, last_solution=solution)
+    cache = EvolutionCache(problem; decay_constant_ratio=1e-2, record_metric_work=true, last_solution=solution)
     t_ift = @elapsed derivatives = background_charge_derivatives(cache, solution, state)
     t_ift = @elapsed derivatives = background_charge_derivatives(cache, solution, state)
     ift_mass, ift_spin = derivatives.charges_wrt_mass, derivatives.charges_wrt_angular_momentum

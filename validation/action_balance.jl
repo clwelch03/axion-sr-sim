@@ -73,7 +73,7 @@ for rstar_min in (-45.0, -60.0, -80.0, -100.0, -120.0)
     mesh = RadialMesh(background; rstar_min, rstar_max=180.0, step=0.4)
     problem = RadialProblem(background, CosinePotential(), 0.3, mode_set; mesh)
     solution = solve_radial(problem, [1e-6, 1e-7])
-    cache = EvolutionCache(problem; decay_constant_ratio=1.0, last_solution=solution)
+    cache = EvolutionCache(problem; decay_constant_ratio=1.0, record_metric_work=true, last_solution=solution)
     terms = balance_terms(cache, solution, state)
     rate, derivatives = terms.state_rate, terms.derivatives
     actions = AC.reference_actions(phase_actions(solution), state)

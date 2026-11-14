@@ -19,7 +19,7 @@ Julia implementation of the method described in `docs/multiphase.tex`.
 | `src/initial_guess.jl` | Hydrogenic seed for the Newton iteration |
 | `src/charges.jl` | Phase-averaged `E`, `J`, boundary fluxes, amplitude derivatives via the implicit-function theorem |
 | `src/calibration.jl` | Amplitudes for prescribed per-cloud energies |
-| `src/evolution.jl` | Tsit5 drivers on a fixed background and with black-hole spindown (background derivatives, metric work) |
+| `src/evolution.jl` | Drivers on a fixed background and with black-hole spindown (background derivatives, metric work); Tsit5 by default, stiff integrators with a finite-difference Jacobian (`algorithm`, `FiniteDifferenceJacobian`) |
 
 ## Conventions
 
@@ -44,7 +44,9 @@ Julia implementation of the method described in `docs/multiphase.tex`.
   `J = Σ m_i N_i`. The evolution drivers take `balance=:action` (default since 2026-11-09: one action
   balance per phase, any number of modes, no metric work) or `balance=:energy` (energy and angular
   momentum, two modes; the earlier default, needed to reproduce results from before that date).
-  `metric_work` is the action-based `(∂E)|_N` work, independent of the inner endpoint.
+  `metric_work` is the action-based `(∂E)|_N` work, independent of the inner endpoint. Under the action
+  balance the energy, angular momentum and metric work are not computed (the diagnostics hold `NaN` for
+  `w`) unless `record_metric_work=true` or `include_metric_work=true` is passed; the amplitude rates do not change.
 * The evolution state is `ln A` by default (`log_amplitudes`), with the first step set from the
   initial e-folding time; read amplitudes with `amplitude_trajectory(result)`.
 
@@ -62,6 +64,8 @@ result = evolve_fixed_background(problem, [1e-6, 1e-7], (0.0, 1e8); verbose=true
 trajectory = amplitude_trajectory(result)                         # times, amplitudes[time, mode]
 phase_actions(solution), amplitude_rates(solution; balance=:action)
 spun = evolve_with_spindown(problem, [1e-6, 1e-7], (0.0, 1e8), 1e-2)   # f_a/M_Pl = 0.01
+stiff = evolve_with_spindown(problem, [1e-6, 1e-7], (0.0, 1e8), 1e-2; algorithm=Rosenbrock23())   # stiff integrator
+stiff.solve_counts                                                # radial solves: stages, Jacobian, accepted states
 far = RadialMesh(background; rstar_min=-100.0, rstar_max=2000.0, step=0.4, stretch_from=150.0)
 sized = RadialMesh(background, 0.3, modes; max_radius=2000.0)        # endpoints from the physics at this point
 ```

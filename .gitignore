@@ -8,3 +8,7 @@ __pycache__/
 *.jls
 # Generated campaign results, including TOML/JSON summaries and failure reports.
 /runs/**/results/
+
+# Benchmark harness: cached states and run logs.
+/benchmarks/cache/
+/benchmarks/logs/

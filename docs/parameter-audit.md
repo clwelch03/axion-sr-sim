@@ -14,8 +14,13 @@ the growth rates. I expect it to leave the quadrature conclusions (Sections 1, 2
 conclusions (3.1, 3.4) and the tolerance conclusions (5) unchanged, since those concern how accurately the same
 field is averaged and integrated. The conclusions that involve the $(2,-1)$ and $(-1,2)$ components directly should
 be rechecked: the endpoint dependence at the strong states (3.2, 3.3), which comes from exactly those components'
-waves in transit, and the size of the polar-truncation error at the strong states (4). Section 7 gives a spot check
-on the merged code.
+waves in transit, and the size of the polar-truncation error at the strong states (4).
+
+**Spot check on the merged code (Section 7).** Rerun on `rewrite/axioncloud` 6c0a9e6 merged into this branch: the
+polar-truncation error at the strong states is unchanged (1.5-2%), but the endpoint dependence at the strong states
+almost disappears (outer endpoint at strong_takeover $6.3\times10^{-4} \to 2.2\times10^{-5}$, inner endpoint at
+strong_peak $2.3\times10^{-5} \to 6\times10^{-8}$). The old-code endpoint numbers for the strong states in 3.2 and
+3.3 are therefore superseded; the table below gives the merged-code values.
 
 ## If you read only this
 
@@ -27,10 +32,10 @@ on the merged code.
 | **85-point lattice and `n_polar` 8 together (measured)** | | $1.8\times10^{-13}$ | **the recommended quadrature** | $-49\%$ / $-20\%$ |
 | radial `step` | 0.4 | $2.5\times10^{-6}$ (about $10^{-6}$ from the uniform step, the rest from the tail cap) | keep | |
 | cap on stretched intervals (`max_step`) | 1.86 | about $3\times10^{-6}$ (weaker states) | keep, unless the polar truncation is raised; 0.8 removes it | $+45\%$ at 8 threads (1 thread not measured) |
-| outer endpoint (`containment`) | $10^{-4}$ | $6\times10^{-4}$ (strong takeover), $4\times10^{-6}$ elsewhere; **does not converge** | not a parameter fix: see Section 3.2 | |
-| inner endpoint (`horizon_offset_ratio`) | $10^{-6}$ | $\le 3\times10^{-8}$ on the weaker states, $2\times10^{-5}$ on the strong ones; **does not converge** (same cause as the outer endpoint) | keep; see Section 3.3 | |
+| outer endpoint (`containment`) | $10^{-4}$ | about $4\times10^{-6}$, drifting linearly with $r_{*,\max}$ (tail resolution, see `max_step`); strong_takeover $2\times10^{-5}$ on the merged code ($6\times10^{-4}$ before 41fc2e7) | keep; see Section 3.2 | |
+| inner endpoint (`horizon_offset_ratio`) | $10^{-6}$ | $\le 3\times10^{-8}$ on the weaker states; strong_peak $6\times10^{-8}$ on the merged code ($2\times10^{-5}$ before 41fc2e7) | keep | |
 | `stretch_factor` | 1.03 | $3\times10^{-7}$ | keep | |
-| `n_angular` (polar indices per component) | 1 | $2\times10^{-2}$ (strong states), $7\times10^{-4}$ (plateau, takeover) | the largest error found; run with 2 at least for strongly nonlinear cases, after checking 3 | $+91\%$ / $+148\%$ |
+| `n_angular` (polar indices per component) | 1 | $2\times10^{-2}$ (strong states, confirmed on the merged code), $7\times10^{-4}$ (plateau, takeover) | the largest error found; run with 2 at least for strongly nonlinear cases, after checking 3 | $+91\%$ / $+148\%$ |
 | `max_order` (Fourier truncation) | 3 | $\lesssim 3\times10^{-6}$ (mixed with the outer endpoint) | keep | |
 | `newton_tol` | $10^{-10}$ | $\le 2\times10^{-9}$ even at $10^{-7}$ | keep on the $\alpha = 0.3$ meshes; use $10^{-8}$ on the $\alpha = 0.187$ mesh | $0$ to $-14\%$; $-28\%$ at $\alpha = 0.187$ |
 | integrator `reltol`/`abstol` | $10^{-7}$ | see the methods report | keep $10^{-7}$ (Tsit5) or FBDF at $10^{-9}$-$10^{-10}$ on stiff plateaus | |
@@ -45,12 +50,13 @@ Three findings matter more than any saving:
    $d\ln A_{322}/dt$ by 2% at the strong $|211\rangle$ peak, 1.3% at the strong takeover, $7\times10^{-4}$ on the
    plateau and $6\times10^{-4}$ at the takeover. That is $10^{3}$-$10^{4}$ times the radial-step error. Whether
    `n_angular` = 2 is itself converged is not known (3 was not run).
-2. **The endpoint dependence does not converge, at either end.** Moving either endpoint changes the rates in
-   proportion to the change of the domain length in $r_*$, without levelling off. The cause is identified for the
-   strong states: the phase actions $N_i$ are integrals over the domain, and they include wave action that is only
-   passing through, outgoing radiation near the outer endpoint (component $q = (-1,2)$) and waves falling into the
-   horizon near the inner endpoint (component $q = (2,-1)$ and the $|211\rangle$ mode itself). That part grows
-   linearly with the domain. It is a question of definition in the action balance, not of resolution.
+2. **The large endpoint dependence at the strong states was mostly a symptom of the old frequency rule.** On the
+   old code, moving either endpoint changed the rates at the strong states in proportion to the domain length
+   ($6\times10^{-4}$ at the strong takeover), together with the wave action of the driven components $(-1,2)$ and
+   $(2,-1)$ in transit through the domain. On the merged code, with the conjugate-frequency rule, the same domain
+   still holds the same radiation, but the rates change only by $2\times10^{-5}$ (outer) and $6\times10^{-8}$ (inner):
+   the radiation's growth is now consistent with the action balance, so counting it in $N_i$ no longer matters much.
+   The rule itself changes the strong-state rates by up to $1.2\times10^{-3}$.
 3. **On the weaker states the outer-endpoint drift is a resolution error of the mesh tail.** Capping the stretched
    intervals at 0.8 instead of 1.86 reduces it about 30-fold, as expected for a fourth-order scheme (Section 3.2).
 4. **The integrator tolerance is already tighter than the discretisation.** The radial step alone gives relative rate
@@ -280,15 +286,16 @@ $1.0\times10^{-8}$ per unit of $r_{*,\max}$ in $d\ln A_{322}/dt$; for strong_tak
 in $d\ln A_{322}/dt$) and shows no sign of levelling off at $r_{*,\max} = 860$. Refining this parameter would make the
 numbers move further, not settle.
 
-*Cause at the strong takeover (checked).* The component $q = (-1, 2)$, frequency $2\omega_{322} - \omega_{211} > \mu$,
+*Old code; superseded at the strong states by Section 7.* *Cause at the strong takeover (checked on the old code).* The component $q = (-1, 2)$, frequency $2\omega_{322} - \omega_{211} > \mu$,
 propagates: it is radiation produced by the nonlinear coupling and travelling outwards. Its Klein-Gordon charge
 $n_q$ inside the domain grows linearly with the endpoint, 0.042, 0.054, 0.066, 0.078, 0.102 for the five endpoints
 (`../audit-work/radiation_in_box.jl`), because a steady outgoing wave fills the box. It enters the phase actions
 $N_i = \sum_q q_i n_q$ with weights $-1$ (for $|211\rangle$) and $+2$ (for $|322\rangle$): radiation is 0.04% of
 $N_{322}$ at production and 0.07% at $r_{*,\max} = 860$. The action balance treats $N_i$ as the cloud's action, so the
-rates depend on how much radiation the box happens to contain. This is a definition question rather than a
-numerical one: the radiation should probably be left out of the cloud actions (its flux through the outer boundary
-is already in the loss terms). The owner should decide that before rerunning strongly nonlinear cases.
+rates appeared to depend on how much radiation the box happens to contain. On the old code this looked like a
+definition question (whether radiation belongs in the cloud actions). The merged code answers it differently: the box
+holds the same radiation, but the rates change by only $2\times10^{-5}$ (Section 7), so the large drift came from the
+old frequency rule, not from counting the radiation.
 
 *At the weaker states the cause is the resolution of the mesh tail (checked).* On the plateau the propagating
 components hold only $10^{-12}$ of the actions, so radiation in the box is ruled out there; instead $n_{(1,0)}$
@@ -318,8 +325,9 @@ nor nonlinear radiation; I have not found its cause.
 **Recommendation:** keep `containment` = $10^{-4}$. Keep the default cap for now: with it the weaker states carry
 about $3\times10^{-6}$ (cap) plus $4\times10^{-6}$ (endpoint) in the rates, and `max_step` = 0.8 would remove both
 for about $+45\%$ per evaluation. That is worth paying only together with `n_angular` = 2, since the polar
-truncation error ($7\times10^{-4}$) is 100 times larger. Fix the radiation accounting before relying on strongly
-nonlinear runs.
+truncation error ($7\times10^{-4}$) is 100 times larger. At the strong takeover the merged code leaves an endpoint
+dependence of $2\times10^{-5}$ (Section 7), so no change of the radiation accounting is needed for the rates at the
+present accuracy.
 
 ### 3.3 Inner endpoint (`horizon_offset_ratio`)
 
@@ -342,10 +350,10 @@ $q = (2,-1)$ in the domain grows linearly with $|r_{*,\min}|$, $2.585$, $2.638$,
 $7\times10^{-7}$ per unit of $r_*$. Near the horizon each component is a wave falling in, whose action density per
 unit $r_*$ is constant, so the integral over the domain grows with its length. That component enters $N_{322}$ with
 weight $-1$; the $|211\rangle$ mode's own charge also drifts ($-2.9\times10^{-5}$ per unit of $r_*$; it is
-superradiant, so its infalling wave carries negative action). This is the same accounting question as in 3.2.
+superradiant, so its infalling wave carries negative action). This is the same accounting question as in 3.2. On the merged code (Section 7) the strong_peak change at production
+falls to $6.3\times10^{-8}$, so the inner endpoint no longer matters at any state.
 
-**Recommendation: keep $10^{-6}$**, and treat the inner and outer endpoint dependence together when the definition of
-the cloud actions is revisited.
+**Recommendation: keep $10^{-6}$.**
 
 ### 3.4 `stretch_factor`
 
@@ -445,6 +453,38 @@ $10^{-9}$ to $10^{-10}$ on stiff plateaus).
 The joint change is of the size of the larger single-parameter changes (step and outer endpoint), as expected if the
 errors add; the strong takeover is dominated by the outer endpoint (3.2). This is one joint point, not a joint
 convergence study, and it does not include the truncation.
+
+## 7. Spot check on the merged code (conjugate-frequency rule)
+
+After merging `origin/rewrite/axioncloud` (6c0a9e6, which contains 41fc2e7) into this branch (merge commit 9ec31f6),
+three studies were rerun at the strong states, where the driven components matter most (job 27847112,
+`../audit-work/run8_merged/`). Rate error / fastest rate:
+
+| check | old code (ebf0ae9) | merged code (9ec31f6) |
+|---|---|---|
+| `n_angular` 1 vs 2, strong_peak | $2.0\times10^{-2}$ | $2.0\times10^{-2}$ |
+| `n_angular` 1 vs 2, strong_takeover | $1.5\times10^{-2}$ | $1.5\times10^{-2}$ |
+| `max_order` 3 vs 5, both strong states | $< 10^{-6}$ | $< 10^{-6}$ |
+| outer endpoint $10^{-4}$ vs $10^{-8}$, strong_takeover | $6.3\times10^{-4}$ | $2.2\times10^{-5}$ |
+| inner endpoint $10^{-6}$ vs $10^{-8}$, strong_peak | $2.3\times10^{-5}$ | $6.3\times10^{-8}$ |
+
+The production rates themselves move with the rule: $d\ln A_{322}/dt$ by $6.7\times10^{-4}$ at strong_peak and
+$1.2\times10^{-3}$ at strong_takeover, $d\ln A_{211}/dt$ by $3.6\times10^{-4}$ at strong_takeover.
+
+The radiation in the box is unchanged by the rule: the charge of $(-1,2)$ at strong_takeover is again 0.042, 0.054,
+0.066, 0.078, 0.102 for the five outer endpoints (`radiation_in_box.jl` on the merged-code states). What changed is
+that the rates no longer depend on it at the old level. The old explanation in 3.2 and 3.3 (wave action in transit
+counted in $N_i$) correctly identified which components were involved, but the drift was large because, under the
+old rule, those components' imaginary frequencies did not match how they grow; with the conjugate-frequency rule the
+balance is consistent and the remaining dependence is $2\times10^{-5}$ at the outer end and below $10^{-7}$ at the inner
+end. The outer value is not monotonic in the endpoint ($1.7$, $2.2$, $1.5$, $0.9\times10^{-5}$ for $10^{-3}$ to
+$10^{-6}$), so it is not a clean drift; its cause was not investigated.
+
+What this establishes: the conclusions on the polar and Fourier truncation hold on the merged code, and the strong-
+state endpoint numbers of 3.2 and 3.3 (old code) are superseded by the values above. What it does not establish: the
+weaker-state numbers were not rerun. Since the rule changes the driven components only at the level of the growth
+rates, and on the weaker states the driven components are tiny, I expect those to be unchanged, but that is not
+measured.
 
 ## Appendix: full tables
 

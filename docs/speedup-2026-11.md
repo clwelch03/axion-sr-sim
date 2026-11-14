@@ -1342,9 +1342,11 @@ was the cost-aware refactorisation rule of 2.3.4 (an estimated 25% fewer steps i
 integrator is not Tsit5 (4.4).
 
 - *Failure record per step attempt.* When a radial solve fails inside a step, the step must be rejected and retried
-  with a smaller step. The old code set a flag on failure and cleared it at the next accepted step. An integrator that
-  runs its own Newton iteration, such as FBDF, can abandon a step attempt by itself, and then the flag stayed set and
-  spoiled the next attempt; with fixed steps (`adaptive=false`) a failure froze the evolution. Now the integrator's
+  with a smaller step. The old code set a flag on failure, and the check that the integrator makes at the end of each
+  step attempt rejected the step and cleared the flag. An integrator that runs its own Newton iteration, such as
+  FBDF, can abandon a step attempt by itself, and then skips that check, so the flag stayed set and spoiled the next
+  attempt. With fixed steps (`adaptive=false`) the check is not made at all, so after one failure every later
+  evaluation returned zero rates and the evolution froze. Now the integrator's
   own counter of step attempts, which increases at every attempt whether it is accepted or not, is recorded at the
   failure. The rest of that attempt returns zero rates and is rejected, and the next attempt has a new number, so
   there is nothing to clear. With fixed steps a failed solve now stops the run with an error. This was tested with a

@@ -1410,8 +1410,8 @@ scripts and outputs in `axion-sr-sim-speedup/item8-work/`, STATUS.md paragraph "
 
 ## 9. Notes for the cleanup pass
 
-Each name below was checked against `9e17100` with grep. Items marked "already removed" were listed by an agent but
-are gone.
+Each name below was checked with grep, first against `9e17100` and again on 2026-11-14 against the merged code (as
+contained in `speedup/followup`). Items marked "already removed" were listed by an agent but are gone.
 
 Already removed (nothing to do): `DEFAULT_FACTORIZATION_METHOD` (global switch, removed in `50ddeb9`),
 `_rescale_frequency_step!` (removed in `9e17100`), `JacobianWorkspace.layout` (field no longer exists),
@@ -1444,7 +1444,8 @@ Functions that are now test-only or unused (from the review's list; each verifie
       wrapper.
 - [ ] `rhs_derivatives` (allocating wrapper): used by one test and one scratch script in `validation/logs/`.
 - [ ] allocating `radial_rhs` (`src/radial.jl`): no caller found in `src`, `test`, `scripts` or `benchmarks`.
-- [ ] `total_solves` (`src/evolution.jl`): defined and exported, no use found.
+- [ ] `total_solves` (`src/evolution.jl`): defined and exported; used only by one test (added with the per-attempt
+      failure record).
 - [ ] `solution_tangents` outside tests (the review listed this as an unused export; it is in fact used internally,
       four references in `src`).
 
@@ -1461,19 +1462,43 @@ Structure (deferred by the review to the cleanup):
 - [ ] Move test-only functions out of `src/`.
 - [ ] Two pre-existing weak spots in the chord and line-search logic that the review asked polish to assess; the
       sources do not record the outcome.
-- [ ] Docstring corrections: the review listed some; its list is not in the sources. One known case: the
-      `evolve_with_spindown` docstring says `integrator.p.accepted_solution` is the solution at `integrator.u`, which is
-      not true for integrators that are not first-same-as-last (4.4).
+- [ ] Docstring corrections: the review listed some; its list is not in the sources. The one known case, the
+      `evolve_with_spindown` docstring on the accepted-state solution, was corrected in `2a1089a` (section 8, item 6).
+- [ ] `EvolutionCache` has a field `integrator::Any` (the running integrator, read by `_step_attempt`). Julia compiles
+      fast code when it knows the types of the values it works on; a field declared `Any` hides the type, so every
+      access is resolved while the program runs. The cost is negligible here (one access per evaluation), but the
+      field is untyped state on a struct that already mixes settings and state; it belongs in the split above.
+- [ ] `u_modified!(integrator, false)` in `_record_accepted_solution!` (`src/evolution.jl`) and in the checkpoint
+      callback of `scripts/evolution_spindown.jl` prints a deprecation warning in the test log: the integrator library
+      has renamed it `derivative_discontinuity!(integrator, false)`. The call should be renamed before the old name is
+      removed.
+- [ ] `JacobianStore`'s reuse policy (`max_reuse_steps`, `_reuse_stored_jacobian`) is unused in practice. It is off by
+      default because reuse gave erratic errors with the Rosenbrock methods (2.7), and FBDF, the recommended stiff
+      integrator, already decides itself when to ask for a new $\Lambda$, so the store only serves a repeated request
+      at the same state (section 5). Keep the store, consider removing the policy.
 
 Validation scripts and scratch:
 
-- [ ] `validation/newton_counts.jl` is stale: its wrappers hook `jacobian` and the sparse `ScaledFactorization`,
-      which `solve_radial` no longer calls, so it no longer counts Jacobians and factorisations. Fix or retire.
+- [ ] `validation/newton_counts.jl` is stale (still so on the merged code): its wrappers hook `jacobian` and the
+      sparse `ScaledFactorization`, which `solve_radial` no longer calls, so it no longer counts Jacobians and
+      factorisations. Fix or retire.
+- [ ] `benchmarks/` reference provenance. `reference.toml` was written from `b4c4100` and rewritten on 2026-11-14
+      from `6bec64a`, the original solver with the conjugate-frequency rule (4.1); the README states this and the
+      procedure for the next change of equations. Three things to keep in mind: the stored states in `states/*.bin`
+      were converged under the earlier rule, so they are fixed evaluation points, not solutions of the present
+      equations; the README's baseline timing table is still from `b4c4100`, which is fine for timing because the
+      rule does not change the work; and if `6bec64a` and the unoptimised solver are ever gone, a future reference
+      has to be written from the last commit before the change plus a separate argument for the change, as the
+      README says.
 - [ ] Scratch directories and worktrees under `axion-sr-sim-speedup/` that can be deleted once nothing is needed from
       them: worktrees `base/`, `assembly/`, `linear-solver/`, `newton/`, `balance/`, `integrator/`, `integration/`,
-      `polish/`, `methods/` and `docs/` (after merge), and the scratch directories `balance-scratch/`,
-      `integrator-work/`, `linear-solver-work/`, `methods-work/`, `polish-work/`, `review-work/`. Keep `review-work/`
-      until the end-to-end outputs (`e2e_01856b9/`) and the A/B logs (`rescale_ab/`) cited here are no longer needed.
+      `polish/`, `methods/`, `integration-next/` (merged), `pr-baseline/` (detached at `6bec64a`, used to write the
+      new reference), `docs/` (superseded), and `audit/`, `scaling/`, `followup/` once their documents are merged;
+      and the scratch directories `balance-scratch/`, `integrator-work/`, `linear-solver-work/`, `methods-work/`,
+      `polish-work/`, `review-work/`, `audit-work/`, `scaling-work/`, `item8-work/`, `pr-work/`. Keep `review-work/`
+      until the end-to-end outputs (`e2e_01856b9/`) and the A/B logs (`rescale_ab/`) cited here are no longer needed,
+      and `methods-work/`, `audit-work/`, `pr-work/` while sections 5 and 8 cite their logs. The worktrees
+      `chiral-runs/` and `conjugate-rule/` belong to other sessions of the owner's work, not to this project.
       Untracked scratch inside worktrees (`.scratch/` in `assembly/`, `newton/work/`) goes with the worktrees.
       Remove worktrees with `git worktree remove`, not `rm`.
 - [ ] `benchmarks/logs/` is git-ignored, so harness logs are not in the repository; copy any you want to keep.

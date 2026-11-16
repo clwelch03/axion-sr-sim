@@ -35,6 +35,15 @@ rates and frequencies remain the Leaver ones (the paper's leading-order superrad
 Table I constants are leading order in α and the paper itself says they can be poor at the α of interest (its p. 11).
 The output name then gets _quartic<c> before _diagnostics.csv.
 
+Optional relativistic rate constants, AXION_QUARTIC_RATES=witte (default: table1, the constants above). The two rate
+constants are replaced by the relativistic (Green's function) values of Witte & Mummery, arXiv 2412.03655, tabulated in
+alpha in data/witte_mummery_quartic_rates.csv (copied unchanged from their public code; see the file's header) and
+interpolated linearly in (log alpha, log rate), as their code does. Their table for the absorbed process was computed at
+a = 0.95; as in their code, its spin dependence elsewhere is the leading-order factor (1 + √(1 − a²)), so the term is
+table(α) (1 + √(1 − a²)) / (1 + √(1 − 0.95²)). Their convention is that of Table I (their non-relativistic limits are
+4.2e-7 α¹¹ and 1.1e-8 α⁸). Only the rate constants change; the equations above are unchanged. The output name then gets
+_witte after _quartic<c>.
+
 Integrator: AXION_ODE_METHOD, a scipy solve_ivp method name (default DOP853, explicit). Once the |211> cloud sits at
 its threshold the equations are stiff (the hole's spin relaxes to the threshold much faster than anything else
 changes), and an explicit method then takes very many small steps; LSODA switches to an implicit method there.
@@ -72,6 +81,12 @@ gw_scale_label = os.environ.get("AXION_GW_SCALE", "1")
 gw_scale = float(gw_scale_label) if gw_emission else 0.0
 quartic_coupling_label = os.environ.get("AXION_QUARTIC_COUPLING", "0")
 quartic_coupling = float(quartic_coupling_label)
+quartic_rate_source = os.environ.get("AXION_QUARTIC_RATES", "table1")
+if quartic_rate_source not in ("table1", "witte"):
+    sys.exit(f"AXION_QUARTIC_RATES must be table1 or witte, not {quartic_rate_source}")
+if quartic_rate_source == "witte":
+    witte_rate_table = np.loadtxt(os.path.join(os.path.dirname(__file__), "..", "data", "witte_mummery_quartic_rates.csv"),
+                                  delimiter=",", comments="#", skiprows=7)
 gw_power_table = np.loadtxt(os.path.join(os.path.dirname(__file__), "..", "data", "superrad_gw_power.csv"),
                             delimiter=",", skiprows=1)
 
@@ -82,6 +97,19 @@ def gw_power_coefficient(level_index, mass_coupling):
         raise ValueError(f"α = {mass_coupling} is outside the GW power table")
     return np.exp(np.interp(np.log(mass_coupling), np.log(gw_power_table[:, 0]),
                             np.log(gw_power_table[:, 1 + level_index])))
+
+
+def quartic_rate_constants(mass_coupling, spin):
+    """Rate constants (units of μ) of 211 x 211 -> 322 x BH and 322 x 322 -> 211 x ∞ at the current α and spin."""
+    horizon_factor = 1 + np.sqrt(1 - spin**2)
+    if quartic_rate_source == "table1":
+        return 4e-7 * mass_coupling**11 * horizon_factor, 1e-8 * mass_coupling**8
+    alphas = witte_rate_table[:, 0]
+    if not alphas[0] <= mass_coupling <= alphas[-1]:
+        raise ValueError(f"α = {mass_coupling} is outside the Witte–Mummery rate table")
+    absorbed_constant, radiated_constant = (
+        10 ** np.interp(np.log10(mass_coupling), np.log10(alphas), np.log10(witte_rate_table[:, column])) for column in (1, 2))
+    return absorbed_constant * horizon_factor / (1 + np.sqrt(1 - 0.95**2)), radiated_constant
 
 
 def mode_frequencies(mass, angular_momentum):
@@ -110,11 +138,12 @@ def rates(_, state):
                      for index, (frequency, occupation) in enumerate(zip(frequencies, occupations))]
     occupation_rates = [rate - power / (coupling_squared * frequency.real)
                         for rate, power, frequency in zip(superradiant_rates, gw_powers, frequencies)]
-    if quartic_coupling != 0:   # Baryakhtar et al. Eqs. (34)-(37), Table I rate constants (see the header)
+    if quartic_coupling != 0:   # Baryakhtar et al. Eqs. (34)-(37), Table I or Witte–Mummery constants (see the header)
         mass_coupling, spin = initial_mass_coupling * mass, angular_momentum / mass**2
         common_factor = quartic_coupling**2 * initial_mass_coupling / mass**4
-        to_322_and_hole = common_factor * 4e-7 * mass_coupling**11 * (1 + np.sqrt(1 - spin**2)) * occupations[0]**2 * occupations[1]
-        to_211_and_infinity = common_factor * 1e-8 * mass_coupling**8 * occupations[1]**2 * occupations[0]
+        absorbed_constant, radiated_constant = quartic_rate_constants(mass_coupling, spin)
+        to_322_and_hole = common_factor * absorbed_constant * occupations[0]**2 * occupations[1]
+        to_211_and_infinity = common_factor * radiated_constant * occupations[1]**2 * occupations[0]
         occupation_rates[0] += -2 * to_322_and_hole + to_211_and_infinity
         occupation_rates[1] += to_322_and_hole - 2 * to_211_and_infinity
         mass_rate += coupling_squared * (2 * frequencies[0].real - frequencies[1].real) * to_322_and_hole
@@ -133,6 +162,7 @@ output_path = os.path.join(os.path.dirname(__file__), "..", "results",
                            f"leaver_spindown_a{spin_label}_alpha0.3_fa{decay_constant_label}"
                            + (("_gw" + ("" if gw_scale_label == "1" else gw_scale_label)) if gw_emission else "")
                            + ("" if quartic_coupling == 0 else "_quartic" + quartic_coupling_label)
+                           + ("_witte" if quartic_coupling != 0 and quartic_rate_source == "witte" else "")
                            + ("" if ode_method == "DOP853" else "_" + ode_method.lower()) + "_diagnostics.csv")
 with open(output_path, "w") as output:
     output.write("time,N1,N2,Re_omega1,Re_omega2,Im_omega1,Im_omega2,b,a" + (",radiated_energy" if gw_emission else "") + "\n")

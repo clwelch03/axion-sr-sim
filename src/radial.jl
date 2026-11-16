@@ -196,7 +196,8 @@ coupling `α = Mμ`, retained modes, and numerical settings. The amplitudes are
 deliberately *not* part of the problem: they are passed to `solve_radial`, so
 one problem serves a whole time evolution.
 
-Keyword arguments: `mesh` (default `RadialMesh(background)`), `n_polar`,
+Keyword arguments: `driven_growth_rule` (`:conjugate` default, `:signed`, `:zero`; the imaginary
+part given to driven components, see `component_frequencies`), `mesh` (default `RadialMesh(background)`), `n_polar`,
 `n_phase` (quadrature sizes), `phase_grid` (a `PhaseGrid` replacing the tensor
 grid of `n_phase` points per mode, for example a `rank1_lattice` rule), `horizon_order` (default 3) and `outer_order`
 (default 7) for the asymptotic expansions, `outer_boundary` (an `OuterBoundary`;
@@ -214,12 +215,15 @@ struct RadialProblem{T<:Real, Q<:Real, P<:AxionPotential}
     horizon_order::Int
     outer_order::Int
     outer_boundary::OuterBoundary
+    driven_growth_rule::Symbol   # imaginary part of driven components: :conjugate, :signed or :zero
 end
 
 function RadialProblem(background::KerrBackground{T}, potential::AxionPotential, mass_coupling, mode_set::ModeSet;
                        mesh::RadialMesh=RadialMesh(background), n_polar::Int=12, n_phase::Int=16,
-                       phase_grid::Union{Nothing, PhaseGrid}=nothing, horizon_order::Int=3, outer_order::Int=7, outer_boundary::OuterBoundary=OuterBoundary(),
-                       outer_data::Union{Nothing, Symbol}=nothing) where {T}
+                       phase_grid::Union{Nothing, PhaseGrid}=nothing, horizon_order::Int=3, outer_order::Int=7,
+                       outer_boundary::OuterBoundary=OuterBoundary(), outer_data::Union{Nothing, Symbol}=nothing,
+                       driven_growth_rule::Symbol=:conjugate) where {T}
+    driven_growth_weights(first(mode_set.components), driven_growth_rule)   # validates the rule name
     quadrature = FieldQuadrature(mode_set; n_polar, n_phase, phase_grid)
     mixing = [mixing_matrix(quadrature.angular, mode_set, index) for index in 1:n_components(mode_set)]
     if outer_data !== nothing
@@ -227,7 +231,8 @@ function RadialProblem(background::KerrBackground{T}, potential::AxionPotential,
                                        convergence_margin=outer_boundary.convergence_margin, far_order=outer_boundary.far_order,
                                        steps_per_wavelength=outer_boundary.steps_per_wavelength)
     end
-    RadialProblem(background, potential, T(mass_coupling), mode_set, quadrature, mesh, mixing, horizon_order, outer_order, outer_boundary)
+    RadialProblem(background, potential, T(mass_coupling), mode_set, quadrature, mesh, mixing, horizon_order, outer_order, outer_boundary,
+                  driven_growth_rule)
 end
 
 """
@@ -241,7 +246,8 @@ be differentiated through the background with ForwardDiff.
 function with_background(problem::RadialProblem, background::KerrBackground{B}, mass_coupling) where {B}
     mesh = RadialMesh(background, problem.mesh.rstar)
     RadialProblem(background, problem.potential, convert(B, mass_coupling), problem.mode_set,
-                  problem.quadrature, mesh, problem.mixing, problem.horizon_order, problem.outer_order, problem.outer_boundary)
+                  problem.quadrature, mesh, problem.mixing, problem.horizon_order, problem.outer_order, problem.outer_boundary,
+                  problem.driven_growth_rule)
 end
 
 """
@@ -252,7 +258,8 @@ mesh and quadrature). Used to seed nonlinear solves from free-field ones.
 """
 with_potential(problem::RadialProblem, potential::AxionPotential) =
     RadialProblem(problem.background, potential, problem.mass_coupling, problem.mode_set, problem.quadrature,
-                  problem.mesh, problem.mixing, problem.horizon_order, problem.outer_order, problem.outer_boundary)
+                  problem.mesh, problem.mixing, problem.horizon_order, problem.outer_order, problem.outer_boundary,
+                  problem.driven_growth_rule)
 
 n_channels(problem::RadialProblem) = n_channels(problem.mode_set)
 n_modes(problem::RadialProblem) = n_modes(problem.mode_set)

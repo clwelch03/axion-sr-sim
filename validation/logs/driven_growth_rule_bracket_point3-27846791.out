@@ -1,0 +1,23 @@
+
+====================================================================================================
+P3 A=(1e-2,1e-4), contained mesh
+  a = 0.9, α = 0.3, cosine, contained mesh RadialMesh(background, α, mode_set)
+  A = (1.0000000000e-02, 1.0000000000e-04)
+  rule conjugate (78 s; continuation from cold; Newton iterations in last solve 8)
+    q=(-1,2): Re ω̃_q − α = 6.305293e-04, Im ω̃_q = +1.1521e-07, ratio Im/gap = +1.827e-04
+    mode 1: ω = 0.296205031058  γ = +3.439303e-07  N = 2.223084e+02  L_N = -1.535857e-04  Ȧ = +3.359030e-09  (Ȧ/A = +3.359030e-07)
+    mode 2: ω = 0.298417780157  γ = -1.143606e-07  N = 2.309633e+03  L_N = +5.270192e-04  Ȧ = -1.269008e-11  (Ȧ/A = -1.269008e-07)
+  rule signed    (3 s; warm start from conjugate solution; Newton iterations in last solve 6)
+    q=(-1,2): Re ω̃_q − α = 6.305292e-04, Im ω̃_q = -5.7291e-07, ratio Im/gap = -9.086e-04
+    mode 1: ω = 0.296205031046  γ = +3.441170e-07  N = 2.223036e+02  L_N = -1.556287e-04  Ȧ = +3.405391e-09  (Ȧ/A = +3.405391e-07)
+    mode 2: ω = 0.298417780146  γ = -1.143960e-07  N = 2.309642e+03  L_N = +5.310593e-04  Ȧ = -1.277624e-11  (Ȧ/A = -1.277624e-07)
+  rule zero      (1 s; warm start from conjugate solution; Newton iterations in last solve 4)
+    q=(-1,2): Re ω̃_q − α = 6.305293e-04, Im ω̃_q = +0.0000e+00, ratio Im/gap = +0.000e+00
+    mode 1: ω = 0.296205030969  γ = +3.439423e-07  N = 2.223075e+02  L_N = -1.538431e-04  Ȧ = +3.364728e-09  (Ȧ/A = +3.364728e-07)
+    mode 2: ω = 0.298417780152  γ = -1.143659e-07  N = 2.309634e+03  L_N = +5.276532e-04  Ȧ = -1.270428e-11  (Ȧ/A = -1.270428e-07)
+  relative difference signed vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = -4.05e-11   Δγ/γ = +5.43e-04   ΔN/N = -2.16e-05   ΔL_N/L_N = +1.33e-02   ΔȦ/Ȧ = +1.38e-02
+    mode 2: Δω/ω = -3.61e-11   Δγ/γ = +3.09e-04   ΔN/N = +4.07e-06   ΔL_N/L_N = +7.67e-03   ΔȦ/Ȧ = +6.79e-03
+  relative difference zero vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = -2.98e-10   Δγ/γ = +3.49e-05   ΔN/N = -3.77e-06   ΔL_N/L_N = +1.68e-03   ΔȦ/Ȧ = +1.70e-03
+    mode 2: Δω/ω = -1.50e-11   Δγ/γ = +4.61e-05   ΔN/N = +6.58e-07   ΔL_N/L_N = +1.20e-03   ΔȦ/Ȧ = +1.12e-03

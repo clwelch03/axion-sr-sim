@@ -26,7 +26,7 @@ import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument("segments", nargs="+")
-parser.add_argument("--output", default="plots/spin_bump_a0.9_alpha0.3_fa0.0466873.png")
+parser.add_argument("--output", default="plots/spin_bump_a0.9_alpha0.3_fa5.7e17.png")
 parser.add_argument("--start-time", type=float, default=1e10)
 arguments = parser.parse_args()
 

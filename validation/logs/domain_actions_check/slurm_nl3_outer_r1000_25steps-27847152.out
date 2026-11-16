@@ -1,0 +1,73 @@
+[(-60.0, 1000.0) solve time 519 s]
+---- (-60.0, 1000.0)  r* ∈ [-60.0, 1000.0], nodes 832, newton iterations 30, converged false
+  A = [0.01, 0.001]  ω = ComplexF64[0.29611413071932224 + 5.163078573763462e-6im, 0.2983760716294961 - 5.8066819761985635e-9im]
+  N = (3.03150868e+00, 6.05317924e+03)   E = 1.80725683e+03   (E − ΣωN)/E = +1.30e-04
+  n_q:  [1, 0]: 3.380928e+00  [0, 1]: 6.052480e+03  [3, 0]: 1.945357e-13  [2, 1]: 2.083221e-10  [2, -1]: 1.987121e-05  [1, 2]: 8.295160e-08  [0, 3]: 1.324768e-05  [-1, 2]: 3.494587e-01
+  component_charges energy of (-1,2) = 1.050712e-01
+  tail of n_(-1,2) beyond r*=200: 3.0641e-01 (1.01e-04 of N_2);  beyond 300: 2.7179e-01
+  dN/dA = [[3.956243e+03 -9.140022e+03]; [-4.656035e+04 5.153649e+06]]
+  d n_(-1,2)/dA = (4.555872e+02, -4.672834e+03)
+  L_N = (-3.158235e-05, 6.309916e-05)   L_E = 9.475299e-06  L_J = 9.461597e-05  complete L_E = 9.475306e-06
+  Adot action          = (8.00592177e-09, 1.95495368e-12)
+  Adot energy (coded)  = (8.00593951e-09, 1.95497845e-12)  ratio−1 vs action (+2.2e-06, +1.3e-05)
+  Adot energy (complete flux) ratio−1 vs action (+7.0e-07, +4.0e-06)
+  dE/dA = (-1.555666e+03, 1.523938e+06)   D = dE/dA − Σω dN/dA = (-1.148e-03, -4.903e-01)   D/|dE/dA| = (-7.38e-07, -3.22e-07)
+  Σ D Adot / (dE/dτ) = +1.071e-06   (dE/dτ = -9.475309e-06)
+  Adot, tail beyond r*=200 removed   = (7.27147667e-09, 1.77679881e-12)  rel. change (-9.17e-02, -9.11e-02)
+  Adot, tail beyond r*=300 removed   = (7.34765293e-09, 1.79527694e-12)  rel. change (-8.22e-02, -8.17e-02)
+  Adot, (-1,2) removed entirely      = (7.17893222e-09, 1.75435023e-12)  rel. change (-1.03e-01, -1.03e-01)
+  k(-1,2) = 1.95760e-02 +7.911e-05i;  dn/dr* of (-1,2):  r*=100: 3.192e-04  r*=200: 3.292e-04  r*=299: 3.517e-04  r*=399: 3.689e-04  r*=501: 3.817e-04  r*=699: 3.963e-04  r*=1000: 4.037e-04
+┌ Warning: solve_radial did not converge: |F| = 1.5627003290986749e-10 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:627
+┌ Warning: non-converged continuation step
+│   fraction = 0.046415888336127795
+│   solution.residual_norm = 1.5627003290986749e-10
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:59
+┌ Warning: solve_radial did not converge: |F| = 3.2453026984364425e-9 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:627
+┌ Warning: non-converged continuation step
+│   fraction = 0.06812920690579612
+│   solution.residual_norm = 3.2453026984364425e-9
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:59
+┌ Warning: solve_radial did not converge: |F| = 5.173628059182523e-8 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:627
+┌ Warning: non-converged continuation step
+│   fraction = 0.1
+│   solution.residual_norm = 5.173628059182523e-8
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:59
+┌ Warning: solve_radial did not converge: |F| = 7.762778120909441 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:627
+┌ Warning: non-converged continuation step
+│   fraction = 0.14677992676220694
+│   solution.residual_norm = 7.762778120909441
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:59
+┌ Warning: solve_radial did not converge: |F| = 11.484866256694701 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:627
+┌ Warning: non-converged continuation step
+│   fraction = 0.2154434690031884
+│   solution.residual_norm = 11.484866256694701
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:59
+┌ Warning: solve_radial did not converge: |F| = 15.406926111141532 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:627
+┌ Warning: non-converged continuation step
+│   fraction = 0.31622776601683794
+│   solution.residual_norm = 15.406926111141532
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:59
+┌ Warning: solve_radial did not converge: |F| = 18.106427571752935 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:627
+┌ Warning: non-converged continuation step
+│   fraction = 0.4641588833612779
+│   solution.residual_norm = 18.106427571752935
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:59
+┌ Warning: solve_radial did not converge: |F| = 20.041494315250045 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:627
+┌ Warning: non-converged continuation step
+│   fraction = 0.6812920690579612
+│   solution.residual_norm = 20.041494315250045
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:59
+┌ Warning: solve_radial did not converge: |F| = 21.800531854793014 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:627
+┌ Warning: non-converged continuation step
+│   fraction = 1.0
+│   solution.residual_norm = 21.800531854793014
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:59

@@ -1,0 +1,260 @@
+===== fixed_background_a0.9_alpha0.3_contained_diagnostics.csv rows=481  b:[1.0000,1.0000] a:[0.9000,0.9000]
+  FD check (A1<1e-4): median|r1/g1-1|=1.48e-06
+  A1 range [9.856e-07,2.256e-02]  A2 range [3.057e-09,3.721e-05]  A2/A1 [4.668e-07,4.546e-03]
+  gap=w_q-alpha: min 6.0756e-04 max 6.7618e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.0191  max 0.02015  (nan 0)
+  vg : min 0.06355  max 0.06703  (nan 0)
+  Gq : min 3.405e-17  max 7.625e-07  (nan 0)
+  eps: min 5.317e-14  max 0.001144  (nan 0)
+  rc : min -6.658e-05  max 0.001449  (nan 0)
+  rs : min -2.432e-05  max 0.001439  (nan 0)
+  @argmax A2/A1: tau=6.9887e+08 A=(7.2961e-03,3.3170e-05) b=1.00000 a=0.90000 gap=6.1753e-04 k=1.9259e-02 vg=6.4064e-02 Gq=1.368e-08 eps=2.135e-05 ratio_conj=-2.054e-05 ratio_signed=-6.255e-06  [row 309]
+  @argmax A1: tau=6.6643e+08 A=(2.2558e-02,7.9592e-06) b=1.00000 a=0.90000 gap=6.7618e-04 k=2.0154e-02 vg=6.7028e-02 Gq=6.736e-07 eps=1.005e-03 ratio_conj=0.001447 ratio_signed=0.001438  [row 184]
+  @argmax A2: tau=6.7562e+08 A=(1.0857e-02,3.7211e-05) b=1.00000 a=0.90000 gap=6.2757e-04 k=1.9415e-02 vg=6.4581e-02 Gq=1.245e-07 eps=1.928e-04 ratio_conj=-6.658e-05 ratio_signed=8.924e-05  [row 260]
+===== fixed_background_a0.9_alpha0.3_diagnostics.csv rows=592  b:[1.0000,1.0000] a:[0.9000,0.9000]
+  FD check (A1<1e-4): median|r1/g1-1|=3.74e-03
+  A1 range [1.000e-06,1.905e-02]  A2 range [9.798e-08,3.888e-05]  A2/A1 [1.290e-05,1.000e-01]
+  gap=w_q-alpha: min 6.0756e-04 max 6.5966e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.0191  max 0.01991  (nan 0)
+  vg : min 0.06355  max 0.06621  (nan 0)
+  Gq : min 6.765e-12  max 4.577e-07  (nan 0)
+  eps: min 1.059e-08  max 0.0006938  (nan 0)
+  rc : min -3.265e-05  max 0.0008362  (nan 0)
+  rs : min -2.432e-05  max 0.0008344  (nan 0)
+  @argmax A2/A1: tau=0.0000e+00 A=(1.0000e-06,1.0000e-07) b=1.00000 a=0.90000 gap=6.0756e-04 k=1.9102e-02 vg=6.3546e-02 Gq=1.478e-08 eps=2.326e-05 ratio_conj=2.433e-05 ratio_signed=-2.432e-05  [row 0]
+  @argmax A1: tau=6.5815e+08 A=(1.9051e-02,9.6248e-06) b=1.00000 a=0.90000 gap=6.5966e-04 k=1.9905e-02 vg=6.6206e-02 Gq=4.411e-07 eps=6.663e-04 ratio_conj=0.0008349 ratio_signed=0.0008329  [row 332]
+  @argmax A2: tau=6.8809e+08 A=(6.3722e-03,3.8885e-05) b=1.00000 a=0.90000 gap=6.1596e-04 k=1.9234e-02 vg=6.3983e-02 Gq=1.168e-08 eps=1.826e-05 ratio_conj=-1.582e-05 ratio_signed=1.696e-05  [row 416]
+===== omiya_fig6_a0.99_alpha0.30_chiral_diagnostics.csv rows=436  b:[1.0000,1.0000] a:[0.9900,0.9900]
+  FD check (A1<1e-4): median|r1/g1-1|=nan
+  A1 range [3.593e-03,5.112e-02]  A2 range [3.225e-10,7.841e-05]  A2/A1 [2.542e-08,4.698e-03]
+  gap=w_q-alpha: min 6.0100e-04 max 7.0775e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.019  max 0.02062  (nan 0)
+  vg : min 0.0632  max 0.06857  (nan 0)
+  Gq : min 1.603e-13  max 2.545e-06  (nan 0)
+  eps: min 2.512e-10  max 0.003715  (nan 0)
+  rc : min -0.0001621  max 0.003725  (nan 0)
+  rs : min -4.443e-05  max 0.003715  (nan 0)
+  @argmax A2/A1: tau=1.0452e+08 A=(1.4230e-02,6.6854e-05) b=1.00000 a=0.99000 gap=6.1344e-04 k=1.9195e-02 vg=6.3852e-02 Gq=2.752e-08 eps=4.309e-05 ratio_conj=-4.131e-05 ratio_signed=-1.511e-05  [row 279]
+  @argmax A1: tau=8.7956e+07 A=(5.1118e-02,1.8362e-05) b=1.00000 a=0.99000 gap=7.0774e-04 k=2.0619e-02 vg=6.8568e-02 Gq=2.473e-06 eps=3.606e-03 ratio_conj=0.003697 ratio_signed=0.003715  [row 140]
+  @argmax A2: tau=9.1433e+07 A=(2.3477e-02,7.8407e-05) b=1.00000 a=0.99000 gap=6.3133e-04 k=1.9473e-02 vg=6.4773e-02 Gq=1.583e-07 eps=2.443e-04 ratio_conj=-0.0001619 ratio_signed=0.000245  [row 220]
+===== omiya_fig6_a0.99_alpha0.30_cosine_diagnostics.csv rows=426  b:[1.0000,1.0000] a:[0.9900,0.9900]
+  FD check (A1<1e-4): median|r1/g1-1|=nan
+  A1 range [3.606e-03,2.986e-02]  A2 range [3.235e-10,4.610e-05]  A2/A1 [4.258e-08,4.675e-03]
+  gap=w_q-alpha: min 6.0246e-04 max 7.0494e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01902  max 0.02058  (nan 0)
+  vg : min 0.06328  max 0.06843  (nan 0)
+  Gq : min 3.691e-14  max 2.445e-06  (nan 0)
+  eps: min 5.784e-11  max 0.003575  (nan 0)
+  rc : min -0.0001551  max 0.003531  (nan 0)
+  rs : min -4.293e-05  max 0.003519  (nan 0)
+  @argmax A2/A1: tau=8.4436e+07 A=(8.5012e-03,3.9747e-05) b=1.00000 a=0.99000 gap=6.1356e-04 k=1.9197e-02 vg=6.3858e-02 Gq=2.825e-08 eps=4.424e-05 ratio_conj=-4.222e-05 ratio_signed=-1.404e-05  [row 265]
+  @argmax A1: tau=6.8218e+07 A=(2.9856e-02,1.0732e-05) b=1.00000 a=0.99000 gap=7.0494e-04 k=2.0578e-02 vg=6.8433e-02 Gq=2.388e-06 eps=3.490e-03 ratio_conj=0.003506 ratio_signed=0.003519  [row 128]
+  @argmax A2: tau=7.1608e+07 A=(1.4336e-02,4.6104e-05) b=1.00000 a=0.99000 gap=6.3274e-04 k=1.9495e-02 vg=6.4846e-02 Gq=1.651e-07 eps=2.547e-04 ratio_conj=-0.0001505 ratio_signed=0.0002784  [row 205]
+===== omiya_fig6_a0.99_alpha0.42_chiral_diagnostics.csv rows=486  b:[1.0000,1.0000] a:[0.9900,0.9900]
+  FD check (A1<1e-4): median|r1/g1-1|=nan
+  A1 range [3.571e-03,3.029e-01]  A2 range [3.556e-09,7.431e-04]  A2/A1 [5.044e-08,8.443e-03]
+  gap=w_q-alpha: min 2.4514e-03 max 3.1493e-03  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.04544  max 0.05153  (nan 0)
+  vg : min 0.1076  max 0.1218  (nan 0)
+  Gq : min 9.456e-12  max 1.469e-05  (nan 0)
+  eps: min 4.426e-09  max 0.006186  (nan 0)
+  rc : min -0.0002113  max 0.005181  (nan 0)
+  rs : min -6.13e-05  max 0.005174  (nan 0)
+  @argmax A2/A1: tau=2.9692e+07 A=(7.6488e-02,6.4575e-04) b=1.00000 a=0.99000 gap=2.5187e-03 k=4.6066e-02 vg=1.0903e-01 Gq=1.466e-07 eps=6.860e-05 ratio_conj=-5.126e-05 ratio_signed=-1.641e-05  [row 334]
+  @argmax A1: tau=2.6701e+07 A=(3.0289e-01,1.6648e-04) b=1.00000 a=0.99000 gap=3.1493e-03 k=5.1530e-02 vg=1.2178e-01 Gq=1.339e-05 eps=5.611e-03 ratio_conj=0.005157 ratio_signed=0.005174  [row 185]
+  @argmax A2: tau=2.7299e+07 A=(1.2942e-01,7.4311e-04) b=1.00000 a=0.99000 gap=2.6234e-03 k=4.7016e-02 vg=1.1125e-01 Gq=1.196e-06 eps=5.483e-04 ratio_conj=-0.0002109 ratio_signed=0.0003555  [row 270]
+===== omiya_fig6_a0.99_alpha0.42_cosine_diagnostics.csv rows=476  b:[1.0000,1.0000] a:[0.9900,0.9900]
+  FD check (A1<1e-4): median|r1/g1-1|=nan
+  A1 range [3.571e-03,1.769e-01]  A2 range [3.556e-09,4.380e-04]  A2/A1 [8.452e-08,8.398e-03]
+  gap=w_q-alpha: min 2.4517e-03 max 3.1276e-03  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.04545  max 0.05135  (nan 0)
+  vg : min 0.1076  max 0.1214  (nan 0)
+  Gq : min 9.027e-12  max 1.411e-05  (nan 0)
+  eps: min 4.225e-09  max 0.005951  (nan 0)
+  rc : min -0.0002034  max 0.004867  (nan 0)
+  rs : min -6.13e-05  max 0.004865  (nan 0)
+  @argmax A2/A1: tau=2.6180e+07 A=(4.5611e-02,3.8306e-04) b=1.00000 a=0.99000 gap=2.5191e-03 k=4.6069e-02 vg=1.0903e-01 Gq=1.456e-07 eps=6.814e-05 ratio_conj=-5.152e-05 ratio_signed=-1.542e-05  [row 319]
+  @argmax A1: tau=2.3204e+07 A=(1.7694e-01,1.0094e-04) b=1.00000 a=0.99000 gap=3.1276e-03 k=5.1352e-02 vg=1.2136e-01 Gq=1.324e-05 eps=5.566e-03 ratio_conj=0.004847 ratio_signed=0.004865  [row 172]
+  @argmax A2: tau=2.3862e+07 A=(7.4194e-02,4.3802e-04) b=1.00000 a=0.99000 gap=2.6127e-03 k=4.6920e-02 vg=1.1102e-01 Gq=8.563e-07 eps=3.935e-04 ratio_conj=-0.0002034 ratio_signed=0.0003028  [row 260]
+===== spindown_a0.99_alpha0.3_fa1e-2_diagnostics.csv rows=426  b:[0.9550,1.0000] a:[0.8597,0.9900]
+  FD check (A1<1e-4): median|r1/g1-1|=1.85e-06
+  A1 range [9.759e-07,2.178e-02]  A2 range [3.047e-09,3.493e-05]  A2/A1 [3.983e-07,8.782e-02]
+  gap=w_q-alpha: min 5.6409e-04 max 6.0020e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01814  max 0.01899  (nan 0)
+  vg : min 0.06202  max 0.06359  (nan 0)
+  Gq : min 2.182e-09  max 1.152e-06  (nan 0)
+  eps: min 3.636e-06  max 0.00197  (nan 0)
+  rc : min -0.0001306  max 0.002458  (nan 0)
+  rs : min -4.466e-05  max 0.002421  (nan 0)
+  @argmax A2/A1: tau=1.5000e+09 A=(2.3440e-04,2.0585e-05) b=0.98267 a=0.86289 gap=5.7107e-04 k=1.8358e-02 vg=6.2153e-02 Gq=2.182e-09 eps=3.636e-06 ratio_conj=-3.812e-06 ratio_signed=3.773e-06  [row 425]
+  @argmax A1: tau=3.7556e+08 A=(2.1778e-02,5.0960e-06) b=0.95562 a=0.92028 gap=5.8139e-04 k=1.8267e-02 vg=6.3590e-02 Gq=1.094e-06 eps=1.884e-03 ratio_conj=0.002458 ratio_signed=0.002421  [row 146]
+  @argmax A2: tau=3.8298e+08 A=(9.9902e-03,3.4929e-05) b=0.97135 a=0.86929 gap=5.6432e-04 k=1.8144e-02 vg=6.2144e-02 Gq=1.059e-07 eps=1.805e-04 ratio_conj=-0.0001276 ratio_signed=0.0001189  [row 230]
+===== spindown_a0.99_alpha0.3_fa3e-3_diagnostics.csv rows=651  b:[0.9886,1.0000] a:[0.9011,0.9900]
+  FD check (A1<1e-4): median|r1/g1-1|=1.84e-06
+  A1 range [9.759e-07,2.681e-02]  A2 range [3.047e-09,4.294e-05]  A2/A1 [4.036e-07,4.522e-03]
+  gap=w_q-alpha: min 5.9042e-04 max 6.8141e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01872  max 0.02019  (nan 0)
+  vg : min 0.06301  max 0.06742  (nan 0)
+  Gq : min 1.272e-10  max 1.418e-06  (nan 0)
+  eps: min 2.016e-07  max 0.002134  (nan 0)
+  rc : min -0.0001202  max 0.002706  (nan 0)
+  rs : min -4.466e-05  max 0.002693  (nan 0)
+  @argmax A2/A1: tau=3.9211e+08 A=(8.3154e-03,3.7603e-05) b=0.99744 a=0.97671 gap=6.0823e-04 k=1.9089e-02 vg=6.3663e-02 Gq=2.214e-08 eps=3.496e-05 ratio_conj=-3.337e-05 ratio_signed=-1.297e-05  [row 305]
+  @argmax A1: tau=3.7285e+08 A=(2.6805e-02,1.1096e-05) b=0.99586 a=0.98390 gap=6.8141e-04 k=2.0190e-02 vg=6.7424e-02 Gq=1.212e-06 eps=1.812e-03 ratio_conj=0.002677 ratio_signed=0.002693  [row 178]
+  @argmax A2: tau=3.7721e+08 A=(1.3161e-02,4.2939e-05) b=0.99708 a=0.97934 gap=6.2272e-04 k=1.9311e-02 vg=6.4425e-02 Gq=3.315e-07 eps=5.176e-04 ratio_conj=-0.0001188 ratio_signed=0.0002037  [row 250]
+===== spindown_a0.9_alpha0.3_fa0.0466873_diagnostics.csv rows=592  b:[0.9815,1.0000] a:[0.8694,0.9000]
+  FD check (A1<1e-4): median|r1/g1-1|=1.87e-06
+  A1 range [9.856e-07,2.808e-03]  A2 range [2.786e-09,3.396e-09]  A2/A1 [1.003e-06,3.102e-03]
+  gap=w_q-alpha: min 5.6881e-04 max 6.0756e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01831  max 0.0191  (nan 0)
+  vg : min 0.06207  max 0.06355  (nan 0)
+  Gq : min 4.628e-10  max 1.478e-08  (nan 0)
+  eps: min 7.741e-07  max 2.326e-05  (nan 0)
+  rc : min 8.136e-07  max 2.433e-05  (nan 0)
+  rs : min -2.432e-05  max 8.138e-07  (nan 0)
+  @argmax A2/A1: tau=0.0000e+00 A=(9.8558e-07,3.0575e-09) b=1.00000 a=0.90000 gap=6.0756e-04 k=1.9102e-02 vg=6.3546e-02 Gq=1.478e-08 eps=2.326e-05 ratio_conj=2.433e-05 ratio_signed=-2.432e-05  [row 0]
+  @argmax A1: tau=9.2542e+08 A=(2.8077e-03,2.9658e-09) b=0.98148 a=0.86941 gap=5.6881e-04 k=1.8311e-02 vg=6.2068e-02 Gq=4.629e-10 eps=7.741e-07 ratio_conj=8.136e-07 ratio_signed=8.138e-07  [row 555]
+  @argmax A2: tau=1.5000e+09 A=(2.8077e-03,3.3961e-09) b=0.98148 a=0.86941 gap=5.6881e-04 k=1.8311e-02 vg=6.2068e-02 Gq=4.628e-10 eps=7.741e-07 ratio_conj=8.137e-07 ratio_signed=8.137e-07  [row 591]
+===== spindown_a0.9_alpha0.3_fa0.0466873_t1e11_diagnostics.csv rows=2056  b:[0.9815,1.0000] a:[0.8694,0.9000]
+  FD check (A1<1e-4): median|r1/g1-1|=2.19e-06
+  A1 range [9.856e-07,2.808e-03]  A2 range [2.786e-09,4.100e-06]  A2/A1 [1.003e-06,2.787e-02]
+  gap=w_q-alpha: min 5.6881e-04 max 6.0756e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01831  max 0.0191  (nan 0)
+  vg : min 0.06207  max 0.06355  (nan 0)
+  Gq : min 2.251e-11  max 1.478e-08  (nan 0)
+  eps: min 3.604e-08  max 2.326e-05  (nan 0)
+  rc : min -2.563e-07  max 2.433e-05  (nan 0)
+  rs : min -2.432e-05  max 8.146e-07  (nan 0)
+  @argmax A2/A1: tau=1.0000e+11 A=(1.4712e-04,4.1003e-06) b=0.99546 a=0.87508 gap=5.9895e-04 k=1.8924e-02 vg=6.3239e-02 Gq=1.470e-10 eps=2.345e-07 ratio_conj=-2.563e-07 ratio_signed=2.643e-07  [row 2055]
+  @argmax A1: tau=1.8641e+09 A=(2.8078e-03,3.7008e-09) b=0.98147 a=0.86941 gap=5.6881e-04 k=1.8311e-02 vg=6.2068e-02 Gq=4.628e-10 eps=7.741e-07 ratio_conj=8.129e-07 ratio_signed=8.146e-07  [row 215]
+  @argmax A2: tau=1.0000e+11 A=(1.4712e-04,4.1003e-06) b=0.99546 a=0.87508 gap=5.9895e-04 k=1.8924e-02 vg=6.3239e-02 Gq=1.470e-10 eps=2.345e-07 ratio_conj=-2.563e-07 ratio_signed=2.643e-07  [row 2055]
+===== spindown_a0.9_alpha0.3_fa0.0466873_t1e11_restart_diagnostics.csv rows=1861  b:[0.9815,0.9955] a:[0.8694,0.8752]
+  FD check (A1<1e-4): median|r1/g1-1|=nan
+  A1 range [1.472e-04,2.808e-03]  A2 range [3.396e-09,4.100e-06]  A2/A1 [1.210e-06,2.786e-02]
+  gap=w_q-alpha: min 5.6881e-04 max 5.9895e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01831  max 0.01892  (nan 0)
+  vg : min 0.06207  max 0.06324  (nan 0)
+  Gq : min 2.25e-11  max 4.63e-10  (nan 0)
+  eps: min 3.603e-08  max 7.744e-07  (nan 0)
+  rc : min -2.562e-07  max 8.137e-07  (nan 0)
+  rs : min 3.701e-08  max 8.145e-07  (nan 0)
+  @argmax A2/A1: tau=1.0000e+11 A=(1.4719e-04,4.1003e-06) b=0.99546 a=0.87508 gap=5.9895e-04 k=1.8924e-02 vg=6.3239e-02 Gq=1.421e-10 eps=2.267e-07 ratio_conj=-2.562e-07 ratio_signed=2.642e-07  [row 1860]
+  @argmax A1: tau=1.7691e+09 A=(2.8078e-03,3.6186e-09) b=0.98147 a=0.86941 gap=5.6881e-04 k=1.8311e-02 vg=6.2068e-02 Gq=4.630e-10 eps=7.743e-07 ratio_conj=8.13e-07 ratio_signed=8.145e-07  [row 15]
+  @argmax A2: tau=1.0000e+11 A=(1.4719e-04,4.1003e-06) b=0.99546 a=0.87508 gap=5.9895e-04 k=1.8924e-02 vg=6.3239e-02 Gq=1.421e-10 eps=2.267e-07 ratio_conj=-2.562e-07 ratio_signed=2.642e-07  [row 1860]
+===== spindown_a0.9_alpha0.3_fa0.466873_diagnostics.csv rows=186  b:[0.9815,1.0000] a:[0.8694,0.9000]
+  FD check (A1<1e-4): median|r1/g1-1|=1.88e-05
+  A1 range [9.856e-07,2.797e-04]  A2 range [2.720e-09,3.058e-09]  A2/A1 [9.724e-06,3.102e-03]
+  gap=w_q-alpha: min 5.6733e-04 max 6.0756e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01829  max 0.0191  (nan 0)
+  vg : min 0.06199  max 0.06355  (nan 0)
+  Gq : min 2.209e-12  max 1.478e-08  (nan 0)
+  eps: min 3.7e-09  max 2.326e-05  (nan 0)
+  rc : min 3.511e-09  max 2.433e-05  (nan 0)
+  rs : min -2.432e-05  max 4.278e-09  (nan 0)
+  @argmax A2/A1: tau=0.0000e+00 A=(9.8558e-07,3.0575e-09) b=1.00000 a=0.90000 gap=6.0756e-04 k=1.9102e-02 vg=6.3546e-02 Gq=1.478e-08 eps=2.326e-05 ratio_conj=2.433e-05 ratio_signed=-2.432e-05  [row 0]
+  @argmax A1: tau=1.5000e+09 A=(2.7969e-04,2.7221e-09) b=0.98148 a=0.86941 gap=5.6733e-04 k=1.8287e-02 vg=6.1988e-02 Gq=2.241e-12 eps=3.753e-09 ratio_conj=3.511e-09 ratio_signed=4.278e-09  [row 185]
+  @argmax A2: tau=1.2935e+08 A=(6.6642e-06,3.0579e-09) b=0.99999 a=0.89999 gap=6.0754e-04 k=1.9102e-02 vg=6.3546e-02 Gq=1.477e-08 eps=2.325e-05 ratio_conj=2.432e-05 ratio_signed=-2.431e-05  [row 21]
+===== spindown_a0.9_alpha0.3_fa3e-3_diagnostics.csv rows=456  b:[0.9970,1.0000] a:[0.8822,0.9000]
+  FD check (A1<1e-4): median|r1/g1-1|=1.48e-06
+  A1 range [9.856e-07,2.157e-02]  A2 range [3.057e-09,3.552e-05]  A2/A1 [4.700e-07,4.708e-03]
+  gap=w_q-alpha: min 6.0756e-04 max 6.6543e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01909  max 0.01996  (nan 0)
+  vg : min 0.06355  max 0.06659  (nan 0)
+  Gq : min 6.363e-10  max 7.019e-07  (nan 0)
+  eps: min 1.004e-06  max 0.001064  (nan 0)
+  rc : min -6.222e-05  max 0.001301  (nan 0)
+  rs : min -2.432e-05  max 0.001299  (nan 0)
+  @argmax A2/A1: tau=7.1317e+08 A=(6.5541e-03,3.0855e-05) b=0.99826 a=0.89050 gap=6.1250e-04 k=1.9163e-02 vg=6.3859e-02 Gq=1.145e-08 eps=1.799e-05 ratio_conj=-1.695e-05 ratio_signed=-5.294e-06  [row 309]
+  @argmax A1: tau=6.7030e+08 A=(2.1573e-02,8.5985e-06) b=0.99705 a=0.89515 gap=6.6543e-04 k=1.9963e-02 vg=6.6592e-02 Gq=6.067e-07 eps=9.165e-04 ratio_conj=0.001295 ratio_signed=0.001299  [row 185]
+  @argmax A2: tau=6.8090e+08 A=(1.0109e-02,3.5517e-05) b=0.99801 a=0.89194 gap=6.2128e-04 k=1.9298e-02 vg=6.4322e-02 Gq=8.275e-08 eps=1.292e-04 ratio_conj=-6.189e-05 ratio_signed=7.113e-05  [row 259]
+===== spindown_a0.9_alpha0.3_fa3e-3_t1e10_diagnostics.csv rows=646  b:[0.9970,1.0000] a:[0.8761,0.9000]
+  FD check (A1<1e-4): median|r1/g1-1|=1.48e-06
+  A1 range [9.856e-07,2.157e-02]  A2 range [3.057e-09,3.551e-05]  A2/A1 [4.682e-07,4.708e-03]
+  gap=w_q-alpha: min 6.0352e-04 max 6.6542e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01901  max 0.01996  (nan 0)
+  vg : min 0.06343  max 0.06659  (nan 0)
+  Gq : min 1.257e-10  max 7.026e-07  (nan 0)
+  eps: min 1.994e-07  max 0.001064  (nan 0)
+  rc : min -6.225e-05  max 0.001303  (nan 0)
+  rs : min -2.432e-05  max 0.001299  (nan 0)
+  @argmax A2/A1: tau=7.1359e+08 A=(6.5433e-03,3.0809e-05) b=0.99826 a=0.89049 gap=6.1248e-04 k=1.9163e-02 vg=6.3858e-02 Gq=1.135e-08 eps=1.784e-05 ratio_conj=-1.676e-05 ratio_signed=-5.355e-06  [row 290]
+  @argmax A1: tau=6.7037e+08 A=(2.1571e-02,8.8641e-06) b=0.99705 a=0.89514 gap=6.6541e-04 k=1.9963e-02 vg=6.6591e-02 Gq=6.057e-07 eps=9.150e-04 ratio_conj=0.001292 ratio_signed=0.001299  [row 165]
+  @argmax A2: tau=6.8101e+08 A=(1.0064e-02,3.5514e-05) b=0.99801 a=0.89192 gap=6.2115e-04 k=1.9296e-02 vg=6.4315e-02 Gq=8.120e-08 eps=1.268e-04 ratio_conj=-6.176e-05 ratio_signed=6.946e-05  [row 240]
+===== spindown_a0.9_alpha0.3_fa5.1255e-3_t1e10_diagnostics.csv rows=486  b:[0.9922,1.0000] a:[0.8755,0.9000]
+  FD check (A1<1e-4): median|r1/g1-1|=1.48e-06
+  A1 range [9.856e-07,1.976e-02]  A2 range [3.057e-09,3.236e-05]  A2/A1 [4.707e-07,1.782e-02]
+  gap=w_q-alpha: min 6.0249e-04 max 6.4708e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01899  max 0.01964  (nan 0)
+  vg : min 0.06338  max 0.06583  (nan 0)
+  Gq : min 1.314e-10  max 5.899e-07  (nan 0)
+  eps: min 2.085e-07  max 0.0009108  (nan 0)
+  rc : min -5.479e-05  max 0.001048  (nan 0)
+  rs : min -2.432e-05  max 0.001046  (nan 0)
+  @argmax A2/A1: tau=1.0000e+10 A=(6.0407e-04,1.0764e-05) b=0.99690 a=0.87556 gap=6.0249e-04 k=1.8993e-02 vg=6.3379e-02 Gq=1.315e-10 eps=2.087e-07 ratio_conj=-2.174e-07 ratio_signed=1.647e-07  [row 485]
+  @argmax A1: tau=6.7785e+08 A=(1.9756e-02,7.0602e-06) b=0.99225 a=0.88717 gap=6.4708e-04 k=1.9638e-02 vg=6.5829e-02 Gq=5.380e-07 eps=8.300e-04 ratio_conj=0.001045 ratio_signed=0.001046  [row 162]
+  @argmax A2: tau=6.9158e+08 A=(9.2213e-03,3.2357e-05) b=0.99495 a=0.87947 gap=6.1255e-04 k=1.9132e-02 vg=6.3967e-02 Gq=5.681e-08 eps=8.971e-05 ratio_conj=-5.463e-05 ratio_signed=6.057e-05  [row 235]
+===== spindown_chiral_a0.99_alpha0.3_fa1e-2_diagnostics.csv rows=1402  b:[0.9163,1.0000] a:[0.8228,0.9900]
+  FD check (A1<1e-4): median|r1/g1-1|=8.37e-05
+  A1 range [3.903e-08,2.286e-02]  A2 range [2.998e-09,3.816e-05]  A2/A1 [2.272e-07,9.437e+02]
+  gap=w_q-alpha: min 4.7492e-04 max 6.0020e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01617  max 0.01899  (nan 0)
+  vg : min 0.05871  max 0.06316  (nan 0)
+  Gq : min 1.091e-08  max 4.242e-07  (nan 0)
+  eps: min 1.859e-05  max 0.0008604  (nan 0)
+  rc : min -7.229e-05  max 0.0009013  (nan 0)
+  rs : min -4.466e-05  max 0.0009  (nan 0)
+  @argmax A2/A1: tau=1.5000e+09 A=(3.9034e-08,3.6837e-05) b=0.97596 a=0.84666 gap=5.5736e-04 k=1.8074e-02 vg=6.1615e-02 Gq=1.101e-08 eps=1.875e-05 ratio_conj=-1.974e-05 ratio_signed=1.975e-05  [row 1401]
+  @argmax A1: tau=4.1293e+08 A=(2.2856e-02,2.2768e-06) b=0.91641 a=0.84275 gap=4.7515e-04 k=1.6170e-02 vg=5.8717e-02 Gq=4.215e-07 eps=8.548e-04 ratio_conj=0.0009013 ratio_signed=0.0008993  [row 159]
+  @argmax A2: tau=4.4813e+08 A=(7.9954e-03,3.8158e-05) b=0.96747 a=0.83449 gap=5.4404e-04 k=1.7779e-02 vg=6.1142e-02 Gq=2.453e-08 eps=4.287e-05 ratio_conj=-5.467e-05 ratio_signed=4.082e-05  [row 262]
+===== spindown_chiral_a0.99_alpha0.3_fa3e-3_diagnostics.csv rows=601  b:[0.9852,1.0000] a:[0.8737,0.9900]
+  FD check (A1<1e-4): median|r1/g1-1|=1.84e-06
+  A1 range [9.759e-07,4.507e-02]  A2 range [3.047e-09,7.178e-05]  A2/A1 [2.364e-07,4.510e-03]
+  gap=w_q-alpha: min 5.7882e-04 max 6.6335e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01851  max 0.01984  (nan 0)
+  vg : min 0.06249  max 0.0668  (nan 0)
+  Gq : min 1.162e-09  max 1.414e-06  (nan 0)
+  eps: min 1.916e-06  max 0.002178  (nan 0)
+  rc : min -0.0001275  max 0.002867  (nan 0)
+  rs : min -4.466e-05  max 0.002865  (nan 0)
+  @argmax A2/A1: tau=4.1129e+08 A=(1.4112e-02,6.3646e-05) b=0.99238 a=0.95046 gap=5.9884e-04 k=1.8892e-02 vg=6.3331e-02 Gq=2.585e-08 eps=4.145e-05 ratio_conj=-3.881e-05 ratio_signed=-1.171e-05  [row 305]
+  @argmax A1: tau=3.9384e+08 A=(4.5074e-02,1.7785e-05) b=0.98755 a=0.97129 gap=6.6329e-04 k=1.9836e-02 vg=6.6803e-02 Gq=1.225e-06 eps=1.880e-03 ratio_conj=0.002849 ratio_signed=0.002865  [row 181]
+  @argmax A2: tau=3.9839e+08 A=(2.1511e-02,7.1782e-05) b=0.99139 a=0.95730 gap=6.0994e-04 k=1.9057e-02 vg=6.3945e-02 Gq=3.419e-07 eps=5.440e-04 ratio_conj=-0.0001275 ratio_signed=0.0001819  [row 255]
+===== spindown_chiral_a0.9_alpha0.3_fa0.0466873_t1e11_diagnostics.csv rows=4786  b:[0.9815,1.0000] a:[0.8694,0.9000]
+  FD check (A1<1e-4): median|r1/g1-1|=1.79e-06
+  A1 range [9.856e-07,2.801e-03]  A2 range [2.734e-09,4.653e-08]  A2/A1 [9.775e-07,3.102e-03]
+  gap=w_q-alpha: min 5.6783e-04 max 6.0756e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.0183  max 0.0191  (nan 0)
+  vg : min 0.06201  max 0.06355  (nan 0)
+  Gq : min 5.603e-11  max 1.478e-08  (nan 0)
+  eps: min 9.379e-08  max 2.326e-05  (nan 0)
+  rc : min 9.788e-08  max 2.433e-05  (nan 0)
+  rs : min -2.432e-05  max 9.953e-08  (nan 0)
+  @argmax A2/A1: tau=0.0000e+00 A=(9.8557e-07,3.0574e-09) b=1.00000 a=0.90000 gap=6.0756e-04 k=1.9102e-02 vg=6.3546e-02 Gq=1.478e-08 eps=2.326e-05 ratio_conj=2.433e-05 ratio_signed=-2.432e-05  [row 0]
+  @argmax A1: tau=1.8736e+09 A=(2.8005e-03,2.8255e-09) b=0.98148 a=0.86941 gap=5.6783e-04 k=1.8295e-02 vg=6.2015e-02 Gq=5.604e-11 eps=9.381e-08 ratio_conj=9.788e-08 ratio_signed=9.953e-08  [row 215]
+  @argmax A2: tau=1.0000e+11 A=(2.8003e-03,4.6530e-08) b=0.98148 a=0.86941 gap=5.6783e-04 k=1.8295e-02 vg=6.2015e-02 Gq=5.604e-11 eps=9.380e-08 ratio_conj=9.867e-08 ratio_signed=9.867e-08  [row 4785]
+===== spindown_chiral_a0.9_alpha0.3_fa0.466873_diagnostics.csv rows=196  b:[0.9815,1.0000] a:[0.8694,0.9000]
+  FD check (A1<1e-4): median|r1/g1-1|=1.61e-05
+  A1 range [9.856e-07,2.797e-04]  A2 range [2.719e-09,3.058e-09]  A2/A1 [9.724e-06,3.102e-03]
+  gap=w_q-alpha: min 5.6733e-04 max 6.0756e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01829  max 0.0191  (nan 0)
+  vg : min 0.06199  max 0.06355  (nan 0)
+  Gq : min 2.169e-12  max 1.478e-08  (nan 0)
+  eps: min 3.632e-09  max 2.326e-05  (nan 0)
+  rc : min 3.523e-09  max 2.433e-05  (nan 0)
+  rs : min -2.432e-05  max 4.123e-09  (nan 0)
+  @argmax A2/A1: tau=0.0000e+00 A=(9.8557e-07,3.0574e-09) b=1.00000 a=0.90000 gap=6.0756e-04 k=1.9102e-02 vg=6.3546e-02 Gq=1.478e-08 eps=2.326e-05 ratio_conj=2.433e-05 ratio_signed=-2.432e-05  [row 0]
+  @argmax A1: tau=1.4494e+09 A=(2.7968e-04,2.7218e-09) b=0.98148 a=0.86941 gap=5.6733e-04 k=1.8287e-02 vg=6.1987e-02 Gq=2.172e-12 eps=3.638e-09 ratio_conj=3.523e-09 ratio_signed=4.123e-09  [row 190]
+  @argmax A2: tau=1.2460e+08 A=(6.2127e-06,3.0578e-09) b=0.99999 a=0.89999 gap=6.0754e-04 k=1.9102e-02 vg=6.3546e-02 Gq=1.477e-08 eps=2.325e-05 ratio_conj=2.432e-05 ratio_signed=-2.431e-05  [row 21]
+===== spindown_chiral_a0.9_alpha0.3_fa3e-3_t1e10_diagnostics.csv rows=481  b:[0.9920,1.0000] a:[0.8753,0.9000]
+  FD check (A1<1e-4): median|r1/g1-1|=1.48e-06
+  A1 range [9.856e-07,3.431e-02]  A2 range [3.057e-09,5.586e-05]  A2/A1 [2.752e-07,2.426e-02]
+  gap=w_q-alpha: min 6.0243e-04 max 6.4828e-04  sign change: False  frac rows gap<=0: 0.000
+  k  : min 0.01899  max 0.01965  (nan 0)
+  vg : min 0.06338  max 0.0659  (nan 0)
+  Gq : min 1.565e-10  max 6.132e-07  (nan 0)
+  eps: min 2.485e-07  max 0.000946  (nan 0)
+  rc : min -5.782e-05  max 0.001113  (nan 0)
+  rs : min -2.432e-05  max 0.00111  (nan 0)
+  @argmax A2/A1: tau=1.0000e+10 A=(7.9786e-04,1.9354e-05) b=0.99688 a=0.87545 gap=6.0243e-04 k=1.8992e-02 vg=6.3377e-02 Gq=1.565e-10 eps=2.485e-07 ratio_conj=-2.567e-07 ratio_signed=2.239e-07  [row 480]
+  @argmax A1: tau=7.1537e+08 A=(3.4314e-02,1.1687e-05) b=0.99204 a=0.88686 gap=6.4828e-04 k=1.9654e-02 vg=6.5896e-02 Gq=5.532e-07 eps=8.530e-04 ratio_conj=0.00111 ratio_signed=0.00111  [row 157]
+  @argmax A2: tau=7.2810e+08 A=(1.6201e-02,5.5861e-05) b=0.99481 a=0.87917 gap=6.1304e-04 k=1.9139e-02 vg=6.3997e-02 Gq=6.843e-08 eps=1.080e-04 ratio_conj=-5.782e-05 ratio_signed=6.896e-05  [row 230]

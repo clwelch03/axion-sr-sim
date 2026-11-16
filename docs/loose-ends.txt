@@ -1,0 +1,159 @@
+1. D: the complex-frequency prescription is the highest priority.
+
+The problematic assertion remains
+\[
+\widetilde\omega_{\mathbf q}
+=\mathbf q\cdot\widetilde{\boldsymbol\omega}.
+\]
+The signed combination correctly describes the real oscillation frequencies. It does not generally describe the growth rates.
+
+For your existing example,
+\[
+\phi_1^2\phi_2^*
+\propto
+e^{-i(2\omega_1-\omega_2)t}
+e^{(2\gamma_1+\gamma_2)t},
+\]
+so its complex frequency is
+\[
+2\widetilde\omega_1-\widetilde\omega_2^*,
+\]
+rather than \(2\widetilde\omega_1-\widetilde\omega_2\). Omiya explicitly uses the conjugated frequency for this driven channel. arxiv.org
+
+But correcting this one sign is not a complete nonlinear prescription. On your evolving solution family,
+\[
+\dot F_{\mathbf q}
+=
+\sum_k\partial_{A_k}F_{\mathbf q}\,\dot A_k
++\partial_bF_{\mathbf q}\,\dot b
++\partial_jF_{\mathbf q}\,\dot j.
+\]
+There is generally no reason for this to equal
+\((\mathbf q\cdot\boldsymbol\gamma)F_{\mathbf q}\).
+
+You can see the assumption directly by differentiating a component:
+\[
+\partial_t^2\!\left(F_{\mathbf q}e^{-i\vartheta_{\mathbf q}}\right)
+=e^{-i\vartheta_{\mathbf q}}
+\left[
+-\omega_{\mathbf q}^2F_{\mathbf q}
+-2i\omega_{\mathbf q}\dot F_{\mathbf q}
+-i\dot\omega_{\mathbf q}F_{\mathbf q}
++\ddot F_{\mathbf q}
+\right].
+\]
+Replacing the frequency by \(\omega_{\mathbf q}+i\gamma_{\mathbf q}\) models a particular exponential envelope; it does not automatically represent the response of a deforming profile.
+
+What needs resolving is therefore:
+- What approximation do the solved \(\gamma_i\) represent?
+- How does that approximation relate to the amplitude evolution obtained from action balance?
+- Are errors in this prescription negligible at the order at which you calculate the fluxes and evolution?
+The linear fixed-background check is \(\dot{\mathcal N}_i=2\gamma_i\mathcal N_i\), using the same time units. Passing it is necessary, but it does not test the interacting prescription.
+
+Also, the integral phase definition is part of this same issue. For an evolving reconstruction, \(\dot\vartheta_i=\omega_i\) requires \(\vartheta_i=\int\omega_i\,dt\); it is not an optional improvement to \(\omega_i(t)t\). Using \(\omega_it\) as frozen-snapshot shorthand is entirely fine.
+
+2. E: my earlier torus-averaging warning needs refinement for your actual two-mode system.
+
+There are two distinct statements:
+- Fourier projection on the abstract phase torus is mathematically well defined.
+- That projection captures the physical slow dynamics without discarding a relevant relative phase.
+Your periodicity argument establishes the first. The second requires checking which phase combinations survive physical averaging.
+
+For an integer vector \(\mathbf k\),
+\[
+e^{i\mathbf k\cdot\boldsymbol\xi}
+=e^{i(\mathbf k\cdot\boldsymbol\omega)t}
+e^{-i(\mathbf k\cdot\mathbf m)\varphi}.
+\]
+Azimuthal integration removes it unless
+\[
+\mathbf k\cdot\mathbf m=0.
+\]
+For the surviving combinations, averaging over fast time is justified when
+\[
+|\mathbf k\cdot\boldsymbol\omega|\,T_{\rm slow}\gg1,
+\]
+for the combinations with dynamically relevant couplings. Small denominators and the existence of smooth multiphase solution families are recognized issues in general multiphase Whitham theory. Springer Nature Link
+
+For \(211/322\), this is substantially less concerning than my original comment suggested. Since \(\mathbf m=(1,2)\), an azimuthally invariant combination must have
+\[
+\mathbf k=p(2,-1).
+\]
+Its frequency is \(p(2\omega_{211}-\omega_{322})\), ordinarily of order \(\mu\). The small difference \(\omega_{211}-\omega_{322}\) carries nonzero azimuthal number and is removed by azimuthal integration.
+
+The question becomes more consequential with additional modes. For \(211,322,433\), for example,
+\[
+\psi=\xi_{211}-2\xi_{322}+\xi_{433}
+\]
+is azimuthally invariant, and its leading rest-mass frequency cancels. Its remaining detuning must be compared with the slow interaction/evolution rates. If it becomes sufficiently small, averaging over \(\psi\) can discard coherent dynamics, and you may need to retain it as a slow variable.
+
+So I would justify the current two-mode averaging concisely, and make the arbitrary-\(K\) extension conditional on checking relevant resonances.
+
+3. G: specify what the actions contain before using them to establish energy balance.
+
+“Integrated over the cloud” remains insufficiently definite for a field containing propagating components.
+
+For a real-frequency outgoing component,
+\[
+R_{\mathbf q}\sim \frac{C_{\mathbf q}e^{ikr}}r,
+\]
+your charge density per unit \(r\) approaches a nonzero constant. Its stationary radiation tail therefore contributes an amount growing with the outer integration radius.
+
+A finite-domain action is perfectly legitimate. But you need to identify whether you use:
+- the full field between finite extraction boundaries, or
+- a localized cloud contribution with radiation accounted for separately.
+Those choices affect the amplitude derivatives and the energy identities. In particular, “the cloud is contained” does not by itself eliminate contributions from the radiation crossing the domain.
+
+This needs an implementation-specific definition and a domain-dependence check, not a long explanatory section.
+
+4. H: separate closing the black-hole equations from proving equivalence to energy balance.
+
+For black-hole evolution, supply the actual horizon-flux equations and their normalization. With physical fluxes defined positive toward increasing \(r\),
+\[
+\frac{dM_{\rm BH}}{dt}=-F_E^{\rm phys}(r_{\rm in}),
+\qquad
+\frac{dJ_{\rm BH}}{dt}=-F_J^{\rm phys}(r_{\rm in}),
+\]
+when the inner extraction flux represents the horizon flux. This gives mass loss when superradiant energy flows outward.
+
+The more consequential issue is the conversion from instantaneous-\(M\) snapshot units to fixed-\(M_0\) evolution units. For example,
+\[
+\alpha=b\alpha_0,\qquad
+\chi=\frac{j}{b^2},\qquad
+M_0\omega_{\rm phys}=\frac{\widehat\omega}{b},
+\]
+where \(\widehat\omega=M_{\rm BH}\omega_{\rm phys}\).
+
+Likewise, with the field normalization used in your displayed integrals, the physical action scales as
+\[
+\mathcal N_i^{\rm phys}
+=f_a^2M_{\rm BH}^2\,\widehat{\mathcal N}_i
+\]
+in natural units. An invariant physical action is therefore not an invariant raw \(M=1\) integral when \(M\) changes. “All quantities use consistent fixed reference units” may accurately describe your code, but the conversion is important enough to show.
+
+For the claimed equivalence to energy balance, the substantive condition is
+\[
+\boxed{
+\partial_{A_k}E
+=\sum_i\omega_i\,\partial_{A_k}\mathcal N_i
+\quad\text{at fixed background}.
+}
+\]
+This does not follow from the Legendre expression for \(E\) alone. It additionally needs the appropriate stationarity argument, including treatment of boundary terms. Your complex-frequency snapshots and open boundaries are precisely where that argument needs checking.
+
+Define the residual
+\[
+D_k\equiv
+\partial_{A_k}E-\sum_i\omega_i\partial_{A_k}\mathcal N_i.
+\]
+Then the chain rule gives
+\[
+\frac{dE}{d\tau}
+-\sum_i\omega_i\frac{d\mathcal N_i}{d\tau}
+=w+\sum_kD_k\frac{dA_k}{d\tau}.
+\]
+Thus your stated energy law requires the last term to vanish or be negligible at the retained order. Defining \(w\) through background derivatives does not establish that.
+
+Your reported \(10^{-7}\) agreement could provide a strong check, depending on how independently the two formulations were evaluated. I would examine \(D_k\), its dependence on extraction boundaries, and whether energy and fluxes were calculated independently rather than reconstructed from the action identities.
+
+I would work through D first, because its resolution determines what stationarity and accuracy claims you can use in H. The two-mode part of E now looks like a relatively short clarification; the arbitrary-mode extension deserves a separate resonance assessment.

@@ -45,6 +45,14 @@ end
     mode_frequencies = [0.29 + 1e-3im, 0.295 - 2e-4im]
     @test AC.component_frequencies(mode_set, mode_frequencies)[static] ≈ 2mode_frequencies[1] - conj(mode_frequencies[2])
     @test AC.component_frequencies(mode_set, real.(mode_frequencies))[static] ≈ 2 * 0.29 - 0.295
+    @test AC.component_frequencies(mode_set, mode_frequencies, :signed)[static] ≈ 2mode_frequencies[1] - mode_frequencies[2]
+    @test AC.component_frequencies(mode_set, mode_frequencies, :zero)[static] ≈ 2 * 0.29 - 0.295
+    for rule in (:signed, :zero)   # fundamentals keep their eigenvalues under every rule
+        fundamentals = findall(AC.is_fundamental, mode_set.components)
+        @test AC.component_frequencies(mode_set, mode_frequencies, rule)[fundamentals] ≈
+              AC.component_frequencies(mode_set, mode_frequencies)[fundamentals]
+    end
+    @test_throws ArgumentError AC.component_frequencies(mode_set, mode_frequencies, :bogus)
     with_angular = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]; n_angular=2)
     @test with_angular.components[1].ls == [1, 3]
     @test_throws ArgumentError BoundMode(1, 1, 0)
@@ -339,8 +347,8 @@ end
     background = KerrBackground(0.99)
     mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]; n_angular=2)
     mesh = RadialMesh(background; rstar_min=-10.0, rstar_max=30.0, step=10.0)
-    for potential in (ChiralPotential(), CosinePotential(), FreePotential())
-        problem = RadialProblem(background, potential, 0.3, mode_set; mesh, n_phase=8, n_polar=8)
+    for potential in (ChiralPotential(), CosinePotential(), FreePotential()), rule in (:conjugate, :signed, :zero)
+        problem = RadialProblem(background, potential, 0.3, mode_set; mesh, n_phase=8, n_polar=8, driven_growth_rule=rule)
         block = 0.5 .* randn(AC.node_block_size(AC.UnknownLayout(problem)))
         frequency_reals = [0.29, 1e-3, 0.295, -2e-4]
         for s in (0.3, 20.0)
@@ -359,13 +367,15 @@ end
     background = KerrBackground(0.9)
     mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
     mesh = RadialMesh(background; rstar_min=-10.0, rstar_max=30.0, step=10.0)
-    problem = RadialProblem(background, QuarticPotential(1.0), 0.3, mode_set; mesh, n_phase=8, n_polar=8)
-    layout = AC.UnknownLayout(problem)
-    amplitudes, scale = [0.05, 0.02], 0.05
-    unknowns = AC.initial_unknowns(problem, layout, amplitudes, scale) .+ 0.01 .* randn(AC.n_unknowns(layout))
-    structured = AC.jacobian(problem, layout, unknowns, amplitudes, scale)
-    naive = ForwardDiff.jacobian(u -> AC.residual(problem, layout, u, amplitudes, scale), unknowns)
-    @test maximum(abs, Matrix(structured) .- naive) < 1e-10 * maximum(abs, naive)
+    for rule in (:conjugate, :signed, :zero)
+        problem = RadialProblem(background, QuarticPotential(1.0), 0.3, mode_set; mesh, n_phase=8, n_polar=8, driven_growth_rule=rule)
+        layout = AC.UnknownLayout(problem)
+        amplitudes, scale = [0.05, 0.02], 0.05
+        unknowns = AC.initial_unknowns(problem, layout, amplitudes, scale) .+ 0.01 .* randn(AC.n_unknowns(layout))
+        structured = AC.jacobian(problem, layout, unknowns, amplitudes, scale)
+        naive = ForwardDiff.jacobian(u -> AC.residual(problem, layout, u, amplitudes, scale), unknowns)
+        @test maximum(abs, Matrix(structured) .- naive) < 1e-10 * maximum(abs, naive)
+    end
 end
 
 @testset "Jacobian blocks, in-place assembly and boundary derivatives" begin

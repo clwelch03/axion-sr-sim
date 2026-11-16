@@ -1,0 +1,97 @@
+
+[791885] signal 15: Terminated
+in expression starting at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:130
+pthread_cond_wait at /lib64/libpthread.so.0 (unknown line)
+uv_cond_wait at /workspace/srcdir/libuv/src/unix/thread.c:822
+ijl_task_get_next at /cache/build/builder-amdci4-4/julialang/julia-ci/src/scheduler.c:599
+wait at ./task.jl:1296
+#wait#392 at ./condition.jl:141
+wait at ./condition.jl:136 [inlined]
+_trywait at ./asyncevent.jl:186
+profile_printing_listener at ./Base.jl:335
+#start_profile_listener##0 at ./Base.jl:355
+jfptr_YY.start_profile_listenerYY.YY.0_13562.1 at /global/home/users/clwelch/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/lib/julia/sys.so (unknown line)
+jl_apply at /cache/build/builder-amdci4-4/julialang/julia-ci/src/julia.h:2318 [inlined]
+start_task at /cache/build/builder-amdci4-4/julialang/julia-ci/src/task.c:1285
+unknown function (ip: (nil)) at (unknown file)
+gc_sweep_page at /cache/build/builder-amdci4-4/julialang/julia-ci/src/gc-stock.c:923
+gc_sweep_pool_page at /cache/build/builder-amdci4-4/julialang/julia-ci/src/gc-stock.c:998 [inlined]
+gc_sweep_pool_parallel at /cache/build/builder-amdci4-4/julialang/julia-ci/src/gc-stock.c:1290
+gc_sweep_pool at /cache/build/builder-amdci4-4/julialang/julia-ci/src/gc-stock.c:1410 [inlined]
+_jl_gc_collect at /cache/build/builder-amdci4-4/julialang/julia-ci/src/gc-stock.c:3266
+ijl_gc_collect at /cache/build/builder-amdci4-4/julialang/julia-ci/src/gc-stock.c:3574
+maybe_collect at /cache/build/builder-amdci4-4/julialang/julia-ci/src/gc-stock.c:355 [inlined]
+jl_gc_small_alloc_inner at /cache/build/builder-amdci4-4/julialang/julia-ci/src/gc-stock.c:731 [inlined]
+jl_gc_small_alloc_noinline at /cache/build/builder-amdci4-4/julialang/julia-ci/src/gc-stock.c:789 [inlined]
+jl_gc_alloc_ at /cache/build/builder-amdci4-4/julialang/julia-ci/src/gc-stock.c:803
+jl_alloc_genericmemory_unchecked at /cache/build/builder-amdci4-4/julialang/julia-ci/src/genericmemory.c:41
+GenericMemory at ./boot.jl:588 [inlined]
+new_as_memoryref at ./boot.jl:605 [inlined]
+Array at ./boot.jl:652 [inlined]
+Array at ./boot.jl:662 [inlined]
+similar at ./array.jl:407 [inlined]
+similar at /cache/build/builder-amdci4-4/julialang/julia-ci/usr/share/julia/stdlib/v1.13/LinearAlgebra/src/adjtrans.jl:391 [inlined]
+matprod_dest at /cache/build/builder-amdci4-4/julialang/julia-ci/usr/share/julia/stdlib/v1.13/LinearAlgebra/src/matmul.jl:134 [inlined]
+_mul at /cache/build/builder-amdci4-4/julialang/julia-ci/usr/share/julia/stdlib/v1.13/LinearAlgebra/src/matmul.jl:123 [inlined]
+mul at /cache/build/builder-amdci4-4/julialang/julia-ci/usr/share/julia/stdlib/v1.13/LinearAlgebra/src/matmul.jl:119 [inlined]
+* at /cache/build/builder-amdci4-4/julialang/julia-ci/usr/share/julia/stdlib/v1.13/LinearAlgebra/src/matmul.jl:116 [inlined]
+reconstruct_field at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/field.jl:106
+phase_averaged_potential at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/field.jl:216
+#field_bilinears#71 at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/charges.jl:75
+field_bilinears at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/charges.jl:61 [inlined]
+cloud_charges at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/charges.jl:165
+#92 at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/charges.jl:352 [inlined]
+#88 at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/charges.jl:337
+derivative at /global/home/users/clwelch/.julia/packages/ForwardDiff/ix15H/src/derivative.jl:14 [inlined]
+#86 at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/charges.jl:337
+iterate at ./generator.jl:48 [inlined]
+_collect at ./array.jl:848
+collect_similar at ./array.jl:763
+unknown function (ip: 0x146c562f0181) at (unknown file)
+map at ./abstractarray.jl:3396 [inlined]
+#observable_jacobian#83 at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/charges.jl:336
+observable_jacobian at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/charges.jl:334 [inlined]
+#charge_jacobian#90 at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/charges.jl:351 [inlined]
+charge_jacobian at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/charges.jl:351 [inlined]
+report at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:69
+unknown function (ip: 0x146c56261cb6) at (unknown file)
+top-level scope at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:134
+jl_toplevel_eval_flex at /cache/build/builder-amdci4-4/julialang/julia-ci/src/toplevel.c:731
+jl_eval_toplevel_stmts at /cache/build/builder-amdci4-4/julialang/julia-ci/src/toplevel.c:585
+jl_toplevel_eval_flex at /cache/build/builder-amdci4-4/julialang/julia-ci/src/toplevel.c:683
+ijl_toplevel_eval at /cache/build/builder-amdci4-4/julialang/julia-ci/src/toplevel.c:754
+ijl_toplevel_eval_in at /cache/build/builder-amdci4-4/julialang/julia-ci/src/toplevel.c:799
+eval at ./boot.jl:489
+include_string at ./loading.jl:3016
+_include at ./loading.jl:3076
+include at ./Base.jl:309
+exec_options at ./client.jl:344
+_start at ./client.jl:577
+jfptr__start_59126.1 at /global/home/users/clwelch/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/lib/julia/sys.so (unknown line)
+jl_apply at /cache/build/builder-amdci4-4/julialang/julia-ci/src/julia.h:2318 [inlined]
+true_main at /cache/build/builder-amdci4-4/julialang/julia-ci/src/jlapi.c:985
+jl_repl_entrypoint at /cache/build/builder-amdci4-4/julialang/julia-ci/src/jlapi.c:1152
+main at /cache/build/builder-amdci4-4/julialang/julia-ci/cli/loader_exe.c:58
+__libc_start_main at /lib64/libc.so.6 (unknown line)
+unknown function (ip: 0x4010b8) at /workspace/srcdir/glibc-2.17/csu/../sysdeps/x86_64/start.S
+unknown function (ip: (nil)) at (unknown file)
+Allocations: 456106734 (Pool: 456104173; Big: 2561); GC: 4896
+┌ Warning: solve_radial did not converge: |F| = 1.89946400384911e-10 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:626
+┌ Warning: non-converged continuation step
+│   fraction = 0.046415888336127795
+│   solution.residual_norm = 1.89946400384911e-10
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:58
+┌ Warning: solve_radial did not converge: |F| = 6.843352257409375 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:626
+┌ Warning: non-converged continuation step
+│   fraction = 0.2154434690031884
+│   solution.residual_norm = 6.843352257409375
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:58
+┌ Warning: solve_radial did not converge: |F| = 20.362481244104956 after 30 iterations
+└ @ AxionCloud /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/src/bvp.jl:626
+┌ Warning: non-converged continuation step
+│   fraction = 1.0
+│   solution.residual_norm = 20.362481244104956
+└ @ Main /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:58
+[(-60.0, 1000.0) solve time 1883 s]

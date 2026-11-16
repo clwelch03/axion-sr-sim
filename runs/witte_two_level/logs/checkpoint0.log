@@ -1,0 +1,4 @@
+their keys: Any["322_322^211^Inf", "211_211^322^BH"]
+322_322^211^Inf: their load_rate_coeffs = 0.011278770750034925  our CSV (log-log interp, x(Mpl/fa)^4 [x r_P ratio]) = 0.011278770750034925  relative difference = 0.0
+211_211^322^BH: their load_rate_coeffs = 0.0290532904294251  our CSV (log-log interp, x(Mpl/fa)^4 [x r_P ratio]) = 0.0290532904294251  relative difference = 0.0
+alpha used = 0.30000000000000004  f_a = 3.66e16 GeV  largest |relative difference| = 0.0

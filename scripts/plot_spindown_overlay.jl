@@ -23,7 +23,10 @@ using CairoMakie, DelimitedFiles, Printf
 include(joinpath(@__DIR__, "plot_helpers.jl"))
 
 flags = filter(startswith("--"), ARGS)
-issubset(flags, ["--markers", "--compact"]) || error("unknown option among $flags")
+# --t-max=<t/M₀>: end of the time axis (default: the end of the longest run); runs are cut there
+time_axis_end_flags = filter(startswith("--t-max="), flags)
+time_axis_end = isempty(time_axis_end_flags) ? Inf : parse(Float64, split(last(time_axis_end_flags), "=")[2])
+issubset(setdiff(flags, time_axis_end_flags), ["--markers", "--compact"]) || error("unknown option among $flags")
 last_as_markers, compact = "--markers" in flags, "--compact" in flags
 arguments = filter(!startswith("--"), ARGS)
 4 ≤ length(arguments) ≤ 9 ||
@@ -32,8 +35,8 @@ run_count = length(arguments) ÷ 2
 prefixes = Tuple(arguments[2index - 1] for index in 1:run_count)
 labels = Tuple(arguments[2index] for index in 1:run_count)
 output_path = isodd(length(arguments)) ? arguments[end] :
-              joinpath(@__DIR__, "..", "plots", "spindown_overlay_$(join(labels, "_"))_" *
-                       replace(prefixes[1], r"^spindown_((free|chiral)_)?" => "", r"_t[^_]+$" => "") * (compact ? "_compact" : "") * ".png")
+              joinpath(@__DIR__, "..", "plots", gev_file_name("spindown_overlay_$(join(labels, "_"))_" *
+                       replace(prefixes[1], r"^spindown_((free|chiral)_)?" => "", r"_t[^_]+$" => "") * (compact ? "_compact" : "") * ".png"))
 
 """Accepted states of one run as a named tuple of columns."""
 function read_run(prefix)
@@ -100,35 +103,46 @@ mode_211_color, mode_322_color, ink = colorant"#3DAE2B", colorant"#00A0DF", colo
 last_as_markers || run_count < 4 || error("four runs need --markers (there are three line styles)")
 line_styles = [last_as_markers && index == run_count ? :markers : (:solid, :dash, :dashdot)[index] for index in 1:run_count]
 grid = (:black, 0.06)
-figure = compact ? Figure(size=(900, 850), fontsize=20, figure_padding=(16, 48, 16, 16)) : Figure(size=(1300, 1000), fontsize=15)
+figure = compact ? Figure(size=(900, 850), fontsize=22, figure_padding=(16, 48, 16, 16)) : Figure(size=(1300, 1000), fontsize=15)
 line_width = compact ? 2.5 : 2
 # the runs are named in the legend (display_label of each label), not in the title
 title = compact ? "a₀ = $spin_label, α₀ = $mass_coupling_label, f_a = $(scientific(decay_constant_gev)) GeV" :
         "Spin-down: a₀ = $spin_label, α₀ = $mass_coupling_label, " *
         "f_a = $(scientific(decay_constant_gev)) GeV (f_a/M_Pl = $(scientific(decay_constant_ratio))), equal initial occupations"
-Label(figure[0, compact ? 1 : (1:2)], title; fontsize=compact ? 20 : 17, color=ink, halign=:left, tellwidth=false)
+# compact: the parameters are the occupation panel's title (below), with no line above the figure
+compact || Label(figure[0, 1:2], title; fontsize=17, color=ink, halign=:left, tellwidth=false)
 
 shared_end = minimum(run.time[end] for run in runs)
-longest_end = maximum(run.time[end] for run in runs)
+longest_end = min(maximum(run.time[end] for run in runs), time_axis_end)
 # the log-time column starts at 0.2 × the shortest run's end: earlier accepted states are sparse (straight segments on
 # a log axis) and that span is already in the left column
 windows = ((0.0, shared_end, false, "All runs, t ≤ $(scientific(shared_end)) M₀"),
            (0.2shared_end, longest_end, true, "To $(scientific(longest_end)) M₀ (log time); dotted: final value of a shorter run"))
-# compact has no linear column, so its log axis shows the whole run: from the earliest first state after t = 0, as in
+# compact has no linear column, so its log axis shows the whole run: from the latest of the runs' first states after
+# t = 0 (a run saved densely from very early, such as Witte's code, would otherwise add an empty stretch), as in
 # the whole-run column of scripts/plot_spindown.jl
-compact && (windows = ((minimum(run.time[2] for run in runs), longest_end, true,
-                        "Whole run (log time); dotted: final value of the shorter run"),))
+compact && (windows = ((maximum(run.time[2] for run in runs), longest_end, true, title),))
 for (column_index, (time_min, time_max, log_axis, window_title)) in enumerate(windows)
     first_column = column_index == 1
     time_scale = log_axis ? log10 : identity
     # log axis: ticks at 1, 2, 5 × 10ⁿ inside the window (Makie's default gives fractional exponents like 10^8.7)
     time_ticks = Makie.automatic
     if log_axis
-        tick_values = [m * 10.0^n for n in floor(Int, log10(time_min)):ceil(Int, log10(time_max)) for m in (1, 2, 5)]
+        # powers of ten only, so the axis reads as logarithmic; 2 and 5 are added only for windows under two decades
+        tick_mantissas = log10(time_max / time_min) >= 2 ? (1,) : (1, 2, 5)
+        tick_values = [m * 10.0^n for n in floor(Int, log10(time_min)):ceil(Int, log10(time_max)) for m in tick_mantissas]
         tick_values = filter(t -> time_min ≤ t ≤ time_max, tick_values)
         time_ticks = (tick_values, scientific.(tick_values))
     end
+    # whole decades on the occupation axis (Makie can choose fractional exponents such as 10^2.5), as in plot_spindown.jl
+    shown_occupations = vcat([vcat(run.occupation_211[time_min .≤ run.time .≤ time_max],
+                                   run.occupation_322[time_min .≤ run.time .≤ time_max]) for run in runs]...)
+    decades = floor(Int, log10(minimum(shown_occupations))):ceil(Int, log10(maximum(shown_occupations)))
+    decade_step = max(1, cld(length(decades), 6))
+    decade_ticks = [10.0^n for n in decades if mod(n, decade_step) == 0]
+    decade_labels = [rich("10", superscript(replace(string(round(Int, log10(value))), "-" => "−"))) for value in decade_ticks]
     axis_occupation = Axis(figure[1, column_index]; yscale=log10, xscale=time_scale, xticks=time_ticks, title=window_title, titlealign=:left,
+                           titlefont=compact ? :regular : :bold, yticks=(decade_ticks, decade_labels),
                            ylabel=first_column ? L"occupation $\mathcal{N}_i$  [$f_a^2 M_0^2$]" : "", xgridcolor=grid, ygridcolor=grid)
     axis_spin = Axis(figure[2, column_index]; xscale=time_scale, xticks=time_ticks, ylabel=first_column ? L"black-hole spin $a = J/M^2$" : "",
                      xlabel=compact ? L"t/M_0" : "", xgridcolor=grid, ygridcolor=grid)
@@ -185,9 +199,10 @@ for (column_index, (time_min, time_max, log_axis, window_title)) in enumerate(wi
                        LineElement(color=ink, linewidth=2, linestyle=line_styles[index]) for index in eachindex(runs)]
         axislegend(axis_occupation, [level_entries, run_entries], [[L"|211\rangle", L"|322\rangle"], collect(display_label.(labels))],
                    ["level", "run"]; position=compact ? :lt : :rc, framevisible=false, orientation=:horizontal, nbanks=max(2, run_count))
-        # compact (whole run on a log axis): the early part on the left is flat, so the legends go there
+        # compact (whole run on a log axis): the early part on the left is flat, so the legends go there (spin legend at
+        # mid-height, between the initial spin and the threshold, which sit at the top and bottom of the panel)
         axislegend(axis_spin, [LineElement(color=ink, linewidth=2), LineElement(color=(mode_211_color, 0.8), linewidth=1.5)],
-                   ["spin a", L"|211\rangle threshold ($\omega_{211} = \Omega_H$)"]; position=compact ? :lb : :rt,
+                   ["spin a", L"|211\rangle threshold ($\omega_{211} = \Omega_H$)"]; position=compact ? :lc : :rt,
                    framevisible=false)
     end
 end

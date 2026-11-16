@@ -1,0 +1,92 @@
+
+====================================================================================================
+P1 A=(1e-2,1e-4), default mesh
+  a = 0.9, α = 0.3, cosine, default mesh RadialMesh(background)
+  A = (1.0000000000e-02, 1.0000000000e-04)
+  rule conjugate (997 s; continuation from cold; Newton iterations in last solve 8)
+    q=(-1,2): Re ω̃_q − α = 6.308627e-04, Im ω̃_q = +1.1695e-07, ratio Im/gap = +1.854e-04
+    mode 1: ω = 0.296204732604  γ = +3.476184e-07  N = 2.238825e+02  L_N = -1.558338e-04  Ȧ = +3.400358e-09  (Ȧ/A = +3.400358e-07)
+    mode 2: ω = 0.298417797652  γ = -1.153347e-07  N = 2.111555e+03  L_N = +4.868142e-04  Ȧ = -1.274976e-11  (Ȧ/A = -1.274976e-07)
+  rule signed    (106 s; warm start from conjugate solution; Newton iterations in last solve 6)
+    q=(-1,2): Re ω̃_q − α = 6.308627e-04, Im ω̃_q = -5.7855e-07, ratio Im/gap = -9.171e-04
+    mode 1: ω = 0.296204732551  γ = +3.478091e-07  N = 2.238826e+02  L_N = -1.564063e-04  Ȧ = +3.413293e-09  (Ȧ/A = +3.413293e-07)
+    mode 2: ω = 0.298417797632  γ = -1.153711e-07  N = 2.111555e+03  L_N = +4.878944e-04  Ȧ = -1.277531e-11  (Ȧ/A = -1.277531e-07)
+  rule zero      (19 s; warm start from conjugate solution; Newton iterations in last solve 5)
+    q=(-1,2): Re ω̃_q − α = 6.308628e-04, Im ω̃_q = +0.0000e+00, ratio Im/gap = +0.000e+00
+    mode 1: ω = 0.296204732507  γ = +3.476309e-07  N = 2.238825e+02  L_N = -1.558377e-04  Ȧ = +3.400366e-09  (Ȧ/A = +3.400366e-07)
+    mode 2: ω = 0.298417797646  γ = -1.153402e-07  N = 2.111555e+03  L_N = +4.869512e-04  Ȧ = -1.275382e-11  (Ȧ/A = -1.275382e-07)
+  relative difference signed vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = -1.79e-10   Δγ/γ = +5.48e-04   ΔN/N = +1.94e-07   ΔL_N/L_N = +3.67e-03   ΔȦ/Ȧ = +3.80e-03
+    mode 2: Δω/ω = -6.75e-11   Δγ/γ = +3.16e-04   ΔN/N = +1.70e-07   ΔL_N/L_N = +2.22e-03   ΔȦ/Ȧ = +2.00e-03
+  relative difference zero vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = -3.27e-10   Δγ/γ = +3.59e-05   ΔN/N = -1.01e-07   ΔL_N/L_N = +2.51e-05   ΔȦ/Ȧ = +2.31e-06
+    mode 2: Δω/ω = -2.05e-11   Δγ/γ = +4.73e-05   ΔN/N = +2.48e-09   ΔL_N/L_N = +2.81e-04   ΔȦ/Ȧ = +3.18e-04
+
+====================================================================================================
+P2 A=(1e-2,1e-3), default mesh
+  a = 0.9, α = 0.3, cosine, default mesh RadialMesh(background)
+  A = (1.0000000000e-02, 1.0000000000e-03)
+  rule conjugate (1117 s; continuation from cold; Newton iterations in last solve 8)
+    q=(-1,2): Re ω̃_q − α = 7.908042e-04, Im ω̃_q = +9.7815e-05, ratio Im/gap = +1.237e-01
+    mode 1: ω = 0.295473042898  γ = +9.831284e-05  N = 2.040634e+01  L_N = -4.018558e-03  Ȧ = +9.897436e-07  (Ȧ/A = +9.897436e-05)
+    mode 2: ω = 0.298131923540  γ = -2.488509e-07  N = 1.898655e+04  L_N = +7.714042e-03  Ȧ = +6.336403e-11  (Ȧ/A = +6.336403e-08)
+  rule signed    (31 s; warm start from conjugate solution; Newton iterations in last solve 7)
+    q=(-1,2): Re ω̃_q − α = 7.887655e-04, Im ω̃_q = -1.0401e-04, ratio Im/gap = -1.319e-01
+    mode 1: ω = 0.295475043980  γ = +1.034694e-04  N = 1.976218e+01  L_N = -6.534615e-03  Ȧ = +1.662218e-06  (Ȧ/A = +1.662218e-04)
+    mode 2: ω = 0.298131904757  γ = -2.705176e-07  N = 1.898699e+04  L_N = +1.271768e-02  Ȧ = +1.162952e-10  (Ȧ/A = +1.162952e-07)
+  rule zero      (12 s; warm start from conjugate solution; Newton iterations in last solve 7)
+    q=(-1,2): Re ω̃_q − α = 7.898981e-04, Im ω̃_q = +0.0000e+00, ratio Im/gap = +0.000e+00
+    mode 1: ω = 0.295473931085  γ = +1.007867e-04  N = 2.014462e+01  L_N = -5.081598e-03  Ȧ = +1.267906e-06  (Ȧ/A = +1.267906e-04)
+    mode 2: ω = 0.298131914571  γ = -2.590567e-07  N = 1.898669e+04  L_N = +9.832001e-03  Ȧ = +8.263040e-11  (Ȧ/A = +8.263040e-08)
+  relative difference signed vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = +6.77e-06   Δγ/γ = +5.25e-02   ΔN/N = -3.16e-02   ΔL_N/L_N = +6.26e-01   ΔȦ/Ȧ = +6.79e-01
+    mode 2: Δω/ω = -6.30e-08   Δγ/γ = +8.71e-02   ΔN/N = +2.33e-05   ΔL_N/L_N = +6.49e-01   ΔȦ/Ȧ = +8.35e-01
+  relative difference zero vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = +3.01e-06   Δγ/γ = +2.52e-02   ΔN/N = -1.28e-02   ΔL_N/L_N = +2.65e-01   ΔȦ/Ȧ = +2.81e-01
+    mode 2: Δω/ω = -3.01e-08   Δγ/γ = +4.10e-02   ΔN/N = +7.46e-06   ΔL_N/L_N = +2.75e-01   ΔȦ/Ȧ = +3.04e-01
+
+====================================================================================================
+P5 largest A1, spindown a0=0.99 fa=3e-3
+  from spindown_a0.99_alpha0.3_fa3e-3_diagnostics.csv (max_A1): τ = 3.728462e+08, a = 0.983900, b = 0.995864, α = 0.298759, cosine; spindown-driver mesh of a₀ = 0.99
+  A = (2.6805441008e-02, 1.1095563607e-05)
+  rule conjugate (1301 s; continuation from cold; Newton iterations in last solve 10)
+    q=(-1,2): Re ω̃_q − α = 6.814087e-04, Im ω̃_q = +1.8239e-06, ratio Im/gap = +2.677e-03
+    mode 1: ω = 0.294933724694  γ = -5.258810e-09  N = 1.535005e+03  L_N = +1.606550e-05  Ȧ = -1.206382e-10  (Ȧ/A = -4.500513e-09)
+    mode 2: ω = 0.297187117792  γ = +9.145701e-07  N = 2.874152e+01  L_N = -5.257864e-05  Ȧ = +1.016097e-11  (Ȧ/A = +9.157684e-07)
+  rule signed    (7 s; warm start from conjugate solution; Newton iterations in last solve 4)
+    q=(-1,2): Re ω̃_q − α = 6.814075e-04, Im ω̃_q = +1.8349e-06, ratio Im/gap = +2.693e-03
+    mode 1: ω = 0.294933724677  γ = -5.267848e-09  N = 1.535005e+03  L_N = +1.626461e-05  Ȧ = -1.230049e-10  (Ȧ/A = -4.588804e-09)
+    mode 2: ω = 0.297187117179  γ = +9.148155e-07  N = 2.874134e+01  L_N = -5.267822e-05  Ȧ = +1.018002e-11  (Ȧ/A = +9.174858e-07)
+  rule zero      (10 s; warm start from conjugate solution; Newton iterations in last solve 6)
+    q=(-1,2): Re ω̃_q − α = 6.814081e-04, Im ω̃_q = +0.0000e+00, ratio Im/gap = +0.000e+00
+    mode 1: ω = 0.294933724685  γ = -5.263205e-09  N = 1.535005e+03  L_N = +1.615765e-05  Ȧ = -1.217478e-10  (Ȧ/A = -4.541905e-09)
+    mode 2: ω = 0.297187117485  γ = +9.146830e-07  N = 2.874146e+01  L_N = -5.261538e-05  Ȧ = +1.016795e-11  (Ȧ/A = +9.163982e-07)
+  relative difference signed vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = -5.90e-11   Δγ/γ = +1.72e-03   ΔN/N = -8.83e-09   ΔL_N/L_N = +1.24e-02   ΔȦ/Ȧ = +1.96e-02
+    mode 2: Δω/ω = -2.06e-09   Δγ/γ = +2.68e-04   ΔN/N = -6.18e-06   ΔL_N/L_N = +1.89e-03   ΔȦ/Ȧ = +1.88e-03
+  relative difference zero vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = -2.92e-11   Δγ/γ = +8.36e-04   ΔN/N = -1.41e-08   ΔL_N/L_N = +5.74e-03   ΔȦ/Ȧ = +9.20e-03
+    mode 2: Δω/ω = -1.03e-09   Δγ/γ = +1.23e-04   ΔN/N = -2.05e-06   ΔL_N/L_N = +6.99e-04   ΔȦ/Ȧ = +6.88e-04
+
+====================================================================================================
+P6 largest A2/A1, spindown a0=0.99 fa=1e-2
+  from spindown_a0.99_alpha0.3_fa1e-2_diagnostics.csv (max_ratio): τ = 1.500000e+09, a = 0.862894, b = 0.982670, α = 0.294801, cosine; spindown-driver mesh of a₀ = 0.99
+  A = (2.3439644466e-04, 2.0584662311e-05)
+  rule conjugate (1275 s; continuation from cold; Newton iterations in last solve 6)
+    q=(-1,2): Re ω̃_q − α = 5.710707e-04, Im ω̃_q = -2.1768e-09, ratio Im/gap = -3.812e-06
+    mode 1: ω = 0.291290312861  γ = -2.165742e-09  N = 2.021979e-01  L_N = +8.758140e-10  Ȧ = -5.076907e-13  (Ȧ/A = -2.165949e-09)
+    mode 2: ω = 0.293331187820  γ = -5.545143e-12  N = 1.721665e+02  L_N = +1.909429e-09  Ȧ = -1.183726e-16  (Ȧ/A = -5.750526e-12)
+  rule signed    (8 s; warm start from conjugate solution; Newton iterations in last solve 2)
+    q=(-1,2): Re ω̃_q − α = 5.710707e-04, Im ω̃_q = +2.1547e-09, ratio Im/gap = +3.773e-06
+    mode 1: ω = 0.291290312861  γ = -2.165747e-09  N = 2.021979e-01  L_N = +8.758627e-10  Ȧ = -5.077189e-13  (Ȧ/A = -2.166069e-09)
+    mode 2: ω = 0.293331187820  γ = -5.545131e-12  N = 1.721665e+02  L_N = +1.909331e-09  Ȧ = -1.183668e-16  (Ȧ/A = -5.750243e-12)
+  rule zero      (10 s; warm start from conjugate solution; Newton iterations in last solve 2)
+    q=(-1,2): Re ω̃_q − α = 5.710707e-04, Im ω̃_q = +0.0000e+00, ratio Im/gap = +0.000e+00
+    mode 1: ω = 0.291290312861  γ = -2.165744e-09  N = 2.021979e-01  L_N = +8.758384e-10  Ȧ = -5.077049e-13  (Ȧ/A = -2.166009e-09)
+    mode 2: ω = 0.293331187820  γ = -5.545137e-12  N = 1.721665e+02  L_N = +1.909380e-09  Ȧ = -1.183697e-16  (Ȧ/A = -5.750384e-12)
+  relative difference signed vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = +4.76e-15   Δγ/γ = +2.42e-06   ΔN/N = +5.84e-10   ΔL_N/L_N = +5.57e-05   ΔȦ/Ȧ = +5.57e-05
+    mode 2: Δω/ω = +0.00e+00   Δγ/γ = -2.22e-06   ΔN/N = -1.23e-12   ΔL_N/L_N = -5.11e-05   ΔȦ/Ȧ = -4.92e-05
+  relative difference zero vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = +2.67e-15   Δγ/γ = +1.21e-06   ΔN/N = +2.93e-10   ΔL_N/L_N = +2.79e-05   ΔȦ/Ȧ = +2.79e-05
+    mode 2: Δω/ω = +0.00e+00   Δγ/γ = -1.11e-06   ΔN/N = -5.48e-13   ΔL_N/L_N = -2.57e-05   ΔȦ/Ȧ = -2.47e-05

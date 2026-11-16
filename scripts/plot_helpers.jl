@@ -29,6 +29,16 @@ function log_axis_resample(times, series...; logarithmic, time_min, time_max, po
 end
 
 """
+    gev_file_name(name)
+
+Plot file name with f_a in GeV: replaces the `_fa<f_a/M_Pl>` of a results/ prefix (the solvers' input and output
+names) by `_fa<f_a in GeV>` to two significant figures, e.g. `_fa3e-3` → `_fa3.7e16`, `_fa0.0466873` → `_fa5.7e17`
+(M_Pl = 1.2209e19 GeV, non-reduced, as on the figure titles). Results file names keep f_a/M_Pl.
+"""
+gev_file_name(name) = replace(name, r"_fa([0-9.]+(?:e-?[0-9]+)?)(?=_|\.png$|$)" =>
+    matched -> "_fa" * replace(@sprintf("%.1e", parse(Float64, matched[4:end]) * 1.2209e19), "e+" => "e"))
+
+"""
     potential_name(prefix)
 
 Short name of the potential of a spin-down run, from its results/ prefix or Slurm log path: scripts/evolution_spindown.jl
@@ -43,10 +53,10 @@ Text shown on a figure for a run. The short run names used in file names and on 
 Runs are described by what is in the equations: the free-field runs are "linear", and the linear benchmarks say where
 their rates come from. A name not listed here is shown unchanged.
 """
-display_label(run_name) = get(Dict("free" => "linear (no self-interaction)",
+display_label(run_name) = get(Dict("free" => "linear (ours)",
                                    "cosine" => "self-interacting (cosine)",
                                    "chiral" => "self-interacting (QCD potential)",
                                    "two-level cosine" => "perturbative two-level model (cosine)",
-                                   "Leaver" => "linear, exact rates (Leaver)",
-                                   "free (Leaver)" => "linear, exact rates (Leaver)",
+                                   "Leaver" => "linear (Leaver)",
+                                   "free (Leaver)" => "linear (Leaver)",
                                    "hydrogenic" => "linear, small-α rates"), run_name, run_name)

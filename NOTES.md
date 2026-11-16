@@ -1,5 +1,96 @@
 # Progress notes
 
+## 2026-11-14: reviewer loose ends D, E, G, H (`docs/loose-ends.txt`)
+
+Draft text for `docs/multiphase.tex` is in `docs/multiphase-drafts.tex` (not pasted in). All numbers below are
+a = 0.9 (or the run's own spin), α ≈ 0.3, cosine potential, at a few points only. Nothing is committed.
+
+- **Driven-component growth rule is now a switch** (`RadialProblem(...; driven_growth_rule)`, `:conjugate`
+  default = Σ|q_i|γ_i, `:signed` = q·γ, `:zero`; fundamentals keep their eigenvalues). `Pkg.test()`: 164/164,
+  Jacobian-vs-ForwardDiff under all three rules. The rule is a prescription, not a derived result.
+- **Effect of the rule on the fixed-background action-balance rates** (`validation/driven_growth_rule_bracket.jl`):
+  it is controlled by Im ω̃_q/(ω_q − α) of the near-threshold (−1, 2) component.
+
+  | point | Im ω̃_q/(ω_q − α) | spread of Ȧ over the three rules |
+  |---|---|---|
+  | A = (1e-2, 1e-4), default mesh | 2e-4 to 9e-4 | 4e-3, 2e-3 |
+  | A = (1e-2, 1e-3), default mesh | ±0.13 | 28 % to 84 % |
+  | largest A₁ of `spindown_a0.99_fa3e-3` | 2.7e-3 | 2e-2 (Ȧ₁, near-cancelled), 2e-3 (Ȧ₂) |
+  | largest A₂/A₁ of `spindown_a0.99_fa1e-2` | 4e-6 | 6e-5 |
+
+  Not run: contained-mesh versions of the first two points and the largest-A₂ trajectory point (points 3, 4, 7
+  of the script); chiral potential; any re-evolved trajectory.
+- **Stored trajectories** (`validation/threshold_distance_along_trajectories.py`, CSV post-processing): in all 27
+  Julia-solver runs ω_q − α stays positive (4.8e-4 to 7.1e-4 at α = 0.3), |Im ω̃_q|/(ω_q − α) ≤ 5.2e-3, and
+  A₂ ≤ 7.8e-5 at α = 0.3, so A = (1e-2, 1e-3) is never reached. **Every stored Julia-solver result was produced
+  with the old signed rule** (inferred from file times against the edit time of `src/modes.jl`, not from job logs).
+- **Actions are full-field, finite-domain** (`validation/domain_actions_check.jl`): N_i sums all components,
+  radiating ones included, between the mesh endpoints, no analytic tail. At A = (1e-2, 1e-3), outer r* 500 → 700:
+  N₁ −35 %, L_N −35 %, n_(−1,2) +28 %, Ȧ +1.3 % and +2.2 %. Removing the (−1, 2) tail from ∂N/∂A alone moves Ȧ
+  by 35–70 %. Linear point: Ȧ identical to 8 digits at 500/700/1000. Open: the nonlinear r* = 1000 run did not
+  finish, so the 1–2 % has no convergence trend and no identified cause.
+- **D_k = ∂_{A_k}E − Σ ω_i ∂_{A_k}N_i**: |D_k/∂_{A_k}E| ≤ 1e-9 at the linear point (r*_max ≥ 500, any inner
+  endpoint); (−1.7e-5, +1.5e-6) at r* = 500 and (−8e-6, +1.7e-6) at 700 for A = (1e-2, 1e-3), where energy and
+  action balance differ by 1e-5 to 1e-4 in Ȧ. The earlier "1e-7" is the linear point, r*_max = 400, with metric
+  work. E and N are separate integrals, so D_k is a real check; L_E = Σ ω L_N, L_J = Σ m L_N, J = Σ m N and the
+  cancellation of w hold by construction.
+- **Follow-up runs (same day, Slurm).** `Pkg.test()` in this checkout with the rule switch: 164/164.
+  - *Reruns under the conjugate rule*, sped-up code (worktree `axion-sr-sim-speedup/conjugate-rule`, branch
+    `speedup/conjugate-rule` = 057a167 + conjugate-rule port, tests 305/305), same commands as the stored batch,
+    output in `results/conjugate_rule/`. Against the stored signed-rule `_solution.csv` at the 60 saved times:
+    max relative change of A₁, A₂ ≤ 2.5e-3 (a0.99 fa3e-3 cosine 2.5e-3/1.4e-3; a0.9 fa3e-3 t1e10 3e-5/2.1e-3;
+    fa5.1255e-3 1.6e-3/9e-4; chiral a0.99 fa3e-3 9e-4/2e-4; chiral a0.9 fa3e-3 t1e10 2.4e-3/4e-4; both fa0.466873
+    runs ≤ 2e-8); spin changes ≤ 2.3e-5. Still queued when this was written: the two fa0.0466873 t1e11 and the
+    two a0.99 fa1e-2 runs (cosine and chiral). Not rerun: Omiya fig. 6, fixed background, rate-map/plateau/peak scans.
+  - *Outer-endpoint scan at A = (1e-2, 1e-4)*: Ȧ changes by 1.9e-5 and 7.5e-5 from r* = 500 to 700;
+    D_k/∂_{A_k}E ≤ 6e-7; energy vs action balance ≤ 4e-7. So the 1–2 % endpoint dependence at A = (1e-2, 1e-3)
+    belongs to the regime where Im k of the (−1, 2) wave is large (1.3e-3, tail density falls by a third from
+    r* = 500 to 700), i.e. the same regime where the growth rule fails.
+  - *Inner endpoint at A = (1e-2, 1e-3)*, −40/−60/−80: Ȧ and D_k unchanged to 2e-6.
+  - *r* = 850 and 1000 do not converge* at either point (30 Newton iterations, also with 25 continuation steps),
+    so there is still no third endpoint. Consistent with the Day 3 note that pushing r*_max out fails with the
+    present normalisation.
+  - *Rule bracket on the contained mesh* (points 3, 4, 7): the rule matters more on the larger domain.
+    A = (1e-2, 1e-4): spread of Ȧ 1.4 % (0.4 % on the default mesh). A = (1e-2, 1e-3): signed and zero rules give
+    Ȧ of different sign or 7× larger than conjugate, N₁ negative under the signed rule. Largest-A₂ point of
+    `spindown_a0.99_fa3e-3`: Ȧ₁ 6e-4, Ȧ₂ 4.7 % (a near-cancelled rate, Ȧ₂/A₂ = 2.5e-9).
+- **D_k is fully explained** (`validation/energy_action_residual_decomposition.jl`, logs in
+  `validation/logs/energy_action_residual/`). E = Σ ω_i N_i − L̄ term by term (Killing = canonical energy for a
+  scalar), so integrating the radial kinetic term of L̄ by parts gives D_k = S_k + G_k, with
+  S_k = 4π[(r²+a²) Σ Re(Q* ∂_A R)] from r_in to r_out (surface) and G_k = 4π Re ∫dr* (r²+a²) Σ δ ∂_A R*, δ = dQ/dr*
+  right-hand side at real ω_q minus at complex ω̃_q (growth). Checked at A = (1e-6,1e-7), (1e-2,1e-4), (1e-2,1e-3)
+  on r* ∈ [−60, 500] step 0.4 and 0.2 and [−60, 700] step 0.4: |D − S − G| ≤ 1.6e-10 |∂E/∂A|, shrinking with the
+  step. Linear: D₂ at r* = 500 is exactly the outer surface term of the uncontained |322⟩ tail and drops to
+  quadrature level at 700. Nonlinear: S_out (radiating (−1, 2) wave, does not shrink with r_out) and G are
+  comparable; S_in is small.
+- **Open:** the Ḟ_q formulation (only needed for A₂ ≳ 1e-3); whether `results/conjugate_rule/` replaces the
+  stored results; solver failure for r*_max ≥ 850.
+
+### Two-level model with Witte & Mummery relativistic rates (same day)
+
+- `scripts/leaver_spindown.py` has `AXION_QUARTIC_RATES=witte`: the two Table I rate constants of the two-level model
+  are replaced by the relativistic values of Witte & Mummery (2412.03655), copied unchanged into
+  `data/witte_mummery_quartic_rates.csv` from their public code (github.com/SamWitte/Axion_SR_TDE at bac01b2,
+  `src/rate_sve/Rates.zip`). Their BH-channel table is computed at a = 0.95; other spins use the leading-order
+  factor 1 + √(1 − a²), as in their code.
+- Ratio to Table I at α = 0.3: 2.31 (211×211→322×BH), 1.39 (322×322→211×∞). Small-α check of the convention: the
+  ∞ channel goes to 1.0–1.2 as α → 0.03; the BH channel does not (1.25 at α = 0.03, peak ≈ 6 at α ≈ 0.17, 2.3 at
+  0.3). That bump is not understood.
+- Runs (Slurm 27857492, 27857493; LSODA, a₀ = 0.9, α₀ = 0.3, cosine coupling), compared with the full cosine run:
+
+  | f_a/M_Pl | quantity | full | Table I | Witte |
+  |---|---|---|---|---|
+  | 3e-3 | peak 𝒩₂₁₁ | 1086 | 1561 | 1027 |
+  | 3e-3 | max \|a − a_full\|, t ≥ 8e8 | — | 4.5e-3 | 3.6e-4 |
+  | 0.0466873 | t at which 𝒩₃₂₂ = 1 | 2.82e10 | 5.71e10 | 2.34e10 |
+  | 0.0466873 | max \|a − a_full\|, t ≥ 1e10 | — | 4.8e-3 | 2.1e-3 |
+
+  With the relativistic constants the two-level model lies on the full run's spin curve at f_a/M_Pl = 3e-3; the
+  "two-level model spins down about twice as fast" seen with Table I was the leading-order error in Table I. At
+  0.0466873 the full run lies between the two, nearer Witte. Full runs used the old signed growth rule
+  (cosine 0.0466873 conjugate rerun not available). Figures:
+  `plots/spindown_overlay_cosine_twolevel_witte_a0.9_alpha0.3_fa{3e-3_t1e10,0.0466873_t1e11}_compact.png`.
+
 ## Day 4 (2026-11-09)
 
 - **`balance=:action` is now the default** in `amplitude_rates` (both methods), `EvolutionCache`,

@@ -257,7 +257,7 @@ end
 """Right-hand side as a real node block, with the mode frequencies given as interleaved reals."""
 function rhs_block(problem::RadialProblem, s, block::AbstractVector, frequency_reals::AbstractVector, scale)
     T = _assembly_eltype(problem, block, frequency_reals, scale, s)
-    frequencies = component_frequencies(problem.mode_set, _complexify(frequency_reals))
+    frequencies = component_frequencies(problem.mode_set, _complexify(frequency_reals), problem.driven_growth_rule)
     return rhs_block!(zeros(T, length(block)), NodeWorkspace{T}(problem), problem, s, block, frequencies, scale)
 end
 
@@ -326,7 +326,7 @@ function boundary_residual(problem::RadialProblem, layout::UnknownLayout, side::
                            parameter_block::AbstractVector, amplitudes::AbstractVector, scale)
     mode_set = problem.mode_set
     parameters = RadialParameters(layout, parameter_block, amplitudes, scale)
-    frequencies = component_frequencies(mode_set, parameters.mode_frequencies)
+    frequencies = component_frequencies(mode_set, parameters.mode_frequencies, problem.driven_growth_rule)
     leading = side == :horizon ? parameters.horizon_leading : parameters.outer_leading
     state = NodeState(block)
     offset = endpoint_offset(problem, side)
@@ -357,7 +357,7 @@ function residual!(result::AbstractVector, problem::RadialProblem, layout::Unkno
                    amplitudes::AbstractVector, scale; node_workspaces=nothing)
     T = eltype(result)
     parameter_block = unknowns[parameter_range(layout)]
-    frequencies = component_frequencies(problem.mode_set, _complexify(parameter_block[frequency_range(layout)]))
+    frequencies = component_frequencies(problem.mode_set, _complexify(parameter_block[frequency_range(layout)]), problem.driven_growth_rule)
     node_rhs = zeros(T, node_block_size(layout), layout.n_nodes)
     # The boundary rows run as a separate task, concurrently with the node and interval passes.
     boundary_task = Threads.@spawn for (side, node, rows) in ((:horizon, 1, horizon_rows(layout)),
@@ -479,13 +479,14 @@ function rhs_derivatives!(wrt_state::AbstractMatrix, wrt_frequencies::AbstractMa
                 other_channel == channel && (factor += delta_B)
                 _add_complex_block!(wrt_state, 4channel - 1, 4other_channel - 3, -factor / sum_r2a2^2)
             end
-            # ∂(forcing)/∂ω̃_q, then chain through ω̃_q = Σ_i q_i ω_i + i Σ_i |q_i| γ_i.
+            # ∂(forcing)/∂ω̃_q, then chain through ω̃_q = Σ_i q_i ω_i + i Σ_i w_i γ_i, with w_i from `driven_growth_weights`.
             forcing_wrt_frequency = (2sum_r2a2 * (sum_r2a2 * frequency - a * m) + horizon_function * (2a * m - 2a^2 * frequency)) *
                                     profiles[channel] + horizon_function * 2a^2 * frequency * coupled
+            growth_weights = driven_growth_weights(component, problem.driven_growth_rule)
             for mode_index in eachindex(component.q)
                 wrt_component_frequency = -forcing_wrt_frequency / sum_r2a2^2
                 wrt_real_part = wrt_component_frequency * component.q[mode_index]
-                wrt_imag_part = im * wrt_component_frequency * abs(component.q[mode_index])
+                wrt_imag_part = im * wrt_component_frequency * growth_weights[mode_index]
                 wrt_frequencies[4channel - 1, 2mode_index - 1] = real(wrt_real_part)
                 wrt_frequencies[4channel, 2mode_index - 1] = imag(wrt_real_part)
                 wrt_frequencies[4channel - 1, 2mode_index] = real(wrt_imag_part)
@@ -519,7 +520,7 @@ frequencies given as interleaved reals.
 function rhs_derivatives(problem::RadialProblem, s, block::AbstractVector, frequency_reals::AbstractVector, scale)
     T = _assembly_eltype(problem, block, frequency_reals, scale, s)
     workspace = NodeWorkspace{T}(problem)
-    frequencies = component_frequencies(problem.mode_set, _complexify(frequency_reals))
+    frequencies = component_frequencies(problem.mode_set, _complexify(frequency_reals), problem.driven_growth_rule)
     wrt_state, wrt_frequencies = rhs_derivatives!(zeros(T, length(block), length(block)),
                                                   zeros(T, length(block), length(frequency_reals)),
                                                   workspace, problem, s, block, frequencies, scale)
@@ -596,7 +597,7 @@ function boundary_jacobian!(wrt_parameters::AbstractMatrix, problem::RadialProbl
                             parameter_block::AbstractVector, amplitudes::AbstractVector, scale)
     mode_set = problem.mode_set
     parameters = RadialParameters(layout, parameter_block, amplitudes, scale)
-    frequencies = component_frequencies(mode_set, parameters.mode_frequencies)
+    frequencies = component_frequencies(mode_set, parameters.mode_frequencies, problem.driven_growth_rule)
     leading = side == :horizon ? parameters.horizon_leading : parameters.outer_leading
     offset = endpoint_offset(problem, side)
     leading_offset = side == :horizon ? 2layout.n_modes : 2layout.n_modes + 2layout.n_channels
@@ -614,9 +615,11 @@ function boundary_jacobian!(wrt_parameters::AbstractMatrix, problem::RadialProbl
             node_block(NodeState(profiles, slopes))
         end
         rows = 4first(channels) - 3:4last(channels)
-        for (mode_index, weight) in enumerate(mode_set.components[component_index].q)
+        component = mode_set.components[component_index]
+        growth_weights = driven_growth_weights(component, problem.driven_growth_rule)   # Im ω̃_q = Σ_i w_i γ_i
+        for (mode_index, weight) in enumerate(component.q)
             wrt_parameters[rows, 2mode_index - 1] .-= weight .* view(derivatives, :, 1)
-            wrt_parameters[rows, 2mode_index] .-= abs(weight) .* view(derivatives, :, 2)   # Im ω̃_q = Σ_i |q_i| γ_i
+            wrt_parameters[rows, 2mode_index] .-= growth_weights[mode_index] .* view(derivatives, :, 2)
         end
         for (local_index, channel) in enumerate(channels)
             leading_index[channel] == 0 && continue
@@ -743,7 +746,7 @@ function jacobian_blocks!(workspace::JacobianWorkspace, problem::RadialProblem, 
                           unknowns::AbstractVector, amplitudes::AbstractVector, scale; node_workspaces=nothing)
     mesh, blocks = problem.mesh, workspace.blocks
     parameter_block = unknowns[parameter_range(layout)]
-    frequencies = component_frequencies(problem.mode_set, _complexify(parameter_block[frequency_range(layout)]))
+    frequencies = component_frequencies(problem.mode_set, _complexify(parameter_block[frequency_range(layout)]), problem.driven_growth_rule)
     node_rhs, node_wrt_state, node_wrt_frequencies = workspace.node_rhs, workspace.node_wrt_state, workspace.node_wrt_frequencies
     # The boundary blocks run as a separate task, concurrently with the node and interval passes.
     boundary_task = Threads.@spawn for (side, wrt_node, wrt_parameters) in

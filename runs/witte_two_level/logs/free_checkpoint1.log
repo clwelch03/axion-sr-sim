@@ -1,0 +1,14 @@
+f_a = 3.66e16 GeV, kappa = 9.0e-6, initial_occupation u = 2.7e-11, years per M0 = 1.5638632502319791e-12, end time = 0.015638632502319793 yr, bosenova cap u(211) = 0.11914781026947956
+Resuming with overridden u0 at t_start=0.0  spin=0.9  mass=10.000000000000002
+track_alpha: f_edd=0.0, Mdot=0.0 M_sun/yr, dlnM/dt=0.0/yr; SR grid 152 masses, scattering grid 9 masses in [7.0, 10.2] M_sun
+GW (off): 0 annihilation + 0 transition channels, 2 of 2 levels (those in scattering channels)
+keep_levels: evolving 2 of 6 levels, 0 scattering channels
+ODE wall-clock limit: 108.0 h (then save and exit)
+solver retcode: Success  t_end = 0.015638632502319793 of 0.015638632502319793  [setup 8.4 s, integration 7.6 s, 79 steps, 689 RHS calls]
+modes evolved: Any[(2, 1, 1, 0.3447339534502923), (3, 2, 2, 0.6894679069005846)]
+final t = 0.015638632502319793 of 0.015638632502319793 yr; spin = 0.8691528252615474  mass = 9.80860036840592
+wrote /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/runs/witte_two_level/results/witte_free_fa3e-3_t1e10_raw.csv (1000001 rows)
+
+real	0m42.235s
+user	0m37.690s
+sys	0m2.009s

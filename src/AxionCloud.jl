@@ -16,6 +16,8 @@ using SparseArrays
 using ForwardDiff
 using FastGaussQuadrature: gausslegendre
 using OrdinaryDiffEqTsit5
+using OrdinaryDiffEqRosenbrock: Rosenbrock23, Rodas5P
+using OrdinaryDiffEqBDF: FBDF, QNDF
 
 include("kerr.jl")
 include("potential.jl")
@@ -25,6 +27,7 @@ include("field.jl")
 include("series.jl")
 include("radial.jl")
 include("bvp.jl")
+include("block_factorization.jl")
 include("initial_guess.jl")
 include("charges.jl")
 include("evolution.jl")
@@ -40,10 +43,11 @@ export OuterBoundary, IntegratedOuterData, integrated_outer_values, is_propagati
 export RadialMesh, DomainEstimate, domain_estimate, RadialProblem, solve_radial, RadialSolution, profiles, slopes, mode_frequencies, growth_rates
 export Charges, cloud_charges, component_charges, outward_flux, boundary_losses, charge_jacobian
 export phase_actions, action_flux, action_losses, action_jacobian, amplitude_response
-export with_background, amplitude_rates, evolve_fixed_background, evolve_with_spindown
+export with_background, amplitude_rates, evolve_fixed_background, evolve_with_spindown, accepted_radial_solution!
 export BackgroundState, BackgroundDerivatives, balance_terms, background_charge_derivatives, metric_work, boyer_lindquist_metric_work,
        EvolutionCache, EvolutionResult, EvolutionDiagnostics,
-       AmplitudeTrajectory, amplitude_trajectory
+       AmplitudeTrajectory, amplitude_trajectory, SolutionTangents, solution_tangents, predicted_change
+export FiniteDifferenceJacobian, RadialSolveCounts, total_solves, Rosenbrock23, Rodas5P, FBDF, QNDF
 export amplitudes_for_energy, fundamental_energies, with_potential
 
 end

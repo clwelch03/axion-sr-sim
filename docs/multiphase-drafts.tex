@@ -1,0 +1,157 @@
+% Drafts for docs/multiphase.tex, items D, E, G, H of docs/loose-ends.txt (2026-11-14).
+% multiphase.tex itself was not edited. Paste by hand.
+%
+% Layout: PART A is what goes inline in the explanatory text (one or two sentences per item, plus the
+% units and black-hole equations, which are content and not caveats). PART B is a new final section,
+% "Approximations and open issues", that holds the qualifications and the measured numbers (items D, E, G; the energy-balance check of
+% item H is a passed cross-check and stays inline in A5).
+% Evidence and caveats behind every number are in NOTES.md (2026-11-14 entry).
+% New label used: sec:open_issues (Part B).
+
+
+%######################################################################
+% PART A. Inline changes
+%######################################################################
+
+%----------------------------------------------------------------------
+% A1 (item D). Section 2.1, after the displayed equation
+%     \tilde{\omega}_{\mathbf q} = \mathbf q\cdot\boldsymbol{\omega} + i\sum_i |q_i|\,\gamma_i ,
+% REPLACES the rest of that paragraph, from "since a component containing $\phi_i^*$ grows ..."
+% through "... the slow time derivatives $\dot F_{\mathbf q}$ that are dropped."
+%----------------------------------------------------------------------
+
+since a component containing $\phi_i^*$ grows, rather than decays, with $\gamma_i$; for example $\phi_{211}^{\,2}\phi_{322}^{*}$ has complex frequency $2\tilde\omega_{211}-\tilde\omega_{322}^{*}$~\cite{Omiya_2022}. For the driven components this is a prescription, not a derived result; see Section~\ref{sec:open_issues}.
+
+
+%----------------------------------------------------------------------
+% A2 (item E). Section 1.2, directly after the displayed equation
+%     \mathcal{D}_\mathbf{q} F_\mathbf{q} - \alpha^2 F_\mathbf{q}
+%       + \alpha^2 \langle e^{+i\mathbf{q}\cdot\boldsymbol{\xi}} h(\Phi)\rangle_{\boldsymbol\xi} = 0.
+% and before "Inserting \eqref{eq:spatial_profile_Fq}, ..."
+%----------------------------------------------------------------------
+
+Averaging over $\boldsymbol\xi$ assumes that every phase combination surviving the azimuthal integration oscillates fast compared with the evolution. This holds for $\ket{211}$ and $\ket{322}$, and must be rechecked when more modes are added (Section~\ref{sec:open_issues}).
+
+
+%----------------------------------------------------------------------
+% A3 (item G). Section 3, directly after Eq. \eqref{eq:wave_action}. REPLACES the clause
+%     "where $n_\mathbf{q}$ is the Klein--Gordon charge of component $\mathbf{q}$,
+%      integrated over the cloud as in~\cite{Hayes_1970}."
+% New notation: r_in, r_out.
+%----------------------------------------------------------------------
+
+where $n_\mathbf{q}$ is the Klein--Gordon charge of component $\mathbf{q}$ as in~\cite{Hayes_1970}. The radial integral runs over the numerical domain, from the inner endpoint $r_\mathrm{in}$ to the outer endpoint $r_\mathrm{out}$, and the sum includes every retained component, bound or propagating; the $\mathcal{N}_i$ are finite-domain actions of the full field (Section~\ref{sec:open_issues}).
+
+
+%----------------------------------------------------------------------
+% A4 (item H, units and black-hole equations). Section 3, paragraph after Eq. \eqref{eq:action_balance}.
+% REPLACES the sentence "All quantities use consistent fixed reference units." and continues as a new
+% paragraph before "The cloud energy, angular momentum, and their boundary fluxes are related ...".
+% New notation: hats for snapshot (current-mass) units, \alpha_0, M_Pl.
+% Note: this also corrects the existing text, where L_N = F(outer) - F(inner) "(per unit tau)" is
+% missing a factor of b: the flux formula written with R and Q is the hatted snapshot flux.
+%----------------------------------------------------------------------
+
+The radial solve works in units of the current black-hole mass; we mark its outputs with a hat. The evolution uses the initial mass $M_0$, with $\tau=t/M_0$ and actions in units of $f_a^2M_0^2$. At background $(b,j)$ the snapshot is solved with $\alpha=b\,\alpha_0$ and spin $j/b^2$, and
+\begin{equation}
+    \label{eq:reference_units}
+    \omega_i = \hat\omega_i/b, \qquad
+    \mathcal{N}_i = b^2\hat{\mathcal{N}}_i, \qquad
+    L_{\mathcal{N}_i} = b\,\hat L_{\mathcal{N}_i}, \qquad
+    E = b\hat E, \qquad
+    J = b^2\hat J, \qquad
+    \bar{\mathcal L} = b\,\hat{\bar{\mathcal L}},
+\end{equation}
+where the integrals for $\bar{\mathcal L}$ and $\mathcal N_i$ and the flux formula above give the hatted quantities, and the Legendre relation for $E$ and all background derivatives below use the reference-unit ones. The black hole absorbs the fluxes through the inner endpoint:
+\begin{equation}
+    \label{eq:black_hole_evolution}
+    \frac{db}{d\tau} = -\left(\frac{f_a}{M_\mathrm{Pl}}\right)^{2}\sum_i\hat\omega_i\,\hat F_{\mathcal{N}_i}(r_\mathrm{in}),
+    \qquad
+    \frac{dj}{d\tau} = -\left(\frac{f_a}{M_\mathrm{Pl}}\right)^{2} b\sum_i m_i\,\hat F_{\mathcal{N}_i}(r_\mathrm{in}),
+\end{equation}
+with fluxes positive outward and $M_\mathrm{Pl}$ the non-reduced Planck mass.
+% Dropped from the longer draft (all checked against src/evolution.jl:269-288, 514-516, 540):
+% L_E = \hat L_E, L_J = b \hat L_J; these follow from
+% \hat\omega = M_BH \omega_phys, E_phys = f_a^2 M_BH \hat E, J_phys, N_phys = f_a^2 M_BH^2 \hat{...}, and fluxes
+% being per unit t/M_BH in the snapshot and per unit tau in the evolution. Background derivatives hold the
+% tortoise mesh fixed in units of the current mass.
+
+
+%----------------------------------------------------------------------
+% A5 (item H, energy balance). Section 3, REPLACES everything from
+%     "Once the cloud is contained in the domain, the expression for $E$ gives ..."
+% through the end of "... on a contained domain they agree to $10^{-7}$ in the amplitude rates."
+% The labels eq:evolving_background_balance and eq:metric_work are kept. New notation: D_k.
+%----------------------------------------------------------------------
+
+Differentiating the expression for $E$ along the evolution gives
+\begin{equation}
+    \label{eq:energy_action_residual}
+    \frac{dE}{d\tau}-\sum_i\omega_i\,\frac{d\mathcal{N}_i}{d\tau} = w+\sum_k D_k\,\frac{dA_k}{d\tau},
+    \qquad
+    D_k \equiv \partial_{A_k}E-\sum_i\omega_i\,\partial_{A_k}\mathcal{N}_i ,
+\end{equation}
+with the rate of metric work on the cloud (positive when it adds energy)
+\begin{equation}
+    \label{eq:metric_work}
+    w = \Big(\partial_b E-\sum_i\omega_i\,\partial_b\mathcal{N}_i\Big)\dot{b} + \Big(\partial_j E-\sum_i\omega_i\,\partial_j\mathcal{N}_i\Big)\dot{j},
+\end{equation}
+which reduces to $w=\sum_i\mathcal{N}_i\,d\omega_i/d\tau$ in the linear regime once the cloud is contained in the domain. When the residuals $D_k$ vanish, multiplying \eqref{eq:evolution_law} by the frequencies and azimuthal numbers recovers the energy and angular-momentum balance
+\begin{equation}
+    \label{eq:evolving_background_balance}
+    \begin{pmatrix}
+    \partial_{A_1} E & \partial_{A_2} E \\
+    \partial_{A_1} J & \partial_{A_2} J \\
+    \end{pmatrix}\begin{pmatrix}\dot{A}_1 \\ \dot{A}_2\end{pmatrix} = -\begin{pmatrix}L_E \\ L_J\end{pmatrix} + \begin{pmatrix}w \\ 0\end{pmatrix} - \begin{pmatrix}(\partial_b E)\dot{b} + (\partial_j E)\dot{j} \\ (\partial_b J)\dot{b} + (\partial_j J)\dot{j}\end{pmatrix}.
+\end{equation}
+Integrating the radial kinetic term of $\bar{\mathcal L}$ by parts shows that $D_k$ is the sum of a surface term at the two endpoints and a term proportional to the imaginary parts of the frequencies, so it vanishes only for a contained cloud with real frequencies. Numerically $|D_k/\partial_{A_k}E|\le6\times10^{-7}$ at the amplitudes our evolutions reach. We evolve with the action balance \eqref{eq:action_balance}, which does not require $D_k=0$.
+% Longer version, if wanted (e.g. for an appendix):
+%   D_k = 4\pi[(r^2+a^2) \sum_{l,q} Re(Q^* \partial_{A_k} R)]_{r_in}^{r_out}
+%       + 4\pi Re \int dr_* (r^2+a^2) \sum_{l,q} \delta_{l,q} \partial_{A_k} R^*,
+%   \delta_{l,q} = (dQ/dr_* right-hand side at real \omega_q) - (same at complex \tilde\omega_q).
+%   Uses E = \sum_i \omega_i N_i - \bar L term by term (Killing = canonical energy for a scalar).
+% Check: validation/energy_action_residual_decomposition.jl, a = 0.9, alpha = 0.3, cosine, three meshes:
+%   |D - S - G| <= 2e-10 |dE/dA| (quadrature error, shrinks with the step).
+%   |D/dE| < 1e-10 linear and contained; <= 6e-7 at A = (1e-2,1e-4); <= 2e-5 at (1e-2,1e-3).
+%   Nonlinear: the outer surface term (radiating (-1,2) wave, does not shrink with r_out) and the growth
+%   term are comparable.
+% For the reviewer: L_E = sum omega L_N, J = sum m N hold by construction and w cancels the background
+%   terms by definition, so the energy-vs-action agreement tests only sum_k D_k dA_k/dtau.
+
+
+%----------------------------------------------------------------------
+% A6 (reviewer item 4, boundary convention). Section 2.2.2 (outer boundary conditions), directly after the
+% paragraph that ends "... its leading phase is $k_{\mathbf q}r-\omega_{\mathbf q}t$ ..." (the branch choice for
+% real frequencies). Checked against src/series.jl:77-78 (horizon exponent, linear in the frequency) and
+% src/series.jl:160 (outer_wavenumber: branch chosen by Re(omega) < alpha, principal square roots).
+%----------------------------------------------------------------------
+
+In the solve, these real-frequency formulas are continued to the complex $\tilde\omega_{\mathbf q}$, keeping the branch of $k_{\mathbf q}$ selected by the sign of $\mathrm{Re}\,\tilde\omega_{\mathbf q}-\alpha$. Near threshold this continuation is part of the growth-rate approximation of Section~\ref{sec:open_issues}.
+
+%----------------------------------------------------------------------
+% A7 (reviewer item 3, scope). First sentence of Section \ref{sec:open_issues}, directly after
+% \section{Approximations and open issues}.
+%----------------------------------------------------------------------
+
+The numbers in this section are for $\alpha=0.3$ and the cosine potential, except the $0.3\%$, which also covers the chiral potential.
+
+%######################################################################
+% PART B. New final section, before \bibliography
+%######################################################################
+
+\section{Approximations and open issues}\label{sec:open_issues}
+
+\paragraph{Growth rates of the driven components.} The rule $\mathrm{Im}\,\tilde\omega_{\mathbf q}=\sum_i|q_i|\gamma_i$ is exact for the lowest-order source, but higher-order products with the same label grow at other rates, so it is a prescription. The evolution never sets $\dot A_i=\gamma_iA_i$; the prescription enters only through the driven profiles in the boundary fluxes. Replacing it by $\sum_iq_i\gamma_i$ changes the amplitudes in our evolutions by at most $0.3\%$. It becomes inadequate for $A_{322}\gtrsim10^{-3}$, where the imaginary part assigned to the near-threshold component $\mathbf q=(-1,2)$ is no longer small compared with $\omega_{\mathbf q}-\alpha$. Beyond that, the slow time dependence of the driven components has to be solved for and not assigned.
+
+\paragraph{Phase averaging.} The averaged quantities contain cross terms between components $\mathbf{q}$ and $\mathbf{q}'$, with phase factor $e^{-i(\mathbf{q}-\mathbf{q}')\cdot\boldsymbol{\xi}}=e^{-i(\omega_\mathbf{q}-\omega_{\mathbf{q}'})t}\,e^{i(m_\mathbf{q}-m_{\mathbf{q}'})\varphi}$, and likewise for higher products. Such a term survives the azimuthal integration only if $m_\mathbf{q}=m_{\mathbf{q}'}$, and then averages out in time if $|\omega_\mathbf{q}-\omega_{\mathbf{q}'}|$ is large compared with the evolution rates. For $\ket{211}$ and $\ket{322}$, $\mathbf{q}-\mathbf{q}'$ must be a multiple of $(2,-1)$, with frequency of order $\alpha$. With more modes this can fail: for $\ket{211}$, $\ket{322}$, $\ket{433}$ the combination $\xi_{211}-2\xi_{322}+\xi_{433}$, that is $\mathbf{q}-\mathbf{q}'=(1,-2,1)$, has $m_\mathbf{q}=m_{\mathbf{q}'}$ and hydrogenic frequency $-(13/288)\,\alpha^3\approx-1.2\times10^{-3}$ at $\alpha=0.3$. In the same units, the fractional amplitude rates $|\dot A_i/A_i|$ in our two-mode evolutions at $\alpha=0.3$ stay below $2.5\times10^{-6}$, about 500 times smaller, but the three-mode system has not been run. If such a combination becomes slow, it must be kept as a variable and not averaged over.
+
+\paragraph{Finite-domain actions.} No analytic tail is added to $\mathcal{N}_i$ beyond $r_\mathrm{out}$, so the charge of an outgoing component grows with $r_\mathrm{out}$. The balance \eqref{eq:evolution_law} remains consistent because the same component enters the flux. For $a=0.9$, $\alpha=0.3$ and the cosine potential, moving $r_\mathrm{out}$ from $r_*=500$ to $700$ changes the amplitude rates by less than $10^{-4}$ at $\mathbf A=(10^{-2},10^{-4})$, and by $1$--$2\%$ at $\mathbf A=(10^{-2},10^{-3})$, where the growth-rate prescription above is already inadequate.
+
+% Notes not in the text (details in NOTES.md):
+% - 0.3% is from 7 of 11 reruns (cosine and chiral, results/conjugate_rule/); 4 were still queued.
+% - A_322 >~ 1e-3 rests on snapshot comparisons at A = (1e-2, 1e-3) only.
+% - Finite-domain numbers: two outer endpoints only; the solver does not converge for r* >= 850.
+% - L_E = sum_i omega_i L_N_i, L_J = sum_i m_i L_N_i and J = sum_i m_i N_i hold by construction in the
+%   code, so D_k is the only independent content of the energy-versus-action comparison.
+% - In the spin-down runs r_in = r_+ + 1e-6 (r_+ - r_-), and r_out is where every bound component is
+%   below 1e-4 of its peak.

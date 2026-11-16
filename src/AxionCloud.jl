@@ -37,7 +37,7 @@ export KerrBackground, tortoise, offset_from_tortoise, radius
 export AxionPotential, FreePotential, CosinePotential, QuarticPotential, ChiralPotential
 export BoundMode, ModeSet, FourierComponent, fundamental_channels
 export AngularGrid, polar_harmonic, mixing_matrix
-export FieldQuadrature, nonlinear_source, reconstruct_field
+export FieldQuadrature, PhaseGrid, rank1_lattice, nonlinear_source, reconstruct_field
 export HorizonSeries, OuterSeries, endpoint_values, outer_wavenumber
 export OuterBoundary, IntegratedOuterData, integrated_outer_values, is_propagating, uses_integrated_data, gauss_legendre_integrate
 export RadialMesh, DomainEstimate, domain_estimate, RadialProblem, solve_radial, RadialSolution, profiles, slopes, mode_frequencies, growth_rates

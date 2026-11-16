@@ -198,7 +198,8 @@ one problem serves a whole time evolution.
 
 Keyword arguments: `driven_growth_rule` (`:conjugate` default, `:signed`, `:zero`; the imaginary
 part given to driven components, see `component_frequencies`), `mesh` (default `RadialMesh(background)`), `n_polar`,
-`n_phase` (quadrature sizes), `horizon_order` (default 3) and `outer_order`
+`n_phase` (quadrature sizes), `phase_grid` (a `PhaseGrid` replacing the tensor
+grid of `n_phase` points per mode, for example a `rank1_lattice` rule), `horizon_order` (default 3) and `outer_order`
 (default 7) for the asymptotic expansions, `outer_boundary` (an `OuterBoundary`;
 how propagating components get their endpoint data) and the shorthand
 `outer_data = :integrated | :series` overriding its `data` field.
@@ -219,10 +220,11 @@ end
 
 function RadialProblem(background::KerrBackground{T}, potential::AxionPotential, mass_coupling, mode_set::ModeSet;
                        mesh::RadialMesh=RadialMesh(background), n_polar::Int=12, n_phase::Int=16,
-                       horizon_order::Int=3, outer_order::Int=7, outer_boundary::OuterBoundary=OuterBoundary(),
-                       outer_data::Union{Nothing, Symbol}=nothing, driven_growth_rule::Symbol=:conjugate) where {T}
+                       phase_grid::Union{Nothing, PhaseGrid}=nothing, horizon_order::Int=3, outer_order::Int=7,
+                       outer_boundary::OuterBoundary=OuterBoundary(), outer_data::Union{Nothing, Symbol}=nothing,
+                       driven_growth_rule::Symbol=:conjugate) where {T}
     driven_growth_weights(first(mode_set.components), driven_growth_rule)   # validates the rule name
-    quadrature = FieldQuadrature(mode_set; n_polar, n_phase)
+    quadrature = FieldQuadrature(mode_set; n_polar, n_phase, phase_grid)
     mixing = [mixing_matrix(quadrature.angular, mode_set, index) for index in 1:n_components(mode_set)]
     if outer_data !== nothing
         outer_boundary = OuterBoundary(; data=outer_data, include_bound=outer_boundary.include_bound,

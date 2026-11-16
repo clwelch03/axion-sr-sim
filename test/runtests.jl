@@ -164,6 +164,40 @@ end
                           nonlinear_source(quadrature, potential, background, 0.3, s - step, profiles)) ./ 2step rtol=1e-7
 end
 
+@testset "Rank-1 lattice phase rule" begin
+    # The equal-weight average of e^{ik·ξ} over the lattice is 1 exactly when k·z ≡ 0 (mod M).
+    points = rank1_lattice([1, 13], 85)
+    for k in ([0, 0], [1, 0], [3, -2], [13, -1], [-6, 6], [85, 0])
+        @test sum(cis(sum(k .* point)) for point in eachcol(points)) / 85 ≈ (mod(13k[2] + k[1], 85) == 0) atol=1e-13
+    end
+    # The point-list constructor reproduces the tensor grid when given the tensor points.
+    mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)])
+    tensor = AC.PhaseGrid(8, mode_set)
+    axis = 2pi .* (0:7) ./ 8
+    listed = AC.PhaseGrid(reduce(hcat, [[first, second] for first in axis for second in axis]), mode_set)
+    @test sort(vec(listed.synthesis)) == sort(vec(tensor.synthesis))
+    @test listed.sum_slot == tensor.sum_slot && listed.difference_conjugated == tensor.difference_conjugated
+    # For the quartic potential h = Φ³/6 the source contains harmonics |k|₁ ≤ 9 and h′ harmonics |k|₁ ≤ 6, so a
+    # lattice without aliases of order |d|₁ ≤ 12 (z = (1, 13), M = 85) gives the same source and Jacobian as the
+    # tensor grid with 16 points per mode, with 85 points instead of 256.
+    background = KerrBackground(0.9)
+    lattice = FieldQuadrature(mode_set; n_polar=8, phase_grid=AC.PhaseGrid(points, mode_set))
+    reference = FieldQuadrature(mode_set; n_polar=8, n_phase=16)
+    profiles = [0.3 * cis(0.7index) / index for index in 1:AC.n_channels(mode_set)]
+    potential = QuarticPotential(1.0)
+    @test nonlinear_source(lattice, potential, background, 0.3, 4.0, profiles) ≈
+          nonlinear_source(reference, potential, background, 0.3, 4.0, profiles) rtol=1e-13
+    lattice_jacobian = AC.nonlinear_source_jacobian(lattice, potential, background, 0.3, 4.0, profiles)
+    reference_jacobian = AC.nonlinear_source_jacobian(reference, potential, background, 0.3, 4.0, profiles)
+    @test lattice_jacobian.wrt_real ≈ reference_jacobian.wrt_real rtol=1e-13
+    @test lattice_jacobian.wrt_imag ≈ reference_jacobian.wrt_imag rtol=1e-13
+    @test_throws ArgumentError AC.PhaseGrid(rank1_lattice([1, 13, 5], 85), mode_set)
+    # A problem built with the lattice keeps it through with_background.
+    mesh = RadialMesh(background; rstar_min=-30.0, rstar_max=60.0, step=1.0)
+    problem = RadialProblem(background, potential, 0.3, mode_set; mesh, n_polar=8, phase_grid=lattice.phase)
+    @test AC.n_points(with_background(problem, KerrBackground(0.85), 0.29).quadrature.phase) == 85
+end
+
 @testset "Dual-number source against finite differences" begin
     # Independent of `nonlinearity_derivative`: central differences of the plain kernel in α, spin, offset and profiles.
     mode_set = ModeSet([BoundMode(2, 1, 1), BoundMode(3, 2, 2)]; n_angular=2)

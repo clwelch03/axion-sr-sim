@@ -42,7 +42,7 @@ arguments = compact ? ARGS[2:end] : ARGS
 from_log = endswith(arguments[1], ".out")
 prefix = from_log ? replace(basename(arguments[1]), r"-[0-9]+\.out$" => "") : arguments[1]
 output_path = length(arguments) ≥ 2 ? arguments[2] :
-              joinpath(@__DIR__, "..", "plots", prefix * (from_log ? "_partial" : "") * (compact ? "_compact" : "") * ".png")
+              joinpath(@__DIR__, "..", "plots", gev_file_name(prefix * (from_log ? "_partial" : "") * (compact ? "_compact" : "") * ".png"))
 planck_mass_gev = 1.2209e19
 
 if from_log
@@ -106,7 +106,7 @@ end
 # repo palette (main: src/common/plotstyle.py): |211⟩ green, |322⟩ blue, neutral ink
 mode_211_color, mode_322_color, ink = colorant"#3DAE2B", colorant"#00A0DF", colorant"#0b0b0b"
 grid = (:black, 0.06)
-figure = compact ? Figure(size=(900, 850), fontsize=20, figure_padding=(16, 48, 16, 16)) :   # right room for the last tick label
+figure = compact ? Figure(size=(900, 850), fontsize=22, figure_padding=(16, 48, 16, 16)) :   # right room for the last tick label
           Figure(size=(1300, 1000), fontsize=15)
 line_width = compact ? 2.5 : 2
 potential_label = display_label(potential_name(prefix))
@@ -117,7 +117,8 @@ title = compact ?
         "(f_a/M_Pl = $(scientific(decay_constant_ratio))), $potential_label, equal initial occupations" *
         (!from_log && parent_prefix != prefix ? "\nrun to t = $(scientific(restart_time; digits=3)) M₀ joined with its restart" : "") *
         (from_log ? "\nin progress: Slurm log to t = $(scientific(times[end]; digits=3)) M₀ (amplitudes, not occupations)" : "")
-Label(figure[0, compact ? 1 : (1:2)], title; fontsize=compact ? 20 : 17, color=ink, halign=:left, tellwidth=false)
+# compact: the parameters are the occupation panel's title (below), with no line above the figure
+compact || Label(figure[0, 1:2], title; fontsize=17, color=ink, halign=:left, tellwidth=false)
 
 # peak: first time within 0.1% of the maximum, so a run that saturates (no peak) centres on the start of the plateau
 # instead of on a 1e-7 wiggle along it
@@ -127,7 +128,7 @@ log_time_axis = times[end] > 30times[peak_index]
 windows = ((log_time_axis ? times[2] : times[1], times[end], log_time_axis ? "Whole run (log time)" : "Whole run"),
            log_time_axis ? (0.1times[end], times[end], "Last decade (linear time)") :
            (max(times[1], times[peak_index] - 0.08span), min(times[end], times[peak_index] + 0.12span), "Around the |211⟩ peak"))
-compact && (windows = (windows[1],))
+compact && (windows = ((windows[1][1], windows[1][2], title),))
 for (column_index, (time_min, time_max, window_title)) in enumerate(windows)
     shown = time_min .≤ times .≤ time_max
     first_column = column_index == 1
@@ -145,6 +146,7 @@ for (column_index, (time_min, time_max, window_title)) in enumerate(windows)
     decade_step = max(1, cld(length(decades), 6))
     decade_ticks = [10.0^n for n in decades if mod(n, decade_step) == 0]
     axis_occupation = Axis(figure[1, column_index]; yscale=log10, title=window_title, titlealign=:left, xscale=time_scale,
+                           titlefont=compact ? :regular : :bold,
                            yticks=(decade_ticks, [rich("10", superscript(replace(string(round(Int, log10(v))), "-" => "−"))) for v in decade_ticks]),
                            ylabel=!first_column ? "" : from_log ? L"amplitude $A_i$" : L"occupation $\mathcal{N}_i$  [$f_a^2 M_0^2$]",
                            xgridcolor=grid, ygridcolor=grid)

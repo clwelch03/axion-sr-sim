@@ -1,0 +1,9 @@
+evaluation 200: t = 3.668681e+08, N = (0.153499, 3.00317e-06), 112 s
+evaluation 400: t = 6.303424e+08, N = (353.085, 1.39444e-05), 224 s
+evaluation 600: t = 6.622801e+08, N = (846.744, 0.0307268), 332 s
+evaluation 800: t = 6.779814e+08, N = (529.705, 294.555), 443 s
+evaluation 1000: t = 7.717267e+08, N = (105.09, 201.648), 554 s
+evaluation 1200: t = 1.853408e+09, N = (70.3523, 102.144), 664 s
+The solver successfully reached the end of the integration interval. 1369 rhs evaluations in 758 s, 460 saved states
+final: t = 1.000e+10, N = (15.6205, 29.8337), a = 0.87615, M/M0 = 0.997036
+wrote /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/scripts/../results/leaver_spindown_a0.9_alpha0.3_fa3e-3_quartic1_witte_lsoda_diagnostics.csv

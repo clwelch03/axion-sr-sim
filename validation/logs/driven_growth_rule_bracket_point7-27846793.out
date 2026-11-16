@@ -1,0 +1,23 @@
+
+====================================================================================================
+P7 largest A2, spindown a0=0.99 fa=3e-3
+  from spindown_a0.99_alpha0.3_fa3e-3_diagnostics.csv (max_A2): τ = 3.772102e+08, a = 0.979335, b = 0.997083, α = 0.299125, cosine; spindown-driver mesh of a₀ = 0.99
+  A = (1.3161000348e-02, 4.2938550487e-05)
+  rule conjugate (76 s; continuation from cold; Newton iterations in last solve 7)
+    q=(-1,2): Re ω̃_q − α = 6.227170e-04, Im ω̃_q = -7.3976e-08, ratio Im/gap = -1.188e-04
+    mode 1: ω = 0.295396727590  γ = -1.004165e-07  N = 4.671899e+02  L_N = +9.384662e-05  Ȧ = -1.484350e-09  (Ȧ/A = -1.127840e-07)
+    mode 2: ω = 0.297572100522  γ = +1.322028e-08  N = 5.227800e+02  L_N = -1.378682e-05  Ȧ = +1.062963e-13  (Ȧ/A = +2.475546e-09)
+  rule signed    (3 s; warm start from conjugate solution; Newton iterations in last solve 5)
+    q=(-1,2): Re ω̃_q − α = 6.227170e-04, Im ω̃_q = +1.2687e-07, ratio Im/gap = +2.037e-04
+    mode 1: ω = 0.295396727589  γ = -1.004195e-07  N = 4.671901e+02  L_N = +9.391027e-05  Ȧ = -1.485272e-09  (Ȧ/A = -1.128540e-07)
+    mode 2: ω = 0.297572100522  γ = +1.322516e-08  N = 5.227797e+02  L_N = -1.390797e-05  Ȧ = +1.112385e-13  (Ȧ/A = +2.590645e-09)
+  rule zero      (1 s; warm start from conjugate solution; Newton iterations in last solve 4)
+    q=(-1,2): Re ω̃_q − α = 6.227170e-04, Im ω̃_q = +0.0000e+00, ratio Im/gap = +0.000e+00
+    mode 1: ω = 0.295396727602  γ = -1.004138e-07  N = 4.671900e+02  L_N = +9.383914e-05  Ȧ = -1.484209e-09  (Ȧ/A = -1.127732e-07)
+    mode 2: ω = 0.297572100527  γ = +1.322048e-08  N = 5.227799e+02  L_N = -1.381609e-05  Ȧ = +1.076129e-13  (Ȧ/A = +2.506208e-09)
+  relative difference signed vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = -2.15e-12   Δγ/γ = +3.05e-05   ΔN/N = +3.05e-07   ΔL_N/L_N = +6.78e-04   ΔȦ/Ȧ = +6.21e-04
+    mode 2: Δω/ω = +2.76e-12   Δγ/γ = +3.69e-04   ΔN/N = -5.46e-07   ΔL_N/L_N = +8.79e-03   ΔȦ/Ȧ = +4.65e-02
+  relative difference zero vs conjugate, (X_rule − X_conj)/X_conj:
+    mode 1: Δω/ω = +3.92e-11   Δγ/γ = -2.64e-05   ΔN/N = +1.28e-07   ΔL_N/L_N = -7.97e-05   ΔȦ/Ȧ = -9.51e-05
+    mode 2: Δω/ω = +1.88e-11   Δγ/γ = +1.51e-05   ΔN/N = -1.48e-07   ΔL_N/L_N = +2.12e-03   ΔȦ/Ȧ = +1.24e-02

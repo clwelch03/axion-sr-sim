@@ -1,0 +1,17 @@
+
+[815160] signal 15: Terminated
+in expression starting at /global/scratch/projects/pc_heptheory/clwelch/axion-sr-sim/validation/domain_actions_check.jl:130
+pthread_cond_wait at /lib64/libpthread.so.0 (unknown line)
+uv_cond_wait at /workspace/srcdir/libuv/src/unix/thread.c:822
+ijl_task_get_next at /cache/build/builder-amdci4-4/julialang/julia-ci/src/scheduler.c:599
+wait at ./task.jl:1296
+#wait#392 at ./condition.jl:141
+wait at ./condition.jl:136 [inlined]
+_trywait at ./asyncevent.jl:186
+profile_printing_listener at ./Base.jl:335
+#start_profile_listener##0 at ./Base.jl:355
+jfptr_YY.start_profile_listenerYY.YY.0_13562.1 at /global/home/users/clwelch/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/lib/julia/sys.so (unknown line)
+jl_apply at /cache/build/builder-amdci4-4/julialang/julia-ci/src/julia.h:2318 [inlined]
+start_task at /cache/build/builder-amdci4-4/julialang/julia-ci/src/task.c:1285
+unknown function (ip: (nil)) at (unknown file)
+_ZN4llvm9MemorySSAD1Ev at /global/home/users/clwelch/.julia/juliaup/julia-1.13.0+0.x64.linux.gnu/bin/../lib/julia/libLLVM.so.20.1jl (unknown line)

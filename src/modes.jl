@@ -136,12 +136,36 @@ Complex frequency of each component, `ω̃_q = q·ω + i Σ_i |q_i| γ_i` with
 `ω̃_i = ω_i + iγ_i`. A component containing `conj(φ_i)` (`q_i < 0`) carries
 `ω̃_i*`, so it grows with `γ_i` rather than decaying: `φ₁²φ₂*` has `2ω̃₁ − ω̃₂*`.
 Real per-mode frequencies give the real `q·ω`.
+
+The optional `rule` (`:conjugate` default, `:signed`, `:zero`) selects the imaginary part of
+driven components, see `driven_growth_weights`; it is a prescription, not a derived result.
 """
-component_frequencies(mode_set::ModeSet, mode_frequencies::AbstractVector{<:Real}) =
+component_frequencies(mode_set::ModeSet, mode_frequencies::AbstractVector{<:Real}, rule::Symbol=:conjugate) =
     [sum(component.q .* mode_frequencies) for component in mode_set.components]
-component_frequencies(mode_set::ModeSet, mode_frequencies::AbstractVector) =
-    [complex(sum(component.q .* real.(mode_frequencies)), sum(abs.(component.q) .* imag.(mode_frequencies)))
-     for component in mode_set.components]
+function component_frequencies(mode_set::ModeSet, mode_frequencies::AbstractVector, rule::Symbol=:conjugate)
+    real_parts, growth_rates = real.(mode_frequencies), imag.(mode_frequencies)
+    map(mode_set.components) do component
+        imaginary_part = driven_growth_weights(component, rule) ⋅ growth_rates
+        complex(sum(component.q .* real_parts), imaginary_part)
+    end
+end
+
+"""
+    driven_growth_weights(component, rule)
+
+Weights `w_i` in `Im ω̃_q = Σ_i w_i γ_i` for the component with integer vector `q`. The rule is a
+prescription for the imaginary part of the *driven* components; fundamental components
+(`Σ|q_i| = 1`) always carry their own eigenvalue, `w_i = q_i`. For driven components:
+`:conjugate` gives `|q_i|` (a component containing `conj(φ_i)` grows with `γ_i`), `:signed`
+gives `q_i` (`ω̃_q = q·ω̃`), `:zero` gives 0 (real frequency `q·ω`).
+"""
+function driven_growth_weights(component::FourierComponent, rule::Symbol)
+    is_fundamental(component) && return float.(component.q)
+    rule === :conjugate && return float.(abs.(component.q))
+    rule === :signed && return float.(component.q)
+    rule === :zero && return zeros(length(component.q))
+    throw(ArgumentError("driven-component growth rule must be :conjugate, :signed or :zero, got :$rule"))
+end
 
 Base.show(io::IO, mode::BoundMode) = print(io, "|", mode.n, mode.l, mode.m, "⟩")
 function Base.show(io::IO, mode_set::ModeSet)

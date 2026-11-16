@@ -115,7 +115,7 @@ end
 """Right-hand side as a real node block, with the mode frequencies given as interleaved reals."""
 function rhs_block(problem::RadialProblem, s, block::AbstractVector, frequency_reals::AbstractVector, scale)
     state = NodeState(block)
-    frequencies = component_frequencies(problem.mode_set, _complexify(frequency_reals))
+    frequencies = component_frequencies(problem.mode_set, _complexify(frequency_reals), problem.driven_growth_rule)
     dR, dQ = radial_rhs(problem, s, state.profiles, state.slopes, frequencies, scale)
     return node_block(NodeState(dR, dQ))
 end
@@ -156,7 +156,7 @@ function boundary_residual(problem::RadialProblem, layout::UnknownLayout, side::
                            parameter_block::AbstractVector, amplitudes::AbstractVector, scale)
     mode_set, background, mass_coupling = problem.mode_set, problem.background, problem.mass_coupling
     parameters = RadialParameters(layout, parameter_block, amplitudes, scale)
-    frequencies = component_frequencies(mode_set, parameters.mode_frequencies)
+    frequencies = component_frequencies(mode_set, parameters.mode_frequencies, problem.driven_growth_rule)
     state = NodeState(block)
     offset = side == :horizon ? problem.mesh.offsets[1] : problem.mesh.offsets[end]
 
@@ -249,7 +249,7 @@ function rhs_derivatives(problem::RadialProblem, s, block::AbstractVector, frequ
     background, mode_set, mass_coupling = problem.background, problem.mode_set, problem.mass_coupling
     state = NodeState(block)
     mode_frequencies = _complexify(frequency_reals)
-    frequencies = component_frequencies(mode_set, mode_frequencies)
+    frequencies = component_frequencies(mode_set, mode_frequencies, problem.driven_growth_rule)
     a = background.a
     r = radius(background, s)
     horizon_function, sum_r2a2 = delta(background, s), r2a2(background, s)
@@ -283,13 +283,14 @@ function rhs_derivatives(problem::RadialProblem, s, block::AbstractVector, frequ
                 other_channel == channel && (factor += delta_B)
                 _add_complex_block!(wrt_state, 4channel - 1, 4other_channel - 3, -factor / sum_r2a2^2)
             end
-            # ∂(forcing)/∂ω̃_q, then chain through ω̃_q = Σ_i q_i ω_i + i Σ_i |q_i| γ_i.
+            # ∂(forcing)/∂ω̃_q, then chain through ω̃_q = Σ_i q_i ω_i + i Σ_i w_i γ_i, with w_i from `driven_growth_weights`.
             forcing_wrt_frequency = (2sum_r2a2 * (sum_r2a2 * frequency - a * m) + horizon_function * (2a * m - 2a^2 * frequency)) *
                                     state.profiles[channel] + horizon_function * 2a^2 * frequency * coupled[local_index]
+            growth_weights = driven_growth_weights(component, problem.driven_growth_rule)
             for mode_index in eachindex(component.q)
                 wrt_component_frequency = -forcing_wrt_frequency / sum_r2a2^2
                 wrt_real_part = wrt_component_frequency * component.q[mode_index]
-                wrt_imag_part = im * wrt_component_frequency * abs(component.q[mode_index])
+                wrt_imag_part = im * wrt_component_frequency * growth_weights[mode_index]
                 wrt_frequencies[4channel - 1, 2mode_index - 1] = real(wrt_real_part)
                 wrt_frequencies[4channel, 2mode_index - 1] = imag(wrt_real_part)
                 wrt_frequencies[4channel - 1, 2mode_index] = real(wrt_imag_part)

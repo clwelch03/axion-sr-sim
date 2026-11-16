@@ -44,7 +44,7 @@ function single_mode_frequencies(problem::RadialProblem)
     map(mode_set.modes) do mode
         single = RadialProblem(problem.background, FreePotential(), mass_coupling, ModeSet([mode]); mesh=problem.mesh,
                                horizon_order=problem.horizon_order, outer_order=problem.outer_order,
-                               outer_boundary=problem.outer_boundary)
+                               outer_boundary=problem.outer_boundary, driven_growth_rule=problem.driven_growth_rule)
         solution = solve_radial(single, [one(mass_coupling)])
         solution.converged ? mode_frequencies(solution)[1] : complex(hydrogenic_frequency(mode, mass_coupling))
     end
